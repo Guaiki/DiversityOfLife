@@ -14,6 +14,7 @@ import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
 public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> {
+
     private final ModelPart Bandedpalmcivetkit;
 
     private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
@@ -23,7 +24,7 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
     }
 
     public static LayerDefinition createBodyLayer() {
-        // ... (Tu definición de capas queda IGUAL, no la toques) ...
+
         MeshDefinition meshdefinition = new MeshDefinition();
         PartDefinition partdefinition = meshdefinition.getRoot();
 

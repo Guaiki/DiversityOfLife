@@ -10,4 +10,8 @@ public class ModelLayers {
 
     public static final ModelLayerLocation CIVET_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "civet"), "main");
     public static final ModelLayerLocation CIVET_BABY_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "baby_civet"), "main");
+
+    public static final ModelLayerLocation SQUIRREL_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "squrriel"), "main");
+    public static final ModelLayerLocation SQUIRREL_BABY_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "baby_squrriel"), "main");
+
 }

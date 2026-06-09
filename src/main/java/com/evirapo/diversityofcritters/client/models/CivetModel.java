@@ -164,7 +164,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 				this.BandedPlamCivet.y += 4.0F;
 				this.Head.xRot -= 0.3F;
 			} else {
-				// --- locomoción terrestre con blending ---
 				boolean busyBodyAnim = entity.isScratching() || entity.isCleaning()
 				                   || entity.IsDrinking()    || entity.isDigging()
 				                   || entity.isVariantActive;
@@ -250,9 +249,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 		return BandedPlamCivet;
 	}
 
-	// --- Helpers de blending ---
-
-	/** Reproduce una AnimationState escalando la amplitud por {@code weight} (0..1). */
 	private void animateWithWeight(AnimationState state, AnimationDefinition definition,
 	                               float ageInTicks, float weight) {
 		state.updateTime(ageInTicks, 1.0F);
@@ -260,7 +256,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 				this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
 	}
 
-	/** Versión con peso de {@code animateWalk}: escala la amplitud final por {@code weight}. */
 	private void animateWalkWithWeight(AnimationDefinition definition,
 	                                   float limbSwing, float limbSwingAmount,
 	                                   float speed, float intensity, float weight) {

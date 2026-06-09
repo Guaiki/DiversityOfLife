@@ -1,0 +1,1027 @@
+package com.evirapo.diversityofcritters.common.entity.custom;
+
+import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import com.evirapo.diversityofcritters.common.entity.ai.*;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.misc.tags.DoCTags;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.ForgeMod;
+import net.minecraftforge.event.ForgeEventFactory;
+import net.minecraftforge.fluids.FluidType;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.function.Predicate;
+
+/**
+ * Squirrel entity. Misma arquitectura del Civet (climbing, sleep, taming,
+ * hunger/thirst, idle variants, cry) SIN scratching ni digging, y con tres
+ * sistemas nuevos: Gliding, Eating Plants y Holding Item.
+ */
+public class SquirrelEntity extends DiverseCritter {
+
+    // --- ANIMATION STATES ---
+    public final AnimationState idleAnimationState   = new AnimationState();
+    public final AnimationState idleStandUpState     = new AnimationState();
+    public final AnimationState idleSniffLeftState   = new AnimationState();
+    public final AnimationState idleSniffRightState  = new AnimationState();
+    public final AnimationState idleSitStartingState = new AnimationState();
+    public final AnimationState idleSitState         = new AnimationState();
+    public final AnimationState idleSitEndingState   = new AnimationState();
+    public final AnimationState idleLayStartingState = new AnimationState();
+    public final AnimationState idleLayState         = new AnimationState();
+    public final AnimationState idleLayEndingState   = new AnimationState();
+    public final AnimationState climbIdleState       = new AnimationState();
+    public final AnimationState climbingUpState      = new AnimationState();
+    public final AnimationState climbingDownState    = new AnimationState();
+    public final AnimationState drinkStartingState   = new AnimationState();
+    public final AnimationState drinkIdleState       = new AnimationState();
+    public final AnimationState drinkEndingState     = new AnimationState();
+    public final AnimationState cleanStartingState   = new AnimationState();
+    public final AnimationState cleanIdleState       = new AnimationState();
+    public final AnimationState cleanEndingState     = new AnimationState();
+    public final AnimationState preparingCryState    = new AnimationState();
+    public final AnimationState cryingState          = new AnimationState();
+    public final AnimationState stoppingCryState     = new AnimationState();
+    public final AnimationState swimAnimationState   = new AnimationState();
+    public final AnimationState glideState            = new AnimationState();
+    public final AnimationState eatPlantStartingState = new AnimationState();
+    public final AnimationState eatPlantIdleState     = new AnimationState();
+    public final AnimationState eatPlantEndingState   = new AnimationState();
+
+    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
+
+    // --- SYNCED DATA ---
+    private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> IS_GLIDING = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_EATING_PLANT = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<ItemStack> EATING_ITEM = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.ITEM_STACK);
+
+    public static final byte CLIMB_NONE = 0;
+    public static final byte CLIMB_UP   = 1;
+    public static final byte CLIMB_DOWN = 2;
+    public static final byte CLIMB_HANG = 3;
+
+    // --- VARIABLES ---
+    public int idleVariantCooldown = 0;
+    private LookForFoodItems forFoodGoal;
+    private int tamingFeedsLeft = 0;
+    private int cryTimer = 0;
+    private int stopCryTimer = 0;
+    private boolean wasCryingClient = false;
+
+    private IdleVariant prevClientVariant = IdleVariant.NONE;
+    private int clientIdleTick = 0;
+
+    private boolean prevCleaningClient = false;
+    private int clientCleanTick = 0;
+
+    private boolean prevDrinkingClient = false;
+    private int clientDrinkTick = 0;
+    private int clientDrinkEndingTick = 0;
+
+    private boolean prevEatingPlantClient = false;
+    private int clientEatPlantTick = 0;
+    private int clientEatPlantEndingTick = 0;
+
+    private boolean climbRewardArmed = false;
+    private int climbRewardCooldown = 0;
+
+    /** Progreso de sprint (0 = walk, 1 = run), interpolado en el cliente. */
+    public float sprintProgress = 0.0F;
+
+    /** True mientras una variante idle esté activa. */
+    public boolean isVariantActive = false;
+
+    private int postDescentCooldown = 0;
+    private static final int POST_DESCENT_COOLDOWN = 20;
+
+    /** Cooldown post-glide: evita que el aterrizaje del planeo re-dispare el climb
+     *  (misma clase de bug que requirió postDescentCooldown en el Civet). */
+    private int postGlideCooldown = 0;
+    private static final int POST_GLIDE_COOLDOWN = 20;
+
+    private boolean cachedHasClimbable = false;
+
+    public boolean isBeingCleaned = false;
+
+    public SquirrelEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
+        super(pEntityType, pLevel);
+        this.setMaxUpStep(1);
+        this.moveControl = new SquirrelMoveControl(this);
+        this.idleAnimationState.start(0);
+    }
+
+    // --- SETUP ---
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(CLIMB_STATE, CLIMB_NONE);
+        this.entityData.define(CLIMB_FACING_YAW, 0.0F);
+        this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
+        this.entityData.define(IS_GLIDING, false);
+        this.entityData.define(IS_EATING_PLANT, false);
+        this.entityData.define(EATING_ITEM, ItemStack.EMPTY);
+    }
+
+    public static AttributeSupplier.Builder createAttributes() {
+        return Mob.createMobAttributes()
+                .add(Attributes.MAX_HEALTH, 8.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.25D)
+                .add(Attributes.ATTACK_DAMAGE, 1.0D)
+                .add(Attributes.FOLLOW_RANGE, 16.0D);
+    }
+
+    protected PathNavigation createNavigation(Level pLevel) {
+        return new SquirrelNavigation(this, pLevel);
+    }
+
+    // --- GOALS ---
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+
+        this.goalSelector.addGoal(0, new CustomFloatGoal(this));
+        this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
+
+        this.goalSelector.addGoal(2, new SquirrelGlideGoal(this));
+
+        this.goalSelector.addGoal(3, new BabyCryGoal(this));
+        this.goalSelector.addGoal(3, new FindCryingBabyGoal(this, 1.4D, 24.0D));
+        this.goalSelector.addGoal(4, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(5, new NaturalMateGoal(this, 1.0D));
+
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SQUIRREL_FOOD), false));
+
+        this.goalSelector.addGoal(7, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
+            @Override public boolean canUse() { return isFollowing() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
+        });
+
+        this.goalSelector.addGoal(8, new SquirrelCleanGoal(this));
+        this.goalSelector.addGoal(9, new SquirrelMotherCleanBabyGoal(this, 1.2D, 16.0D));
+        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.SQUIRREL_FOOD);
+        this.goalSelector.addGoal(10, this.forFoodGoal);
+
+        this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
+
+        this.goalSelector.addGoal(14, new SquirrelEatPlantGoal(this, 1.1D, 12));
+
+        this.goalSelector.addGoal(16, new SquirrelClimbGoal(this));
+
+        this.goalSelector.addGoal(17, new SquirrelIdleGoal(this));
+        this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
+            @Override public boolean canUse() {
+                boolean canWander = !isTame() || isWandering();
+                return canWander && super.canUse();
+            }
+        });
+        this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
+
+        // Sin targetSelector: el squirrel es herbívoro, no caza.
+    }
+
+    private static byte toByte(IdleVariant v){
+        return switch (v) {
+            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
+            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
+        };
+    }
+    private static IdleVariant fromByte(byte b){
+        return switch (b) {
+            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
+            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
+            default -> IdleVariant.NONE;
+        };
+    }
+    public void setIdleVariant(IdleVariant v){ this.entityData.set(IDLE_VARIANT, toByte(v)); }
+    public IdleVariant getIdleVariant(){ return fromByte(this.entityData.get(IDLE_VARIANT)); }
+
+    @Override
+    public void tick() {
+        super.tick();
+
+        if (!this.level().isClientSide) {
+            this.updateClimbState();
+
+            // Failsafe del glide: independientemente del goal, tocar suelo o agua
+            // SIEMPRE cancela el planeo (y arma los cooldowns anti re-climb).
+            if (this.isGliding() && (this.onGround() || this.isInWaterOrBubble())) {
+                this.setGliding(false);
+            }
+
+            boolean isNewborn = this.isNewborn();
+            double desiredSpeed = isNewborn ? 0.1D : 0.25D;
+            float desiredStep   = isNewborn ? 0.5F : 1.0F;
+
+            if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
+                this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);
+            }
+            if (this.maxUpStep() != desiredStep) {
+                this.setMaxUpStep(desiredStep);
+            }
+
+            if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
+
+            if (this.isNewborn() && this.getHunger() < 3000) {
+                if (!this.isCrying()) {
+                    this.setCrying(true);
+                    this.playSound(SoundEvents.FOX_SCREECH, 0.4F, 2.0F);
+                }
+                if (this.tickCount % 80 == 0) {
+                    this.playSound(SoundEvents.FOX_SCREECH, 0.4F, 2.0F);
+                }
+            } else {
+                if (this.isCrying()) {
+                    this.setCrying(false);
+                }
+            }
+        }
+
+        if (IsDrinking() && getDrinkPos() != null) {
+            BlockPos washingPos = getDrinkPos();
+            if (this.distanceToSqr(washingPos.getX() + 0.5D, washingPos.getY() + 0.5D, washingPos.getZ() + 0.5D) < 3) {
+                if (this.getRandom().nextInt(3)==0){
+                    for (int j = 0; j < 4; ++j) {
+                        double d2 = this.random.nextDouble()/2;
+                        double d3 = this.random.nextDouble()/2;
+                        Vec3 v = this.getDeltaMovement();
+                        this.level().addParticle(ParticleTypes.SPLASH, washingPos.getX() + d2, washingPos.getY() + 0.8F, washingPos.getZ() + d3, v.x, v.y, v.z);
+                    }
+                }
+            } else {
+                setIsDrinking(false);
+            }
+        }
+
+        if (this.level().isClientSide) {
+            IdleVariant currentVariant = getIdleVariant();
+
+            if (currentVariant != prevClientVariant) {
+                this.clientIdleTick = 0;
+                this.prevClientVariant = currentVariant;
+            }
+            if (currentVariant != IdleVariant.NONE) {
+                this.clientIdleTick++;
+            }
+
+            boolean currentCleaning = isCleaning();
+            if (currentCleaning != prevCleaningClient) {
+                this.clientCleanTick = 0;
+                this.prevCleaningClient = currentCleaning;
+            }
+            if (currentCleaning) {
+                this.clientCleanTick++;
+            }
+
+            boolean currentDrinking = IsDrinking();
+            if (currentDrinking && !prevDrinkingClient) {
+                this.clientDrinkTick = 0;
+                this.clientDrinkEndingTick = 0;
+            } else if (!currentDrinking && prevDrinkingClient) {
+                this.clientDrinkEndingTick = 1;
+                this.clientDrinkTick = 0;
+            }
+            if (currentDrinking) {
+                this.clientDrinkTick++;
+            } else if (this.clientDrinkEndingTick > 0) {
+                this.clientDrinkEndingTick++;
+                if (this.clientDrinkEndingTick > 6) {
+                    this.clientDrinkEndingTick = 0;
+                }
+            }
+            this.prevDrinkingClient = currentDrinking;
+
+            // --- Eating plant: máquina de 3 fases en cliente ---
+            // Anims: Eating (starting) 0.25s ≈ 5 ticks | Eating loop | Eating (ending) 0.25s ≈ 5 ticks
+            boolean currentEatingPlant = isEatingPlant();
+            if (currentEatingPlant && !prevEatingPlantClient) {
+                this.clientEatPlantTick = 0;
+                this.clientEatPlantEndingTick = 0;
+            } else if (!currentEatingPlant && prevEatingPlantClient) {
+                this.clientEatPlantEndingTick = 1;
+                this.clientEatPlantTick = 0;
+            }
+            if (currentEatingPlant) {
+                this.clientEatPlantTick++;
+            } else if (this.clientEatPlantEndingTick > 0) {
+                this.clientEatPlantEndingTick++;
+                if (this.clientEatPlantEndingTick > 6) {
+                    this.clientEatPlantEndingTick = 0;
+                }
+            }
+            this.prevEatingPlantClient = currentEatingPlant;
+
+            if (this.isSprinting()) {
+                this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
+            } else {
+                this.sprintProgress = Math.max(0.0F, this.sprintProgress - 0.1F);
+            }
+
+            setupAnimationStatesClient();
+            handleCryingAnimationClient();
+        }
+    }
+
+    @Override
+    public void aiStep() {
+        ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
+
+        if (!stack.isEmpty() && stack.is(DoCTags.Items.SQUIRREL_FOOD) && !this.isNewborn()) {
+            this.setHunger(this.maxHunger());
+
+            var foodProps = stack.isEdible() ? stack.getFoodProperties(this) : null;
+            if (foodProps != null) {
+                this.heal((float) foodProps.getNutrition());
+            } else {
+                this.heal(1.0F);
+            }
+
+            this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, stack), this.getX(), this.getY(), this.getZ(), 0.0, 0.0, 0.0);
+            this.level().playSound(null, this.blockPosition(), SoundEvents.GENERIC_EAT, SoundSource.AMBIENT);
+
+            stack.shrink(1);
+            if (stack.isEmpty()) {
+                this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
+            }
+        }
+
+        if (isHungry() && !this.isNewborn() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
+
+        super.aiStep();
+
+        if (!this.level().isClientSide && this.climbRewardCooldown > 0) {
+            this.climbRewardCooldown--;
+        }
+
+        if (!this.level().isClientSide) {
+            if (this.isClimbing()) {
+                this.climbRewardArmed = true;
+            } else if (this.climbRewardArmed && this.onGround() && this.climbRewardCooldown <= 0) {
+                this.setEnrichment(this.maxEnrichment());
+                this.climbRewardArmed = false;
+                this.climbRewardCooldown = 20;
+            }
+        }
+    }
+
+    @Override
+    public void customServerAiStep() {
+        if (this.getMoveControl().hasWanted()) {
+            double d0 = this.getMoveControl().getSpeedModifier();
+            this.setPose(Pose.STANDING);
+            this.setSprinting(d0 >= 1.25D);
+        } else {
+            this.setPose(Pose.STANDING);
+            this.setSprinting(false);
+        }
+    }
+
+    // --- MOVEMENT & PHYSICS ---
+
+    @Override
+    public boolean causeFallDamage(float pFallDistance, float pMultiplier, DamageSource pSource) {
+        return false;
+    }
+
+    @Override
+    public int getMaxFallDistance() {
+        return this.cachedHasClimbable ? 16 : super.getMaxFallDistance();
+    }
+
+    @Override
+    public void jumpInFluid(FluidType type) {
+        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, 0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/3, 0.0D));
+    }
+
+    @Override
+    public void sinkInFluid(FluidType type) {
+        self().setDeltaMovement(self().getDeltaMovement().add(0.0D, -0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/6, 0.0D));
+    }
+
+    private void setupAnimationStatesClient() {
+        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
+        boolean swimming     = this.isInWaterOrBubble();
+        boolean climbing     = this.isClimbing();
+        boolean gliding      = this.isGliding();
+
+        IdleVariant v = getIdleVariant();
+        int ticksActive = this.clientIdleTick;
+
+        int sitStarting = 10;
+        int sitIdle     = 80;
+        int sitEnding   = 20;
+        int sitTotal    = sitStarting + sitIdle + sitEnding;
+
+        int layStarting = 20;
+        int layIdle     = 80;
+        int layEnding   = 20;
+        int layTotal    = layStarting + layIdle + layEnding;
+
+        boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
+
+        boolean isVariantPlaying = false;
+        if (!isOrderedSitPlaying) {
+            if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SNIFF_LEFT && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
+            else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
+            else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
+        }
+
+        boolean cleaning = isCleaning();
+        int cleanActive = this.clientCleanTick;
+        int cleanStart = 10;
+        int cleanLoop  = 60;
+        int cleanEnd   = 10;
+        int cleanTotal = cleanStart + cleanLoop + cleanEnd;
+
+        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal && !isOrderedSitPlaying;
+
+        boolean drinking = IsDrinking();
+        boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
+        boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
+        boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
+
+        boolean isDrinkPlaying  = (isDrinkStarting || isDrinkIdle || isDrinkEnding) && !isOrderedSitPlaying;
+
+        // --- Eating plant (3 fases) ---
+        boolean eatingPlant = isEatingPlant();
+        boolean isEatStarting = eatingPlant && this.clientEatPlantTick <= 5;
+        boolean isEatIdle     = eatingPlant && this.clientEatPlantTick > 5;
+        boolean isEatEnding   = !eatingPlant && this.clientEatPlantEndingTick > 0;
+
+        boolean isEatPlaying  = (isEatStarting || isEatIdle || isEatEnding) && !isOrderedSitPlaying;
+
+        boolean groundLocomotion = this.isAlive()
+                && !sleepingLike && !swimming && !climbing && !gliding
+                && !isOrderedSitPlaying && !isVariantPlaying;
+
+        this.isVariantActive = isVariantPlaying;
+        this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
+        this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
+
+        // --- Glide ---
+        this.glideState.animateWhen(gliding && this.isAlive(), this.tickCount);
+
+        this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP && isVariantPlaying, this.tickCount);
+        this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
+        this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
+
+        if (v == IdleVariant.SIT && isVariantPlaying) {
+            this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
+            this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
+            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount);
+        } else {
+            this.idleSitStartingState.stop();
+            this.idleSitState.stop();
+            this.idleSitEndingState.stop();
+        }
+
+        if (v == IdleVariant.LAY && isVariantPlaying) {
+            this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
+            this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
+            this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
+        } else {
+            this.idleLayStartingState.stop();
+            this.idleLayState.stop();
+            this.idleLayEndingState.stop();
+        }
+
+        if (isCleanPlaying) {
+            this.cleanStartingState.animateWhen(cleanActive <= cleanStart, this.tickCount);
+            this.cleanIdleState.animateWhen(cleanActive > cleanStart && cleanActive <= cleanStart + cleanLoop, this.tickCount);
+            this.cleanEndingState.animateWhen(cleanActive > cleanStart + cleanLoop, this.tickCount);
+        } else {
+            this.cleanStartingState.stop();
+            this.cleanIdleState.stop();
+            this.cleanEndingState.stop();
+        }
+
+        if (isDrinkPlaying) {
+            this.drinkStartingState.animateWhen(isDrinkStarting, this.tickCount);
+            this.drinkIdleState.animateWhen(isDrinkIdle, this.tickCount);
+            this.drinkEndingState.animateWhen(isDrinkEnding, this.tickCount);
+        } else {
+            this.drinkStartingState.stop();
+            this.drinkIdleState.stop();
+            this.drinkEndingState.stop();
+        }
+
+        if (isEatPlaying) {
+            this.eatPlantStartingState.animateWhen(isEatStarting, this.tickCount);
+            this.eatPlantIdleState.animateWhen(isEatIdle, this.tickCount);
+            this.eatPlantEndingState.animateWhen(isEatEnding, this.tickCount);
+        } else {
+            this.eatPlantStartingState.stop();
+            this.eatPlantIdleState.stop();
+            this.eatPlantEndingState.stop();
+        }
+
+        boolean climbUp   = this.isClimbingUp();
+        boolean climbDown = this.isClimbingDown();
+        boolean climbHang = this.isHanging();
+        this.climbingUpState.animateWhen(climbUp, this.tickCount);
+        this.climbingDownState.animateWhen(climbDown, this.tickCount);
+        this.climbIdleState.animateWhen(climbHang, this.tickCount);
+    }
+
+    @Override
+    public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
+        ItemStack itemstack = pPlayer.getItemInHand(pHand);
+
+        boolean isItemTamingFood = itemstack.is(DoCTags.Items.SQUIRREL_FOOD);
+        boolean isNurserBottle = itemstack.is(DOCItems.FILLED_NURSER_BOTTLE.get());
+
+        boolean canTameWithThis = false;
+        if (!this.isTame()) {
+            if (this.isBaby() && !this.isJuvenile()) {
+                canTameWithThis = isNurserBottle;
+            } else {
+                canTameWithThis = isItemTamingFood;
+            }
+        }
+
+        if (canTameWithThis) {
+            if (this.level().isClientSide()) {
+                return InteractionResult.CONSUME;
+            } else {
+                if (!pPlayer.getAbilities().instabuild) {
+                    if (isNurserBottle) {
+                        itemstack.hurtAndBreak(1, pPlayer, (p) -> p.broadcastBreakEvent(pHand));
+                    } else {
+                        itemstack.shrink(1);
+                    }
+                }
+                if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
+                this.tamingFeedsLeft--;
+                if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
+                    this.tame(pPlayer);
+                    this.navigation.recomputePath();
+                    this.setTarget(null);
+                    this.level().broadcastEntityEvent(this, (byte)7);
+                    this.setWandering(true);
+                    this.setOrderedToSit(false);
+                    this.setInSittingPose(true);
+                } else {
+                    this.level().broadcastEntityEvent(this, (byte)6);
+                }
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        if (isItemTamingFood && !this.isBaby()) {
+            if (this.getHunger() < this.maxHunger() || this.getHealth() < this.getMaxHealth()) {
+                if (!this.level().isClientSide()) {
+                    this.setHunger(this.maxHunger());
+
+                    var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
+                    if (foodProps != null) this.heal((float) foodProps.getNutrition());
+
+                    if (!pPlayer.getAbilities().instabuild) itemstack.shrink(1);
+                    this.level().broadcastEntityEvent(this, (byte) 7);
+                    this.gameEvent(GameEvent.EAT, this);
+                }
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return super.mobInteract(pPlayer, pHand);
+    }
+
+    private void triggerFoodSearch() {
+        if (this.isNewborn()) return;
+        if (this.forFoodGoal != null) {
+            this.forFoodGoal.trigger();
+        } else {
+            this.navigation.stop();
+            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.SQUIRREL_FOOD);
+            List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), predicate);
+            if (!list.isEmpty()) this.navigation.moveTo(list.get(0), 1.1);
+        }
+    }
+
+    @Override
+    public boolean canPickUpLoot() {
+        return !this.isNewborn();
+    }
+
+    @Override
+    public boolean wantsToPickUp(ItemStack pStack) {
+        return pStack.is(DoCTags.Items.SQUIRREL_FOOD);
+    }
+
+    @Override
+    public boolean isFood(ItemStack pStack) {
+        return false;
+    }
+
+    // --- HELPERS & CONFIG ---
+    @Override public int maxHunger() { return 4000; }
+    @Override public int maxThirst() { return 4000; }
+    @Override public int maxEnrichment() { return 4000; }
+    @Override public int maxHygiene() { return 4000; }
+    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
+    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
+    @Override protected boolean getDefaultDiurnal() { return true; }
+    @Override protected double getHungerLossPerSecond()     { return 3.33; }
+    @Override protected double getThirstLossPerSecond()     { return 5.0;  }
+    @Override protected double getEnrichmentLossPerSecond() { return 2.5;  }
+    @Override protected double getHygieneLossPerSecond()    { return 1.5;  }
+
+    // --- CLIMB ---
+    public byte getClimbState() { return this.entityData.get(CLIMB_STATE); }
+    public void setClimbState(byte state) {
+        byte prev = this.getClimbState();
+        this.entityData.set(CLIMB_STATE, state);
+        if (prev == CLIMB_DOWN && state == CLIMB_NONE) {
+            this.postDescentCooldown = POST_DESCENT_COOLDOWN;
+        }
+    }
+
+    public boolean isInPostDescentCooldown() {
+        return this.postDescentCooldown > 0;
+    }
+    public boolean isClimbing() { return getClimbState() != CLIMB_NONE; }
+    public boolean isClimbingUp() { return getClimbState() == CLIMB_UP; }
+    public boolean isClimbingDown() { return getClimbState() == CLIMB_DOWN; }
+    public boolean isHanging() { return getClimbState() == CLIMB_HANG; }
+
+    @Override
+    public boolean onClimbable() { return isClimbing(); }
+
+    // --- GLIDE ---
+    public boolean isGliding() { return this.entityData.get(IS_GLIDING); }
+
+    /** Al apagar el glide se arman AMBOS cooldowns (postGlide + postDescent):
+     *  triple protección contra el re-trigger del climb al aterrizar. */
+    public void setGliding(boolean gliding) {
+        boolean prev = this.isGliding();
+        this.entityData.set(IS_GLIDING, gliding);
+        if (prev && !gliding) {
+            this.postGlideCooldown = POST_GLIDE_COOLDOWN;
+            this.postDescentCooldown = POST_DESCENT_COOLDOWN;
+        }
+    }
+
+    public boolean isInPostGlideCooldown() {
+        return this.postGlideCooldown > 0;
+    }
+
+    /** Altura mínima de aire debajo para que valga la pena planear. */
+    public static final int GLIDE_MIN_AIR = 3;
+
+    /**
+     * Intenta iniciar el planeo (server-side). Verifica el espacio de aire
+     * internamente, así que es seguro llamarlo "a ciegas": si no hay altura
+     * suficiente es un no-op y el squirrel simplemente cae (sin daño de caída).
+     *
+     * Escenario 1: al soltar el HANG (SquirrelClimbGoal.stop()).
+     * Escenario 2: en altura sin pared trepable (SquirrelGlideGoal.canUse()).
+     *
+     * @return true si el glide quedó activo.
+     */
+    public boolean tryStartGlide() {
+        if (this.level().isClientSide) return false;
+        if (this.isGliding()) return true;
+        if (this.isNewborn()) return false;
+        if (this.isInWater() || this.isInWaterOrBubble()) return false;
+        if (this.onGround()) return false;
+        if (this.distanceToGround(GLIDE_MIN_AIR + 1) < GLIDE_MIN_AIR) return false;
+
+        // Dirección de lanzamiento: si hay pared adyacente (venimos de hang/climb),
+        // alejándose de la pared; si no, hacia adelante con el yaw actual.
+        float launchYaw;
+        if (this.hasAdjacentClimbableBlock()) {
+            // climbFacingYaw mira HACIA la pared → el planeo sale en dirección opuesta.
+            launchYaw = this.getClimbFacingYaw() + 180.0F;
+        } else {
+            launchYaw = this.getYRot();
+        }
+
+        this.setClimbState(CLIMB_NONE);
+        this.setGliding(true);
+
+        // Orientar el cuerpo en la dirección del planeo.
+        this.setYRot(launchYaw);
+        this.yRotO = launchYaw;
+        this.setYBodyRot(launchYaw);
+        this.yBodyRotO = launchYaw;
+        this.setYHeadRot(launchYaw);
+
+        // Impulso inicial: avance suave + descenso leve. La física por tick
+        // la mantiene SquirrelGlideGoal.
+        float yawRad = (float) Math.toRadians(launchYaw);
+        double fx = -Math.sin(yawRad) * 0.30D;
+        double fz =  Math.cos(yawRad) * 0.30D;
+        this.setDeltaMovement(fx, -0.05D, fz);
+        this.getNavigation().stop();
+        return true;
+    }
+
+    /** Distancia (en bloques) hasta el primer bloque sólido debajo, hasta maxScan. */
+    public int distanceToGround(int maxScan) {
+        BlockPos.MutableBlockPos pos = this.blockPosition().mutable();
+        for (int i = 0; i < maxScan; i++) {
+            pos.move(0, -1, 0);
+            if (!this.level().getBlockState(pos).isAir()) {
+                return i;
+            }
+        }
+        return maxScan;
+    }
+
+    // --- EAT PLANT / HOLDING ITEM ---
+    public boolean isEatingPlant() { return this.entityData.get(IS_EATING_PLANT); }
+    public void setEatingPlant(boolean eating) { this.entityData.set(IS_EATING_PLANT, eating); }
+
+    public ItemStack getEatingItem() { return this.entityData.get(EATING_ITEM); }
+    public void setEatingItem(ItemStack stack) { this.entityData.set(EATING_ITEM, stack.copy()); }
+
+    public boolean hasAdjacentClimbableBlock() {
+        return hasAdjacentClimbableBlockInternal();
+    }
+
+    private boolean hasAdjacentClimbableBlockInternal() {
+        AABB box = this.getBoundingBox();
+        double probeDistance = 0.3D;
+        int footY = Mth.floor(box.minY);
+        int eyeY  = Mth.floor(box.minY + this.getBbHeight() * 0.5);
+
+        double cx = (box.minX + box.maxX) * 0.5;
+        double cz = (box.minZ + box.maxZ) * 0.5;
+        double halfW = (box.maxX - box.minX) * 0.5;
+        double halfD = (box.maxZ - box.minZ) * 0.5;
+
+        int[][] offsets = {
+            { Mth.floor(cx + halfW + probeDistance), Mth.floor(cz) },   // +X
+            { Mth.floor(cx - halfW - probeDistance), Mth.floor(cz) },   // -X
+            { Mth.floor(cx), Mth.floor(cz + halfD + probeDistance) },   // +Z
+            { Mth.floor(cx), Mth.floor(cz - halfD - probeDistance) }    // -Z
+        };
+
+        for (int[] off : offsets) {
+            for (int dy : new int[]{0, -1}) {
+                BlockPos posFoot = new BlockPos(off[0], footY + dy, off[1]);
+                BlockPos posEye  = new BlockPos(off[0], eyeY  + dy, off[1]);
+                if (this.level().getBlockState(posFoot).is(DoCTags.Blocks.CIVET_CLIMBABLE)
+                 || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public float getClimbFacingYaw() { return this.entityData.get(CLIMB_FACING_YAW); }
+
+    private void updateClimbFacingYaw() {
+        AABB box = this.getBoundingBox();
+        double probeDistance = 0.3D;
+        int footY = Mth.floor(box.minY);
+
+        double cx = (box.minX + box.maxX) * 0.5;
+        double cz = (box.minZ + box.maxZ) * 0.5;
+        double halfW = (box.maxX - box.minX) * 0.5;
+        double halfD = (box.maxZ - box.minZ) * 0.5;
+
+        double[][] probes = {
+            { cx + halfW + probeDistance, cz,                           -90.0 },
+            { cx - halfW - probeDistance, cz,                            90.0 },
+            { cx,                         cz + halfD + probeDistance,     0.0 },
+            { cx,                         cz - halfD - probeDistance,   180.0 }
+        };
+
+        for (double[] probe : probes) {
+            BlockPos pos = new BlockPos(Mth.floor(probe[0]), footY, Mth.floor(probe[1]));
+            if (this.level().getBlockState(pos).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                this.entityData.set(CLIMB_FACING_YAW, (float) probe[2]);
+                return;
+            }
+        }
+    }
+
+    private void updateClimbState() {
+        if (this.postDescentCooldown > 0) this.postDescentCooldown--;
+        if (this.postGlideCooldown > 0) this.postGlideCooldown--;
+
+        // Durante el glide, el sistema de climb queda totalmente suspendido:
+        // ningún wall-grab a mitad de planeo.
+        if (this.isGliding()) {
+            if (this.isClimbing()) this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            return;
+        }
+
+        this.cachedHasClimbable = this.hasAdjacentClimbableBlockInternal();
+        boolean hasClimbable = this.cachedHasClimbable;
+        byte currentState = this.getClimbState();
+
+        if (currentState == CLIMB_HANG) {
+            if (!hasClimbable) {
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            } else {
+                this.updateClimbFacingYaw();
+                this.lockClimbRotation();
+            }
+            return;
+        }
+
+        if (currentState == CLIMB_UP) {
+            if (this.verticalCollision && !this.onGround()) {
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                this.navigation.recomputePath();
+                return;
+            }
+            if (!hasClimbable && !this.onGround()) {
+                // CAMBIO vs Civet: sin impulso de salto. Solo se suelta la pared;
+                // si hay altura, SquirrelGlideGoal toma el control (escenario 2).
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            } else if (this.onGround() && !hasClimbable) {
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            } else {
+                this.updateClimbFacingYaw();
+                this.lockClimbRotation();
+            }
+            return;
+        }
+
+        if (currentState == CLIMB_DOWN) {
+            if (this.onGround()) {
+                this.setClimbState(CLIMB_NONE);
+                return;
+            }
+            this.updateClimbFacingYaw();
+            this.lockClimbRotation();
+            return;
+        }
+
+        if (this.postDescentCooldown > 0 || this.postGlideCooldown > 0) return;
+        if (!this.horizontalCollision || !hasClimbable) return;
+        if (this.isEatingPlant() || this.isNewborn() || this.onGround()) return;
+        if (this.isInWater() || this.isInWaterOrBubble()) return;
+
+        boolean pathGoesUp = false;
+        net.minecraft.world.level.pathfinder.Path path = this.navigation.getPath();
+        if (path != null && !path.isDone()) {
+            int idx = path.getNextNodeIndex();
+            int curY = Mth.floor(this.getY());
+            int limit = Math.min(idx + 3, path.getNodeCount());
+            for (int i = idx; i < limit; i++) {
+                if (path.getNode(i).y > curY) { pathGoesUp = true; break; }
+            }
+        }
+        if (!pathGoesUp) return;
+
+        this.setClimbState(CLIMB_UP);
+        this.updateClimbFacingYaw();
+        this.lockClimbRotation();
+    }
+
+    private void lockClimbRotation() {
+        float wallYaw = this.getClimbFacingYaw();
+        this.setYRot(wallYaw);
+        this.yRotO = wallYaw;
+        this.setYBodyRot(wallYaw);
+        this.yBodyRotO = wallYaw;
+        this.setYHeadRot(wallYaw);
+    }
+
+    public static boolean checkSquirrelSpawnRules(EntityType<SquirrelEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
+        return true;
+    }
+
+    @Nullable
+    @Override
+    public AgeableMob getBreedOffspring(ServerLevel pLevel, AgeableMob pOtherParent) {
+        SquirrelEntity squirrel = DOCEntities.SQUIRREL.get().create(pLevel);
+        squirrel.setIsMale(this.random.nextBoolean());
+        return squirrel;
+    }
+
+    @Override
+    public CritterDietConfig getDietConfig() {
+        return new CritterDietConfig(true, true, true, 200, 200, 200, 300);
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putInt("TamingFeedsLeft", this.tamingFeedsLeft);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
+    }
+
+    public boolean isIdleLocked() {
+        return getIdleVariant() != IdleVariant.NONE;
+    }
+
+    private void handleCryingAnimationClient() {
+        boolean isCrying = this.isCrying();
+
+        if (isCrying) {
+            this.stoppingCryState.stop();
+            this.stopCryTimer = 0;
+            this.wasCryingClient = true;
+
+            if (this.cryTimer < 10) {
+                this.preparingCryState.startIfStopped(this.tickCount);
+                this.cryingState.stop();
+            } else {
+                this.preparingCryState.stop();
+                this.cryingState.startIfStopped(this.tickCount);
+            }
+            this.cryTimer++;
+
+        } else {
+            this.preparingCryState.stop();
+            this.cryingState.stop();
+            this.cryTimer = 0;
+
+            if (this.wasCryingClient) {
+                if (this.stopCryTimer < 10) {
+                    this.stoppingCryState.startIfStopped(this.tickCount);
+                } else {
+                    this.stoppingCryState.stop();
+                    this.wasCryingClient = false;
+                }
+                this.stopCryTimer++;
+            } else {
+                this.stoppingCryState.stop();
+                this.stopCryTimer = 0;
+            }
+        }
+    }
+
+    @Override
+    public float getVoicePitch() {
+        return super.getVoicePitch() * 1.5F;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getAmbientSound() {
+        if (this.isSleeping()) {
+            return SoundEvents.CAT_PURR;
+        }
+        return SoundEvents.FOX_AMBIENT;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getHurtSound(DamageSource pDamageSource) {
+        return SoundEvents.FOX_HURT;
+    }
+
+    @Nullable
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.FOX_DEATH;
+    }
+
+    @Override
+    public SoundEvent getEatingSound(ItemStack pStack) {
+        return SoundEvents.RABBIT_AMBIENT;
+    }
+}

@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity;
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.LionEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -27,6 +28,12 @@ public class DOCEntities {
                     () -> EntityType.Builder.of(CivetEntity::new, MobCategory.CREATURE)
                             .sized(0.75f, 0.4f)
                             .build(new ResourceLocation(DiversityOfCritters.MODID, "civet").toString()));
+
+    public static final RegistryObject<EntityType<SquirrelEntity>> SQUIRREL =
+            ENTITY_TYPES.register("squirrel",
+                    () -> EntityType.Builder.of(SquirrelEntity::new, MobCategory.CREATURE)
+                            .sized(0.7f, 0.45f)
+                            .build(new ResourceLocation(DiversityOfCritters.MODID, "squirrel").toString()));
 
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);
