@@ -201,7 +201,7 @@ public class SquirrelEntity extends DiverseCritter {
         this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
 
-        this.goalSelector.addGoal(14, new SquirrelEatPlantGoal(this, 1.1D, 12));
+        //this.goalSelector.addGoal(14, new SquirrelEatPlantGoal(this, 1.1D, 12));
 
         this.goalSelector.addGoal(16, new SquirrelClimbGoal(this));
 

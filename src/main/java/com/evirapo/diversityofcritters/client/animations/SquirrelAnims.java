@@ -7,7 +7,13 @@ import net.minecraft.client.animation.KeyframeAnimations;
 
 public class SquirrelAnims {
 
-        public static final AnimationDefinition Idle = AnimationDefinition.Builder.withLength(2.0F).looping()
+        public static final AnimationDefinition BABY = AnimationDefinition.Builder.withLength(0.0F)
+                .addAnimation("Head", new AnimationChannel(AnimationChannel.Targets.SCALE,
+                        new Keyframe(0.0F, KeyframeAnimations.scaleVec(1.3F, 1.3F, 1.3F), AnimationChannel.Interpolations.LINEAR)
+                ))
+                .build();
+
+        public static final AnimationDefinition IDLE = AnimationDefinition.Builder.withLength(2.0F).looping()
                 .addAnimation("Eyes", new AnimationChannel(AnimationChannel.Targets.SCALE,
                         new Keyframe(0.0F, KeyframeAnimations.scaleVec(1.0F, 1.0F, 1.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.5F, KeyframeAnimations.scaleVec(1.0F, 1.0F, 1.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -114,7 +120,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition stand_up = AnimationDefinition.Builder.withLength(2.0F)
+        public static final AnimationDefinition STAND_UP = AnimationDefinition.Builder.withLength(2.0F)
                 .addAnimation("BottomJaw", new AnimationChannel(AnimationChannel.Targets.ROTATION,
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                 new Keyframe(0.5F, KeyframeAnimations.degreeVec(80.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -231,7 +237,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition SniffRight = AnimationDefinition.Builder.withLength(2.0F).looping()
+        public static final AnimationDefinition SNIFF_RIGHT = AnimationDefinition.Builder.withLength(2.0F).looping()
                 .addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
                         new Keyframe(0.0F, KeyframeAnimations.degreeVec(7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.25F, KeyframeAnimations.degreeVec(-45.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -331,7 +337,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition SniffLeft = AnimationDefinition.Builder.withLength(2.0F).looping()
+        public static final AnimationDefinition SNIFF_LEFT = AnimationDefinition.Builder.withLength(2.0F).looping()
                 .addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
                         new Keyframe(0.0F, KeyframeAnimations.degreeVec(7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.25F, KeyframeAnimations.degreeVec(-45.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -910,7 +916,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition Walk = AnimationDefinition.Builder.withLength(0.9662F).looping()
+        public static final AnimationDefinition WALK = AnimationDefinition.Builder.withLength(0.9662F).looping()
                 .addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION,
                         new Keyframe(0.0F, KeyframeAnimations.degreeVec(9.4082F, 0.2562F, -9.9138F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.4831F, KeyframeAnimations.degreeVec(2.0F, 2.0F, 5.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -1023,7 +1029,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition Run = AnimationDefinition.Builder.withLength(0.3333F).looping()
+        public static final AnimationDefinition RUN = AnimationDefinition.Builder.withLength(0.3333F).looping()
                 .addAnimation("Body2", new AnimationChannel(AnimationChannel.Targets.ROTATION,
                         new Keyframe(0.0F, KeyframeAnimations.degreeVec(7.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.0833F, KeyframeAnimations.degreeVec(-22.81F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -1147,7 +1153,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition Swim = AnimationDefinition.Builder.withLength(2.0F).looping()
+        public static final AnimationDefinition SWIM = AnimationDefinition.Builder.withLength(2.0F).looping()
                 .addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
                         new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, -12.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(0.5F, KeyframeAnimations.posVec(0.0F, -13.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -1347,7 +1353,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition preparing_sleep = AnimationDefinition.Builder.withLength(2.0F)
+        public static final AnimationDefinition PREPARING_SLEEP = AnimationDefinition.Builder.withLength(2.0F)
                 .addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
                         new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(1.0F, KeyframeAnimations.posVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -1495,7 +1501,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition Sleep = AnimationDefinition.Builder.withLength(4.0F).looping()
+        public static final AnimationDefinition SLEEP = AnimationDefinition.Builder.withLength(4.0F).looping()
                 .addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
                         new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, -3.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM)
                 ))
@@ -1579,7 +1585,7 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-        public static final AnimationDefinition awakening = AnimationDefinition.Builder.withLength(2.0F)
+        public static final AnimationDefinition AWAKENING = AnimationDefinition.Builder.withLength(2.0F)
                 .addAnimation("gray fox", new AnimationChannel(AnimationChannel.Targets.POSITION,
                         new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, -3.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
                         new Keyframe(1.0F, KeyframeAnimations.posVec(0.0F, -3.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),

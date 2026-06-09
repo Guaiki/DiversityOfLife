@@ -1,5 +1,6 @@
 package com.evirapo.diversityofcritters.client.models;
 
+import com.evirapo.diversityofcritters.client.animations.SquirrelBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import net.minecraft.client.model.HierarchicalModel;
 import com.evirapo.diversityofcritters.client.animations.CivetBabyAnims;
@@ -16,6 +17,8 @@ import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
 public class SquirrelBabyModel  <T extends SquirrelEntity> extends HierarchicalModel<T>  {
+
+    private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
 
     private final ModelPart Bandedpalmcivetkit;
     private final ModelPart Torse;
@@ -88,7 +91,40 @@ public class SquirrelBabyModel  <T extends SquirrelEntity> extends HierarchicalM
 
     @Override
     public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+        this.root().getAllParts().forEach(ModelPart::resetPose);
 
+        float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 20.0F);
+        float walkWeight = 1.0F - idleWeight;
+
+        if (idleWeight > 0) {
+            this.animateWithWeight(entity.idleAnimationState, SquirrelBabyAnims.idle, ageInTicks, 1.0F, idleWeight);
+        }
+
+        if (walkWeight > 0) {
+            this.animateCrawling(SquirrelBabyAnims.move, limbSwing, limbSwingAmount, 8.0f, walkWeight);
+        }
+
+        this.animate(entity.preparingSleepState, SquirrelBabyAnims.preparing_sleep, ageInTicks, 1f);
+        this.animate(entity.sleepState,          SquirrelBabyAnims.sleep,           ageInTicks, 1f);
+        this.animate(entity.awakeningState,      SquirrelBabyAnims.awakening,       ageInTicks, 1f);
+
+        this.animate(entity.preparingCryState, SquirrelBabyAnims.preparing_cry, ageInTicks, 1f);
+        this.animate(entity.cryingState,       SquirrelBabyAnims.cry,           ageInTicks, 1f);
+        this.animate(entity.stoppingCryState,  SquirrelBabyAnims.stopping_cry,  ageInTicks, 1f);
+    }
+
+    protected void animateWithWeight(AnimationState state, AnimationDefinition definition, float ageInTicks, float speed, float weight) {
+        state.updateTime(ageInTicks, speed);
+        state.ifStarted(s -> {
+            KeyframeAnimations.animate(this, definition, s.getAccumulatedTime(), 1.0F * weight, ANIMATION_VECTOR_CACHE);
+        });
+    }
+
+    protected void animateCrawling(AnimationDefinition definition, float limbSwing, float limbSwingAmount, float speedMultiplier, float weight) {
+        long time = (long)(limbSwing * 50.0F * speedMultiplier);
+        float finalScale = 1.0F * weight;
+
+        KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
     }
 
     @Override

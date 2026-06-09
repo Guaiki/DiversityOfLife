@@ -1,5 +1,8 @@
 package com.evirapo.diversityofcritters.client.models;
 
+import com.evirapo.diversityofcritters.client.animations.CivetAnims;
+import com.evirapo.diversityofcritters.client.animations.SquirrelAnims;
+import com.evirapo.diversityofcritters.client.animations.SquirrelBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -16,6 +19,11 @@ import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
 public class SquirrelModel <T extends SquirrelEntity> extends HierarchicalModel<T> {
+
+    private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
+
+    public boolean climbing = false;
+    public boolean climbingDown = false;
 
     private final ModelPart squirrel;
     private final ModelPart Glide;
@@ -168,17 +176,151 @@ public class SquirrelModel <T extends SquirrelEntity> extends HierarchicalModel<
 
     @Override
     public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+        this.root().getAllParts().forEach(ModelPart::resetPose);
 
+        boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
+        boolean orderedSitPlaying = entity.isOrderedSitPlaying();
+
+        if (entity.isJuvenile()) {
+            this.Head.xScale = 1.05F;
+            this.Head.yScale = 1.05F;
+            this.Head.zScale = 1.05F;
+        } else {
+            this.Head.xScale = 1.0F;
+            this.Head.yScale = 1.0F;
+            this.Head.zScale = 1.0F;
+        }
+
+        this.animate(entity.preparingSleepState, SquirrelAnims.PREPARING_SLEEP, ageInTicks, 1f);
+        this.animate(entity.sleepState,          SquirrelAnims.SLEEP,          ageInTicks, 1f);
+        this.animate(entity.awakeningState,      SquirrelAnims.AWAKENING,      ageInTicks, 1f);
+
+        if (sleepingLike) {
+            limbSwing = 0f;
+            limbSwingAmount = 0f;
+            this.climbing = false;
+            return;
+        }
+
+        if (orderedSitPlaying) {
+            limbSwing = 0f;
+            limbSwingAmount = 0f;
+            this.climbing = false;
+
+            this.Head.xRot = headPitch * ((float)Math.PI / 180F);
+            this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
+        }
+
+        if (entity.idleAnimationState.isStarted() || limbSwingAmount > 0.01f) {
+            this.Head.xRot = headPitch * ((float)Math.PI / 180F);
+            this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
+        }
+
+        this.climbing = entity.isClimbing();
+        this.climbingDown = entity.isClimbingDown();
+
+        if (entity.isClimbing()){
+            this.animate(entity.climbingUpState,   SquirrelAnims.CLIMBING_UP,   ageInTicks, 1.0F);
+            this.animate(entity.climbingDownState, SquirrelAnims.CLIMBING_DOWN, ageInTicks, 1.0F);
+            this.animate(entity.climbIdleState,    SquirrelAnims.CLIMB_IDLE,    ageInTicks, 1.0F);
+        } else {
+            if (entity.isInWaterOrBubble()){
+                float swimSpeedFactor = 1.0F + limbSwingAmount;
+                this.animate(entity.swimAnimationState, SquirrelAnims.SWIM, ageInTicks, swimSpeedFactor);
+                this.squirrel.y += 4.0F;
+                this.Head.xRot -= 0.3F;
+            } else {
+                boolean busyBodyAnim = entity.isCleaning()
+                        || entity.IsDrinking()
+                        || entity.isVariantActive;
+
+                float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
+                float idleWeight   = busyBodyAnim ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
+                float sprintWeight = entity.sprintProgress;
+                float walkWeight   = 1.0F - sprintWeight;
+
+                if (idleWeight > 0.01F) {
+                    this.animateWithWeight(entity.idleAnimationState, SquirrelAnims.IDLE, ageInTicks, idleWeight);
+                }
+                if (walkWeight > 0.01F) {
+                    this.animateWalkWithWeight(SquirrelAnims.WALK, limbSwing, limbSwingAmount, 2.0F, 2.5F, walkWeight);
+                }
+                if (sprintWeight > 0.01F) {
+                    this.animateWalkWithWeight(SquirrelAnims.RUN, limbSwing, limbSwingAmount, 2.0F, 2.5F, sprintWeight);
+                }
+
+                this.animate(entity.idleStandUpState,    SquirrelAnims.STAND_UP,   ageInTicks, 1.0F);
+                this.animate(entity.idleSniffLeftState,  SquirrelAnims.SNIFF_LEFT, ageInTicks, 1.0F);
+                this.animate(entity.idleSniffRightState, SquirrelAnims.SNIFF_RIGHT,ageInTicks, 1.0F);
+
+                this.animate(entity.idleSitStartingState, SquirrelAnims.SIT_STARTING, ageInTicks, 1.0F);
+                this.animate(entity.idleSitState,         SquirrelAnims.SIT_IDLE,     ageInTicks, 1.0F);
+                this.animate(entity.idleSitEndingState,   SquirrelAnims.SIT_ENDING,   ageInTicks, 1.0F);
+
+                this.animate(entity.idleLayStartingState, SquirrelAnims.LAY_STARTING, ageInTicks, 1.0F);
+                this.animate(entity.idleLayState,         SquirrelAnims.LAY_IDLE,     ageInTicks, 1.0F);
+                this.animate(entity.idleLayEndingState,   SquirrelAnims.LAY_ENDING,   ageInTicks, 1.0F);
+            }
+        }
+
+        this.animate(entity.cleanStartingState, SquirrelAnims.GROOMING_STARTING, ageInTicks, 1.0F);
+        this.animate(entity.cleanIdleState,     SquirrelAnims.GROOMING_IDLE,     ageInTicks, 1.0F);
+        this.animate(entity.cleanEndingState,   SquirrelAnims.GROOMING_ENDING,   ageInTicks, 1.0F);
+        this.animate(entity.drinkStartingState, SquirrelAnims.DRINK_STARTING, ageInTicks, 1.0F);
+        this.animate(entity.drinkIdleState,     SquirrelAnims.DRINK_IDLE,     ageInTicks, 1.0F);
+        this.animate(entity.drinkEndingState,   SquirrelAnims.DRINK_ENDING,   ageInTicks, 1.0F);
+
+        this.animate(entity.orderedSitStartingState, SquirrelAnims.SIT_STARTING, ageInTicks, 1.0F);
+        this.animate(entity.orderedSitIdleState,     SquirrelAnims.SIT_IDLE,     ageInTicks, 1.0F);
+        this.animate(entity.orderedSitEndingState,   SquirrelAnims.SIT_ENDING,   ageInTicks, 1.0F);
+
+        if (this.young){
+            this.applyStatic(SquirrelAnims.BABY);
+        }
     }
 
     @Override
     public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
+        poseStack.pushPose();
+
+        float baseScale = 0.5f;
+        poseStack.scale(baseScale, baseScale, baseScale);
+        poseStack.translate(0, 1.5F, 0);
+
+        if (this.climbing) {
+            if (this.climbingDown) {
+                poseStack.mulPose(Axis.XP.rotationDegrees(-90));
+                poseStack.mulPose(Axis.YP.rotationDegrees(180));
+                poseStack.translate(0, -0.4f, 0.25f);
+            } else {
+                poseStack.mulPose(Axis.XP.rotationDegrees(-90));
+                poseStack.translate(0, -0.4f, 0.25f);
+            }
+        }
+
         squirrel.render(poseStack, vertexConsumer, packedLight, packedOverlay, red, green, blue, alpha);
+
+        poseStack.popPose();
     }
 
     @Override
     public ModelPart root() {
         return squirrel;
+    }
+
+    private void animateWithWeight(AnimationState state, AnimationDefinition definition,
+                                   float ageInTicks, float weight) {
+        state.updateTime(ageInTicks, 1.0F);
+        state.ifStarted(s -> KeyframeAnimations.animate(
+                this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
+    }
+
+    private void animateWalkWithWeight(AnimationDefinition definition,
+                                       float limbSwing, float limbSwingAmount,
+                                       float speed, float intensity, float weight) {
+        long time       = (long)(limbSwing * 50.0F * speed);
+        float finalScale = Math.min(limbSwingAmount * intensity, 1.0F) * weight;
+        KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
     }
 
 }

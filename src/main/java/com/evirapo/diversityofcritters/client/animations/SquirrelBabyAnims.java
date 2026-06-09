@@ -509,7 +509,7 @@ public class SquirrelBabyAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition Stopping_cry = AnimationDefinition.Builder.withLength(0.5F).looping()
+	public static final AnimationDefinition stopping_cry = AnimationDefinition.Builder.withLength(0.5F).looping()
 		.addAnimation("Bandedpalmcivetkit", new AnimationChannel(AnimationChannel.Targets.POSITION, 
 			new Keyframe(0.5F, KeyframeAnimations.posVec(0.0F, -1.25F, 0.0F), AnimationChannel.Interpolations.CATMULLROM)
 		))
