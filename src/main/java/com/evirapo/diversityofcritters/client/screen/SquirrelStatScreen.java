@@ -20,7 +20,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
 
     // ===== TEXTURES =====
-    private static final ResourceLocation GUI_TEXTURE  = new ResourceLocation(DiversityOfCritters.MODID, "textures/gui/gui_civet.png");
+    private static final ResourceLocation GUI_TEXTURE  = new ResourceLocation(DiversityOfCritters.MODID, "textures/gui/gui_squirrel.png");
     private static final ResourceLocation BARS_TEXTURE = new ResourceLocation(DiversityOfCritters.MODID, "textures/gui/bars.png");
     private static final ResourceLocation SUN_ICON     = new ResourceLocation(DiversityOfCritters.MODID, "textures/gui/sun_icon.png");
     private static final ResourceLocation MOON_ICON    = new ResourceLocation(DiversityOfCritters.MODID, "textures/gui/moon_icon.png");
