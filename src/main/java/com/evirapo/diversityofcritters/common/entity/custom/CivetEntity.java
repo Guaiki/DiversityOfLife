@@ -82,10 +82,6 @@ public class CivetEntity extends DiverseCritter {
     public final AnimationState scratchEndingState   = new AnimationState();
     public final AnimationState swimAnimationState   = new AnimationState();
 
-    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
-
-    private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
-
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> IS_DIGGING = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BOOLEAN);
@@ -97,7 +93,6 @@ public class CivetEntity extends DiverseCritter {
     public static final byte CLIMB_HANG = 3;
 
     // --- VARIABLES ---
-    public int idleVariantCooldown = 0;
     private LookForFoodItems forFoodGoal;
     private int tamingFeedsLeft = 0;
     private int cryTimer = 0;
@@ -135,8 +130,6 @@ public class CivetEntity extends DiverseCritter {
     private static final int POST_DESCENT_COOLDOWN = 20;
     private boolean cachedHasClimbable = false;
 
-    public boolean isBeingCleaned = false;
-
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
@@ -151,7 +144,6 @@ public class CivetEntity extends DiverseCritter {
         this.entityData.define(CLIMB_STATE, CLIMB_NONE);
         this.entityData.define(CLIMB_FACING_YAW, 0.0F);
         this.entityData.define(IS_DIGGING, false);
-        this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
         this.entityData.define(IS_SCRATCHING, false);
     }
 
@@ -164,7 +156,7 @@ public class CivetEntity extends DiverseCritter {
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
-        return new CivetNavigation(this, pLevel);
+        return new CritterNavigation(this, pLevel);
     }
 
     // --- GOALS ---
@@ -189,8 +181,8 @@ public class CivetEntity extends DiverseCritter {
 
         this.goalSelector.addGoal(7, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
 
-        this.goalSelector.addGoal(8, new CivetCleanGoal(this));
-        this.goalSelector.addGoal(9, new MotherCleanBabyGoal(this, 1.2D, 16.0D));
+        this.goalSelector.addGoal(8, new CritterCleanGoal(this));
+        this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, CivetEntity.class, 1.2D, 16.0D));
         this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
         this.goalSelector.addGoal(10, this.forFoodGoal);
 
@@ -202,8 +194,9 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(16, new DigDirtGoal(this));
         this.goalSelector.addGoal(16, new CivetClimbGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(17, new CivetIdleGoal(this));
+        this.goalSelector.addGoal(17, new CritterIdleGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
@@ -216,22 +209,6 @@ public class CivetEntity extends DiverseCritter {
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
-
-    private static byte toByte(IdleVariant v){
-        return switch (v) {
-            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
-            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
-        };
-    }
-    private static IdleVariant fromByte(byte b){
-        return switch (b) {
-            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
-            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
-            default -> IdleVariant.NONE;
-        };
-    }
-    public void setIdleVariant(IdleVariant v){ this.entityData.set(IDLE_VARIANT, toByte(v)); }
-    public IdleVariant getIdleVariant(){ return fromByte(this.entityData.get(IDLE_VARIANT)); }
 
     @Override
     public void tick() {
@@ -250,8 +227,6 @@ public class CivetEntity extends DiverseCritter {
             if (this.maxUpStep() != desiredStep) {
                 this.setMaxUpStep(desiredStep);
             }
-
-            if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
 
             if (this.isNewborn() && this.getHunger() < 3000) {
                 if (!this.isCrying()) {
@@ -355,7 +330,6 @@ public class CivetEntity extends DiverseCritter {
             }
             this.prevDiggingClient = currentDigging;
 
-            // Sprint progress: lerp para suavizar la transición walk→run en el modelo
             if (this.isSprinting()) {
                 this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
             } else {
@@ -430,15 +404,8 @@ public class CivetEntity extends DiverseCritter {
         return false;
     }
 
-    /**
-     * Override fall distance so the WalkNodeEvaluator does not mark positions
-     * next to climbable walls as BLOCKED due to fall-distance checks.
-     * Without this, any wall node more than 3 blocks high gets rejected by
-     * the pathfinder before CivetNodeEvaluator can even evaluate it.
-     */
     @Override
     public int getMaxFallDistance() {
-        // Use cached value when available (server tick), otherwise compute directly.
         return this.cachedHasClimbable ? 16 : super.getMaxFallDistance();
     }
 
@@ -513,8 +480,6 @@ public class CivetEntity extends DiverseCritter {
 
         boolean isDigPlaying  = (isDigStarting || isDigIdle || isDigEnding) && !isOrderedSitPlaying;
 
-        // El idle se suprime mientras haya una variante activa (igual que isOrderedSitPlaying).
-        // El PESO en el modelo maneja la visibilidad durante locomoción normal.
         boolean groundLocomotion = this.isAlive()
                 && !sleepingLike && !swimming && !climbing
                 && !isOrderedSitPlaying && !isVariantPlaying;
@@ -904,10 +869,6 @@ public class CivetEntity extends DiverseCritter {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
-    }
-
-    public boolean isIdleLocked() {
-        return getIdleVariant() != IdleVariant.NONE;
     }
 
     private void handleCryingAnimationClient() {

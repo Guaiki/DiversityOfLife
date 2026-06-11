@@ -24,6 +24,9 @@ public class DOCItems {
     public static final RegistryObject<Item> CIVET_SPAWN_EGG = ITEM_TYPES.register("civet_spawn_egg",
             ()-> new ForgeSpawnEggItem(DOCEntities.CIVET, 0xffffff, 0xffffff, new Item.Properties()));
 
+    public static final RegistryObject<Item> SQUIRREL_SPAWN_EGG = ITEM_TYPES.register("squirrel_spawn_egg",
+            ()-> new ForgeSpawnEggItem(DOCEntities.SQUIRREL, 0xffffff, 0xffffff, new Item.Properties()));
+
     public static final RegistryObject<Item> ZOO_BOOK = ITEM_TYPES.register("zoo_book",
             ()-> new Item(new Item.Properties()));
 

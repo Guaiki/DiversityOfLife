@@ -1,48 +1,35 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
-import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.world.entity.ai.goal.Goal;
 
 import java.util.EnumSet;
 
-/** Self-grooming hygiene behavior — identical to CivetCleanGoal, typed to SquirrelEntity. */
-public class SquirrelCleanGoal extends Goal {
+public class CritterCleanGoal extends Goal {
 
-    private final SquirrelEntity entity;
+    private final DiverseCritter entity;
     private int cleanTimer;
-    private final int CLEAN_DURATION = 80;
+    private static final int CLEAN_DURATION = 80;
 
-    public SquirrelCleanGoal(SquirrelEntity entity) {
+    public CritterCleanGoal(DiverseCritter entity) {
         this.entity = entity;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
     }
 
     @Override
     public boolean canUse() {
-        if (entity.isNewborn()) {
-            return false;
-        }
-
+        if (entity.isNewborn()) return false;
         if (entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
                 entity.isAttacking() || entity.isOrderedToSit() || entity.isIdleLocked() ||
-                entity.isGliding() || entity.isEatingPlant()) {
-            return false;
-        }
-
-        if (!entity.hasLowHygiene()) {
-            return false;
-        }
-
+                entity.isDoingSpecialActivity()) return false;
+        if (!entity.hasLowHygiene()) return false;
         return entity.getRandom().nextFloat() < 0.005f;
     }
 
     @Override
     public boolean canContinueToUse() {
         if (entity.isNewborn() || entity.isSleeping() || entity.isPreparingSleep() || entity.isAwakeing() ||
-                entity.isAttacking() || entity.isOrderedToSit() || entity.isGliding()) {
-            return false;
-        }
-
+                entity.isAttacking() || entity.isOrderedToSit() || entity.isDoingSpecialActivity()) return false;
         return cleanTimer > 0;
     }
 

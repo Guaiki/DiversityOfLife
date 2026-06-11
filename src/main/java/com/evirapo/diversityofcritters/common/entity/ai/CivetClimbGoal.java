@@ -11,7 +11,7 @@ import java.util.EnumSet;
  * and hangs in place for a while before continuing.
  *
  * This goal no longer searches for walls or drives climbing —
- * that is now handled entirely by CivetNodeEvaluator + CivetMoveControl.
+ * that is now handled entirely by CritterNodeEvaluator + CivetMoveControl.
  */
 public class CivetClimbGoal extends Goal {
     private final CivetEntity civet;

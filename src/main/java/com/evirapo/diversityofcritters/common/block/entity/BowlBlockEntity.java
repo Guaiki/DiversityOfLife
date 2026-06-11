@@ -185,6 +185,16 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
                     || stack.is(net.minecraft.world.item.Items.MELON_SLICE)
                     || stack.is(net.minecraft.world.item.Items.APPLE);
 
+            boolean seeds = stack.is(net.minecraft.world.item.Items.WHEAT_SEEDS)
+                    || stack.is(net.minecraft.world.item.Items.BEETROOT_SEEDS)
+                    || stack.is(net.minecraft.world.item.Items.MELON_SEEDS)
+                    || stack.is(net.minecraft.world.item.Items.PUMPKIN_SEEDS)
+                    || stack.is(net.minecraft.world.item.Items.TORCHFLOWER_SEEDS)
+                    || stack.is(net.minecraft.world.item.Items.PITCHER_POD);
+
+            boolean berries = stack.is(net.minecraft.world.item.Items.SWEET_BERRIES)
+                    || stack.is(net.minecraft.world.item.Items.GLOW_BERRIES);
+
             boolean leaves = stack.is(net.minecraft.world.level.block.Blocks.OAK_LEAVES.asItem())
                     || stack.is(net.minecraft.world.level.block.Blocks.BIRCH_LEAVES.asItem())
                     || stack.is(net.minecraft.world.level.block.Blocks.SPRUCE_LEAVES.asItem())
@@ -192,7 +202,7 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
                     || stack.is(net.minecraft.world.level.block.Blocks.ACACIA_LEAVES.asItem())
                     || stack.is(net.minecraft.world.level.block.Blocks.DARK_OAK_LEAVES.asItem());
 
-            return veg || leaves;
+            return veg || seeds || berries || leaves;
         }
 
         public static boolean isWater(ItemStack stack) {

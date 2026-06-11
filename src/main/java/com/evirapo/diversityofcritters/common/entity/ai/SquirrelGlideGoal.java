@@ -40,8 +40,10 @@ public class SquirrelGlideGoal extends Goal {
 
     private int glideTicks = 0;
 
-    /** Timeout de seguridad: si en 10s no aterrizó, algo anda mal → cortar. */
-    private static final int MAX_GLIDE_TICKS = 200;
+    /** Timeout de seguridad contra estados colgados. Las salidas normales (suelo, agua,
+     *  colisión) manejan el aterrizaje; este límite solo protege el caso patológico.
+     *  A 0.08 bloques/tick, 3000 ticks cubre ~240 bloques de descenso. */
+    private static final int MAX_GLIDE_TICKS = 3000;
     /** Velocidad horizontal del planeo (bloques/tick). */
     private static final double GLIDE_FORWARD_SPEED = 0.18D;
     /** Velocidad de descenso constante del planeo (reemplaza a la gravedad). */
@@ -73,6 +75,9 @@ public class SquirrelGlideGoal extends Goal {
         if (squirrel.onGround() || squirrel.isClimbing()) return false;
         if (squirrel.isInWater() || squirrel.isInWaterOrBubble()) return false;
         if (squirrel.isInPostGlideCooldown()) return false;
+        // Block glide during the brief arc after cresting a log column: the squirrel
+        // just reached the top and is still rising — it should land, not fly away.
+        if (squirrel.isInPostCrestCooldown()) return false;
         // Con pared adyacente el sistema de climb es quien resuelve, no el glide.
         if (squirrel.hasAdjacentClimbableBlock()) return false;
         // Solo si realmente está cayendo (evita activarse en el ápice de un salto).

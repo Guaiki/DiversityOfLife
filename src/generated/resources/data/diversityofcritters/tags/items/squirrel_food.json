@@ -4,7 +4,11 @@
     "minecraft:beetroot_seeds",
     "minecraft:melon_seeds",
     "minecraft:pumpkin_seeds",
+    "minecraft:torchflower_seeds",
     "minecraft:sweet_berries",
-    "minecraft:glow_berries"
+    "minecraft:glow_berries",
+    "minecraft:apple",
+    "minecraft:melon_slice",
+    "minecraft:egg"
   ]
 }

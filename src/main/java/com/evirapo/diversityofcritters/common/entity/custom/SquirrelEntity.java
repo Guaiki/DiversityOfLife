@@ -45,11 +45,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.function.Predicate;
 
-/**
- * Squirrel entity. Misma arquitectura del Civet (climbing, sleep, taming,
- * hunger/thirst, idle variants, cry) SIN scratching ni digging, y con tres
- * sistemas nuevos: Gliding, Eating Plants y Holding Item.
- */
 public class SquirrelEntity extends DiverseCritter {
 
     // --- ANIMATION STATES ---
@@ -81,10 +76,7 @@ public class SquirrelEntity extends DiverseCritter {
     public final AnimationState eatPlantIdleState     = new AnimationState();
     public final AnimationState eatPlantEndingState   = new AnimationState();
 
-    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
-
     // --- SYNCED DATA ---
-    private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> IS_GLIDING = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BOOLEAN);
@@ -97,8 +89,7 @@ public class SquirrelEntity extends DiverseCritter {
     public static final byte CLIMB_HANG = 3;
 
     // --- VARIABLES ---
-    public int idleVariantCooldown = 0;
-    private LookForFoodItems forFoodGoal;
+    private CritterEatItemGoal forFoodGoal;
     private int tamingFeedsLeft = 0;
     private int cryTimer = 0;
     private int stopCryTimer = 0;
@@ -130,14 +121,14 @@ public class SquirrelEntity extends DiverseCritter {
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
 
-    /** Cooldown post-glide: evita que el aterrizaje del planeo re-dispare el climb
-     *  (misma clase de bug que requirió postDescentCooldown en el Civet). */
     private int postGlideCooldown = 0;
     private static final int POST_GLIDE_COOLDOWN = 20;
 
-    private boolean cachedHasClimbable = false;
+    private int postCrestCooldown = 0;
+    private static final int POST_CREST_COOLDOWN = 10;
+    private int climbUpStartY = 0;
 
-    public boolean isBeingCleaned = false;
+    private boolean cachedHasClimbable = false;
 
     public SquirrelEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -152,7 +143,6 @@ public class SquirrelEntity extends DiverseCritter {
         super.defineSynchedData();
         this.entityData.define(CLIMB_STATE, CLIMB_NONE);
         this.entityData.define(CLIMB_FACING_YAW, 0.0F);
-        this.entityData.define(IDLE_VARIANT, toByte(IdleVariant.NONE));
         this.entityData.define(IS_GLIDING, false);
         this.entityData.define(IS_EATING_PLANT, false);
         this.entityData.define(EATING_ITEM, ItemStack.EMPTY);
@@ -192,21 +182,22 @@ public class SquirrelEntity extends DiverseCritter {
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(8, new SquirrelCleanGoal(this));
-        this.goalSelector.addGoal(9, new SquirrelMotherCleanBabyGoal(this, 1.2D, 16.0D));
-        this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.SQUIRREL_FOOD);
+        this.goalSelector.addGoal(8, new CritterCleanGoal(this));
+        this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, SquirrelEntity.class, 1.2D, 16.0D));
+        this.forFoodGoal = new CritterEatItemGoal(this, DoCTags.Items.SQUIRREL_FOOD);
         this.goalSelector.addGoal(10, this.forFoodGoal);
 
         this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
 
-        //this.goalSelector.addGoal(14, new SquirrelEatPlantGoal(this, 1.1D, 12));
+        this.goalSelector.addGoal(14, new SquirrelEatLeavesGoal(this, 1.1D, 12));
 
         this.goalSelector.addGoal(16, new SquirrelClimbGoal(this));
 
-        this.goalSelector.addGoal(17, new SquirrelIdleGoal(this));
+        this.goalSelector.addGoal(17, new CritterIdleGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
                 boolean canWander = !isTame() || isWandering();
@@ -219,22 +210,6 @@ public class SquirrelEntity extends DiverseCritter {
         // Sin targetSelector: el squirrel es herbívoro, no caza.
     }
 
-    private static byte toByte(IdleVariant v){
-        return switch (v) {
-            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
-            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
-        };
-    }
-    private static IdleVariant fromByte(byte b){
-        return switch (b) {
-            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
-            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
-            default -> IdleVariant.NONE;
-        };
-    }
-    public void setIdleVariant(IdleVariant v){ this.entityData.set(IDLE_VARIANT, toByte(v)); }
-    public IdleVariant getIdleVariant(){ return fromByte(this.entityData.get(IDLE_VARIANT)); }
-
     @Override
     public void tick() {
         super.tick();
@@ -242,8 +217,6 @@ public class SquirrelEntity extends DiverseCritter {
         if (!this.level().isClientSide) {
             this.updateClimbState();
 
-            // Failsafe del glide: independientemente del goal, tocar suelo o agua
-            // SIEMPRE cancela el planeo (y arma los cooldowns anti re-climb).
             if (this.isGliding() && (this.onGround() || this.isInWaterOrBubble())) {
                 this.setGliding(false);
             }
@@ -258,8 +231,6 @@ public class SquirrelEntity extends DiverseCritter {
             if (this.maxUpStep() != desiredStep) {
                 this.setMaxUpStep(desiredStep);
             }
-
-            if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
 
             if (this.isNewborn() && this.getHunger() < 3000) {
                 if (!this.isCrying()) {
@@ -324,14 +295,12 @@ public class SquirrelEntity extends DiverseCritter {
                 this.clientDrinkTick++;
             } else if (this.clientDrinkEndingTick > 0) {
                 this.clientDrinkEndingTick++;
-                if (this.clientDrinkEndingTick > 6) {
+                if (this.clientDrinkEndingTick > 5) {   // 5 ticks = 250 ms = withLength(0.25F)
                     this.clientDrinkEndingTick = 0;
                 }
             }
             this.prevDrinkingClient = currentDrinking;
 
-            // --- Eating plant: máquina de 3 fases en cliente ---
-            // Anims: Eating (starting) 0.25s ≈ 5 ticks | Eating loop | Eating (ending) 0.25s ≈ 5 ticks
             boolean currentEatingPlant = isEatingPlant();
             if (currentEatingPlant && !prevEatingPlantClient) {
                 this.clientEatPlantTick = 0;
@@ -447,8 +416,8 @@ public class SquirrelEntity extends DiverseCritter {
         int ticksActive = this.clientIdleTick;
 
         int sitStarting = 10;
-        int sitIdle     = 80;
-        int sitEnding   = 20;
+        int sitIdle     = 90;
+        int sitEnding   = 10;
         int sitTotal    = sitStarting + sitIdle + sitEnding;
 
         int layStarting = 20;
@@ -646,7 +615,7 @@ public class SquirrelEntity extends DiverseCritter {
 
     @Override
     public boolean wantsToPickUp(ItemStack pStack) {
-        return pStack.is(DoCTags.Items.SQUIRREL_FOOD);
+        return false;
     }
 
     @Override
@@ -661,7 +630,7 @@ public class SquirrelEntity extends DiverseCritter {
     @Override public int maxHygiene() { return 4000; }
     @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
     @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
-    @Override protected boolean getDefaultDiurnal() { return true; }
+    @Override protected boolean getDefaultDiurnal() { return false; }
     @Override protected double getHungerLossPerSecond()     { return 3.33; }
     @Override protected double getThirstLossPerSecond()     { return 5.0;  }
     @Override protected double getEnrichmentLossPerSecond() { return 2.5;  }
@@ -674,6 +643,9 @@ public class SquirrelEntity extends DiverseCritter {
         this.entityData.set(CLIMB_STATE, state);
         if (prev == CLIMB_DOWN && state == CLIMB_NONE) {
             this.postDescentCooldown = POST_DESCENT_COOLDOWN;
+        }
+        if (prev != CLIMB_UP && state == CLIMB_UP) {
+            this.climbUpStartY = this.blockPosition().getY();
         }
     }
 
@@ -705,6 +677,7 @@ public class SquirrelEntity extends DiverseCritter {
     public boolean isInPostGlideCooldown() {
         return this.postGlideCooldown > 0;
     }
+    public boolean isInPostCrestCooldown() { return this.postCrestCooldown > 0; }
 
     /** Altura mínima de aire debajo para que valga la pena planear. */
     public static final int GLIDE_MIN_AIR = 3;
@@ -726,15 +699,31 @@ public class SquirrelEntity extends DiverseCritter {
         if (this.isInWater() || this.isInWaterOrBubble()) return false;
         if (this.onGround()) return false;
         if (this.distanceToGround(GLIDE_MIN_AIR + 1) < GLIDE_MIN_AIR) return false;
-
-        // Dirección de lanzamiento: si hay pared adyacente (venimos de hang/climb),
-        // alejándose de la pared; si no, hacia adelante con el yaw actual.
-        float launchYaw;
+        // Block glide from short climbable structures (e.g. a 1-2 block log pillar
+        // sitting on an elevated platform: the outer-edge air distance can look large
+        // even though the squirrel only climbed 1-2 blocks).
         if (this.hasAdjacentClimbableBlock()) {
-            // climbFacingYaw mira HACIA la pared → el planeo sale en dirección opuesta.
-            launchYaw = this.getClimbFacingYaw() + 180.0F;
+            int colHeight = this.adjacentClimbableColumnHeight(GLIDE_MIN_AIR);
+            if (colHeight > 0 && colHeight < GLIDE_MIN_AIR) return false;
+        }
+
+        // Dirección de lanzamiento: hacia el objetivo del path si hay uno activo,
+        // si no, alejarse de la pared (hang) o conservar el yaw actual (caída libre).
+        float launchYaw;
+        net.minecraft.world.level.pathfinder.Path glideNavPath = this.getNavigation().getPath();
+        if (glideNavPath != null && !glideNavPath.isDone()) {
+            BlockPos glideTarget = glideNavPath.getTarget();
+            double dx = glideTarget.getX() + 0.5D - this.getX();
+            double dz = glideTarget.getZ() + 0.5D - this.getZ();
+            if (dx * dx + dz * dz > 1.0D) {
+                launchYaw = (float)(Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
+            } else {
+                launchYaw = this.hasAdjacentClimbableBlock()
+                        ? this.getClimbFacingYaw() + 180.0F : this.getYRot();
+            }
         } else {
-            launchYaw = this.getYRot();
+            launchYaw = this.hasAdjacentClimbableBlock()
+                    ? this.getClimbFacingYaw() + 180.0F : this.getYRot();
         }
 
         this.setClimbState(CLIMB_NONE);
@@ -767,6 +756,59 @@ public class SquirrelEntity extends DiverseCritter {
             }
         }
         return maxScan;
+    }
+
+    /**
+     * When adjacent to a climbable structure, returns the height of the consecutive
+     * climbable column starting at (or just below) the squirrel's foot level.
+     * Returns 0 if no adjacent climbable block is found near foot level.
+     */
+    public int adjacentClimbableColumnHeight(int maxScan) {
+        int by = Mth.floor(this.getY());
+        int bx = Mth.floor(this.getX());
+        int bz = Mth.floor(this.getZ());
+        int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int[] off : offsets) {
+            for (int yOff = 0; yOff >= -1; yOff--) {
+                BlockPos start = new BlockPos(bx + off[0], by + yOff, bz + off[1]);
+                if (!this.level().getBlockState(start).is(DoCTags.Blocks.CIVET_CLIMBABLE)) continue;
+                int height = 0;
+                BlockPos.MutableBlockPos pos = start.mutable();
+                while (height < maxScan && this.level().getBlockState(pos).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                    height++;
+                    pos.move(0, -1, 0);
+                }
+                return height;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Returns how many consecutive climbable blocks exist ABOVE the squirrel's
+     * foot level in the adjacent column. Used to prevent hang triggering on the
+     * top 1-2 blocks of a column (the model would float in open air there).
+     */
+    public int adjacentClimbableBlocksAbove(int maxScan) {
+        int by = Mth.floor(this.getY());
+        int bx = Mth.floor(this.getX());
+        int bz = Mth.floor(this.getZ());
+        int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int[] off : offsets) {
+            for (int yOff = 0; yOff >= -1; yOff--) {
+                BlockPos check = new BlockPos(bx + off[0], by + yOff, bz + off[1]);
+                if (!this.level().getBlockState(check).is(DoCTags.Blocks.CIVET_CLIMBABLE)) continue;
+                // Adjacent column confirmed — count upward from by+1.
+                int count = 0;
+                BlockPos.MutableBlockPos pos = new BlockPos(bx + off[0], by + 1, bz + off[1]).mutable();
+                while (count < maxScan && this.level().getBlockState(pos).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                    count++;
+                    pos.move(0, 1, 0);
+                }
+                return count;
+            }
+        }
+        return 0;
     }
 
     // --- EAT PLANT / HOLDING ITEM ---
@@ -842,6 +884,7 @@ public class SquirrelEntity extends DiverseCritter {
     private void updateClimbState() {
         if (this.postDescentCooldown > 0) this.postDescentCooldown--;
         if (this.postGlideCooldown > 0) this.postGlideCooldown--;
+        if (this.postCrestCooldown > 0) this.postCrestCooldown--;
 
         // Durante el glide, el sistema de climb queda totalmente suspendido:
         // ningún wall-grab a mitad de planeo.
@@ -874,6 +917,12 @@ public class SquirrelEntity extends DiverseCritter {
                 // CAMBIO vs Civet: sin impulso de salto. Solo se suelta la pared;
                 // si hay altura, SquirrelGlideGoal toma el control (escenario 2).
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                // Only arm crest cooldown after a real climb (≥ GLIDE_MIN_AIR blocks).
+                // Brief wall touches during descent have climbUpStartY ≈ current Y
+                // (barely any height gained), so they must not block the next glide.
+                if (this.blockPosition().getY() - this.climbUpStartY >= GLIDE_MIN_AIR) {
+                    this.postCrestCooldown = POST_CREST_COOLDOWN;
+                }
             } else if (this.onGround() && !hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else {
@@ -938,7 +987,8 @@ public class SquirrelEntity extends DiverseCritter {
 
     @Override
     public CritterDietConfig getDietConfig() {
-        return new CritterDietConfig(true, true, true, 200, 200, 200, 300);
+        // Herbívoro: sólo acepta VEG y MIX, no carne.
+        return new CritterDietConfig(false, true, true, 0, 200, 200, 300);
     }
 
     @Override
@@ -953,8 +1003,21 @@ public class SquirrelEntity extends DiverseCritter {
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
     }
 
-    public boolean isIdleLocked() {
-        return getIdleVariant() != IdleVariant.NONE;
+    @Override
+    public boolean isDoingSpecialActivity() {
+        return isGliding() || isEatingPlant();
+    }
+
+    @Override
+    public void onStartEatingItem(net.minecraft.world.item.ItemStack stack) {
+        setEatingItem(stack);
+        setEatingPlant(true);
+    }
+
+    @Override
+    public void onStopEatingItem() {
+        setEatingPlant(false);
+        setEatingItem(net.minecraft.world.item.ItemStack.EMPTY);
     }
 
     private void handleCryingAnimationClient() {

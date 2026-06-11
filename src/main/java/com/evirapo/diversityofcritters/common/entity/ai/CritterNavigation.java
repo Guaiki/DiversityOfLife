@@ -1,28 +1,28 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
-import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.pathfinder.PathFinder;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Set;
 
-public class CivetNavigation extends WallClimberNavigation {
+public class CritterNavigation extends WallClimberNavigation {
 
-    private final CivetEntity civet;
+    protected final DiverseCritter critter;
 
-    public CivetNavigation(Mob mob, Level level) {
+    public CritterNavigation(Mob mob, Level level) {
         super(mob, level);
-        this.civet = (CivetEntity) mob;
+        this.critter = (DiverseCritter) mob;
     }
 
     @Override
     protected PathFinder createPathFinder(int pMaxVisitedNodes) {
-        this.nodeEvaluator = new CivetNodeEvaluator();
+        this.nodeEvaluator = new CritterNodeEvaluator();
         this.nodeEvaluator.setCanPassDoors(true);
         return new PathFinder(this.nodeEvaluator, pMaxVisitedNodes);
     }
@@ -35,13 +35,12 @@ public class CivetNavigation extends WallClimberNavigation {
         }
         BlockPos self = this.mob.blockPosition();
         if (!this.level.hasChunk(self.getX() >> 4, self.getZ() >> 4)) return null;
-
         return super.createPath(pTargets, pRegionOffset, pOffsetUpward, pAccuracy, pFollowRange);
     }
 
     @Override
     protected boolean canUpdatePath() {
-        return this.civet.isClimbing()
+        return this.critter.isClimbing()
                 || this.mob.onGround()
                 || this.isInLiquid()
                 || this.mob.isPassenger();
@@ -49,13 +48,13 @@ public class CivetNavigation extends WallClimberNavigation {
 
     @Override
     protected double getGroundY(Vec3 pVec) {
-        if (this.civet.isClimbing()) return pVec.y;
+        if (this.critter.isClimbing()) return pVec.y;
         return super.getGroundY(pVec);
     }
 
     @Override
     protected Vec3 getTempMobPos() {
-        if (this.civet.isClimbing()) return this.mob.position();
+        if (this.critter.isClimbing()) return this.mob.position();
         return super.getTempMobPos();
     }
 }

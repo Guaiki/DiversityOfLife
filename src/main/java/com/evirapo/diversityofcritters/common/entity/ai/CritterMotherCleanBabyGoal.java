@@ -1,6 +1,6 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
-import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -8,22 +8,23 @@ import net.minecraft.world.phys.Vec3;
 import java.util.EnumSet;
 import java.util.List;
 
-public class MotherCleanBabyGoal extends Goal {
+public class CritterMotherCleanBabyGoal<T extends DiverseCritter> extends Goal {
 
-    private final CivetEntity mother;
-    private CivetEntity targetBaby;
+    private final T mother;
+    private final Class<T> entityClass;
+    private T targetBaby;
     private final double speed;
     private final double searchRadius;
 
     private int cleanTimer = 0;
-
     private boolean isFinishing = false;
     private int finishingTimer = 0;
 
     private static final double MAX_CLEAN_DIST_SQ = 0.8D;
 
-    public MotherCleanBabyGoal(CivetEntity mother, double speed, double searchRadius) {
+    public CritterMotherCleanBabyGoal(T mother, Class<T> entityClass, double speed, double searchRadius) {
         this.mother = mother;
+        this.entityClass = entityClass;
         this.speed = speed;
         this.searchRadius = searchRadius;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -33,6 +34,7 @@ public class MotherCleanBabyGoal extends Goal {
     public boolean canUse() {
         if (mother.isNewborn() || mother.isBaby() || mother.isJuvenile() || mother.level().isClientSide()) return false;
         if (mother.isSleeping() || mother.isPreparingSleep() || mother.isAttacking()) return false;
+        if (mother.isDoingSpecialActivity()) return false;
 
         targetBaby = findDirtyBaby();
         return targetBaby != null;
@@ -42,11 +44,10 @@ public class MotherCleanBabyGoal extends Goal {
     public boolean canContinueToUse() {
         if (mother.level().isClientSide()) return false;
         if (targetBaby == null || !targetBaby.isAlive()) return false;
+        if (mother.isDoingSpecialActivity()) return false;
 
         if (isFinishing) return finishingTimer < 5;
-        if (mother.distanceToSqr(targetBaby) > 256.0D) return false;
-
-        return true;
+        return mother.distanceToSqr(targetBaby) <= 256.0D;
     }
 
     @Override
@@ -55,10 +56,7 @@ public class MotherCleanBabyGoal extends Goal {
         isFinishing = false;
         finishingTimer = 0;
         mother.setIsDrinking(false);
-
-        if (targetBaby != null) {
-            targetBaby.isBeingCleaned = true;
-        }
+        if (targetBaby != null) targetBaby.isBeingCleaned = true;
     }
 
     @Override
@@ -68,10 +66,7 @@ public class MotherCleanBabyGoal extends Goal {
         finishingTimer = 0;
         mother.setIsDrinking(false);
         mother.getNavigation().stop();
-
-        if (targetBaby != null) {
-            targetBaby.isBeingCleaned = false;
-        }
+        if (targetBaby != null) targetBaby.isBeingCleaned = false;
         targetBaby = null;
     }
 
@@ -79,9 +74,7 @@ public class MotherCleanBabyGoal extends Goal {
     public void tick() {
         if (isFinishing) {
             finishingTimer++;
-            if (finishingTimer >= 5) {
-                this.stop();
-            }
+            if (finishingTimer >= 5) this.stop();
             return;
         }
 
@@ -89,7 +82,7 @@ public class MotherCleanBabyGoal extends Goal {
 
         targetBaby.getNavigation().stop();
         Vec3 babyDm = targetBaby.getDeltaMovement();
-        targetBaby.setDeltaMovement(0, babyDm.y, 0); // Anclamos X/Z pero mantenemos gravedad Y
+        targetBaby.setDeltaMovement(0, babyDm.y, 0);
         targetBaby.getLookControl().setLookAt(mother, 10.0F, (float) targetBaby.getMaxHeadXRot());
 
         if (targetBaby.getHygiene() >= targetBaby.maxHygiene()) {
@@ -113,35 +106,24 @@ public class MotherCleanBabyGoal extends Goal {
         mother.setIsDrinking(true);
 
         cleanTimer++;
-
         if (cleanTimer % 20 == 15) {
             targetBaby.setHygiene(targetBaby.maxHygiene());
         }
     }
 
-    private CivetEntity findDirtyBaby() {
+    private T findDirtyBaby() {
         AABB searchBox = mother.getBoundingBox().inflate(searchRadius, 4.0D, searchRadius);
+        List<T> babies = mother.level().getEntitiesOfClass(entityClass, searchBox,
+                baby -> baby.isNewborn() && baby.hasLowHygiene() && !baby.isBeingCleaned);
 
-        List<CivetEntity> nearbyCivets = mother.level().getEntitiesOfClass(CivetEntity.class, searchBox,
-                (civet) -> civet.isNewborn()
-                        && civet.hasLowHygiene()
-                        && !civet.isBeingCleaned);
+        if (babies.isEmpty()) return null;
 
-        if (nearbyCivets.isEmpty()) {
-            return null;
-        }
-
-        CivetEntity closestBaby = null;
+        T closest = null;
         double closestDistSq = Double.MAX_VALUE;
-
-        for (CivetEntity baby : nearbyCivets) {
-            double distSq = mother.distanceToSqr(baby);
-            if (distSq < closestDistSq) {
-                closestDistSq = distSq;
-                closestBaby = baby;
-            }
+        for (T baby : babies) {
+            double d = mother.distanceToSqr(baby);
+            if (d < closestDistSq) { closestDistSq = d; closest = baby; }
         }
-
-        return closestBaby;
+        return closest;
     }
 }

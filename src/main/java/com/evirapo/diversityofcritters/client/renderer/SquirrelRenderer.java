@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.client.renderer;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.client.models.*;
+import com.evirapo.diversityofcritters.client.renderer.layer.SquirrelLeafLayer;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -24,6 +25,7 @@ public class SquirrelRenderer <T extends SquirrelEntity> extends MobRenderer<T, 
         super(pContext, new SquirrelModel<>(pContext.bakeLayer(ModelLayers.SQUIRREL_LAYER)), 0.25F);
         this.adultModel = this.getModel();
         this.babyModel = new SquirrelBabyModel<>(pContext.bakeLayer(ModelLayers.SQUIRREL_BABY_LAYER));
+        this.addLayer(new SquirrelLeafLayer<>(this));
     }
 
     @Override

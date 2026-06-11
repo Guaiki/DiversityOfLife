@@ -47,6 +47,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
+    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
+
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> IS_JUVENILE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
@@ -68,9 +70,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
 
     int prevHunger;
     int prevThirst;
+
+    public int idleVariantCooldown = 0;
+    public boolean isBeingCleaned = false;
 
     private double hungerLossAccum = 0.0;
     private double thirstLossAccum = 0.0;
@@ -149,6 +155,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(IS_CRYING, false);
         this.entityData.define(IS_PREGNANT, false);
         this.entityData.define(CAN_BREED, true);
+        this.entityData.define(IDLE_VARIANT, (byte) 0);
     }
 
     @Override
@@ -263,11 +270,29 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     public void clearStates() { this.setSleepState(SleepState.AWAKE); this.setCleaning(false); }
 
-    protected boolean getFlag(int pFlagId) { return (this.entityData.get(DATA_FLAGS_ID) & pFlagId) != 0; }
-    protected void setFlag(int pFlagId, boolean pValue) {
-        if (pValue) this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) | pFlagId));
-        else this.entityData.set(DATA_FLAGS_ID, (byte)(this.entityData.get(DATA_FLAGS_ID) & ~pFlagId));
+    private static byte toIdleByte(IdleVariant v) {
+        return switch (v) {
+            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
+            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
+        };
     }
+    private static IdleVariant idleFromByte(byte b) {
+        return switch (b) {
+            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
+            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
+            default -> IdleVariant.NONE;
+        };
+    }
+    public void setIdleVariant(IdleVariant v) { this.entityData.set(IDLE_VARIANT, toIdleByte(v)); }
+    public IdleVariant getIdleVariant() { return idleFromByte(this.entityData.get(IDLE_VARIANT)); }
+    public boolean isIdleLocked() { return getIdleVariant() != IdleVariant.NONE; }
+
+    public boolean isDoingSpecialActivity() { return false; }
+
+    public boolean isClimbing() { return false; }
+
+    public void onStartEatingItem(ItemStack stack) {}
+    public void onStopEatingItem() {}
 
     private Integer fixAgeOnFirstTick = null;
 
@@ -327,6 +352,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             }
 
             if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){ this.starve(); }
+
+            if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
         }
 
         if (this.isOrderedToSit()) {
@@ -621,9 +648,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     // --- DIET ---
-    public static final boolean DEBUG_BOWL_GOALS = false;
     public abstract CritterDietConfig getDietConfig();
-    public void debugGoalMessage(String goalName, String state) {}
 
     @Override
     public boolean canMate(Animal otherAnimal) {

@@ -7,7 +7,7 @@ import net.minecraft.world.level.pathfinder.BlockPathTypes;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 
-public class CivetNodeEvaluator extends WalkNodeEvaluator {
+public class CritterNodeEvaluator extends WalkNodeEvaluator {
 
     private static final float CLIMB_COST_MALUS = 0.5F;
 
@@ -30,8 +30,6 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
         }
 
         // --- B) CLIMB DOWN: beside wall, climbable also below (one step) ---
-        // The !closed guard prevents cycles in reconstructPath.
-        // One step only — A* will chain naturally through successive nodes.
         if (hasAdjacentClimbable(here) && isOpenSpace(here.below())
                 && hasAdjacentClimbable(here.below())) {
             Node downNode = getNode(pNode.x, pNode.y - 1, pNode.z);
@@ -45,10 +43,6 @@ public class CivetNodeEvaluator extends WalkNodeEvaluator {
         }
 
         // --- C) DESCEND FROM TOP: standing ON TOP of a climbable column ---
-        // Block directly below is climbable, nothing adjacent at this Y.
-        // Generate ONE node beside the column face at y-1.
-        // Check all 4 directions and add ALL valid ones (not just first),
-        // so the A* can choose the best direction toward the target.
         if (isClimbable(here.below()) && !hasAdjacentClimbable(here)) {
             for (Direction dir : Direction.Plane.HORIZONTAL) {
                 int faceX = pNode.x + dir.getStepX();

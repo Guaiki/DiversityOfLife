@@ -5,22 +5,14 @@ import net.minecraft.world.entity.ai.goal.Goal;
 
 import java.util.EnumSet;
 
-/**
- * HANG enrichment behavior (same as CivetClimbGoal, typed to SquirrelEntity).
- *
- * KEY DIFFERENCE vs the civet: when the squirrel finishes hanging and releases,
- * it attempts to GLIDE (scenario 1 of the gliding system) instead of dropping.
- * tryStartGlide() internally checks air clearance, so short hangs near the
- * ground still resolve as a plain release.
- */
 public class SquirrelClimbGoal extends Goal {
     private final SquirrelEntity squirrel;
 
     private int hangTicksRemaining = 0;
     private int cooldown = 0;
 
-    private static final int COOLDOWN_MIN = 600;
-    private static final int COOLDOWN_MAX = 2400;
+    private static final int COOLDOWN_MIN = 100;
+    private static final int COOLDOWN_MAX = 400;
     private static final int HANG_DURATION_MIN = 60;
     private static final int HANG_DURATION_MAX = 160;
 
@@ -35,7 +27,10 @@ public class SquirrelClimbGoal extends Goal {
         if (squirrel.isSleeping() || squirrel.isOrderedToSit()) return false;
         if (this.cooldown-- > 0) return false;
 
-        return squirrel.isClimbingUp() && squirrel.getRandom().nextInt(60) == 0;
+        return squirrel.isClimbingUp()
+                && squirrel.distanceToGround(SquirrelEntity.GLIDE_MIN_AIR + 1) >= SquirrelEntity.GLIDE_MIN_AIR
+                && squirrel.adjacentClimbableBlocksAbove(1) >= 1
+                && squirrel.getRandom().nextInt(15) == 0;
     }
 
     @Override
@@ -65,9 +60,6 @@ public class SquirrelClimbGoal extends Goal {
     public void stop() {
         if (squirrel.isHanging()) {
             squirrel.setClimbState(SquirrelEntity.CLIMB_NONE);
-            // SCENARIO 1 of the glide: hang finished → release into a glide.
-            // If there isn't enough air below, this is a no-op and the
-            // squirrel simply drops (no fall damage anyway).
             squirrel.tryStartGlide();
         }
         squirrel.setEnrichment(squirrel.maxEnrichment());

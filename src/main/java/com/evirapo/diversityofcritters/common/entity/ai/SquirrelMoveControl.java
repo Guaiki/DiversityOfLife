@@ -10,21 +10,6 @@ import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * MÓDULO 4 — MoveControl del squirrel, adaptado del CivetMoveControl.
- *
- * Cambio clave vs el Civet: el caso de descenso ya no baja siempre pegado a
- * la pared. La regla acordada:
- *   - Descensos CORTOS (1–2 bloques de aire): CLIMB_DOWN clásico del Civet
- *     (planear ahí se vería raro).
- *   - Descensos LARGOS (>= GLIDE_MIN_AIR = 3 bloques): se entrega el control
- *     al sistema de glide (tryStartGlide) y se aplica la física de gravedad
- *     reducida cada tick desde SquirrelGlideGoal.
- *
- * Mientras IS_GLIDING está activo, este MoveControl NO TOCA el movimiento:
- * la física del planeo es propiedad exclusiva de SquirrelGlideGoal (clave
- * del diseño determinista). Solo gestiona el landingCooldown al aterrizar.
- */
 public class SquirrelMoveControl extends MoveControl {
     private final SquirrelEntity squirrel;
 
@@ -173,7 +158,13 @@ public class SquirrelMoveControl extends MoveControl {
         // CLIMB_DOWN clásico solo para descensos cortos (1-2 bloques).
         if (dy < 0 && adjacentToWall && !onGround && !inCooldown) {
             if (tryHandOffToGlide()) return;
-            this.squirrel.setClimbState(SquirrelEntity.CLIMB_DOWN);
+            // tryHandOffToGlide failed. Only enter CLIMB_DOWN for short structures.
+            // For tall ones the velocity check is the only blocker (squirrel just stepped
+            // off the edge — velocity hasn't built up yet). Returning here lets gravity
+            // act for 1-2 ticks; the next call to tryHandOffToGlide will pass.
+            if (this.squirrel.distanceToGround(SquirrelEntity.GLIDE_MIN_AIR + 1) < SquirrelEntity.GLIDE_MIN_AIR) {
+                this.squirrel.setClimbState(SquirrelEntity.CLIMB_DOWN);
+            }
             return;
         }
 
@@ -222,7 +213,9 @@ public class SquirrelMoveControl extends MoveControl {
                 int futureY = path.getNode(i).y;
                 if (futureY < currentY) {
                     if (tryHandOffToGlide()) return;
-                    this.squirrel.setClimbState(SquirrelEntity.CLIMB_DOWN);
+                    if (this.squirrel.distanceToGround(SquirrelEntity.GLIDE_MIN_AIR + 1) < SquirrelEntity.GLIDE_MIN_AIR) {
+                        this.squirrel.setClimbState(SquirrelEntity.CLIMB_DOWN);
+                    }
                     return;
                 }
                 if (futureY > currentY) break;
@@ -238,6 +231,9 @@ public class SquirrelMoveControl extends MoveControl {
      * @return true si el glide tomó el control (este MoveControl debe soltar).
      */
     private boolean tryHandOffToGlide() {
+        // Don't glide while still rising from the climb (cresting a log top): the
+        // squirrel needs to actually be falling before a handoff to glide makes sense.
+        if (this.squirrel.getDeltaMovement().y > -0.05D) return false;
         if (this.squirrel.distanceToGround(SquirrelEntity.GLIDE_MIN_AIR + 1) < SquirrelEntity.GLIDE_MIN_AIR) {
             return false;
         }
