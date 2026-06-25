@@ -2712,8 +2712,6 @@ public class SquirrelAnims {
                 ))
                 .build();
 
-
-
         public static final AnimationDefinition GROOMING_STARTING = AnimationDefinition.Builder.withLength(0.5F)
                 .addAnimation("BandedPlamCivet", new AnimationChannel(AnimationChannel.Targets.POSITION,
 			new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
