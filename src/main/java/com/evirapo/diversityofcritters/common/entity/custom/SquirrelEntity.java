@@ -82,6 +82,9 @@ public class SquirrelEntity extends DiverseCritter {
     private static final EntityDataAccessor<Boolean> IS_GLIDING = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_EATING_PLANT = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<ItemStack> EATING_ITEM = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<Byte> MORPH = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
+
+    public static final String[] MORPH_NAMES = { "Dark red" };
 
     public static final byte CLIMB_NONE = 0;
     public static final byte CLIMB_UP   = 1;
@@ -146,6 +149,7 @@ public class SquirrelEntity extends DiverseCritter {
         this.entityData.define(IS_GLIDING, false);
         this.entityData.define(IS_EATING_PLANT, false);
         this.entityData.define(EATING_ITEM, ItemStack.EMPTY);
+        this.entityData.define(MORPH, (byte) 0);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -995,13 +999,18 @@ public class SquirrelEntity extends DiverseCritter {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putInt("TamingFeedsLeft", this.tamingFeedsLeft);
+        tag.putByte("Morph", this.getMorph());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
+        if (tag.contains("Morph")) this.setMorph(tag.getByte("Morph"));
     }
+
+    public byte getMorph() { return this.entityData.get(MORPH); }
+    public void setMorph(byte morph) { this.entityData.set(MORPH, morph); }
 
     @Override
     public boolean isDoingSpecialActivity() {

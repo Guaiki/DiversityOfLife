@@ -15,7 +15,9 @@ import org.jetbrains.annotations.NotNull;
 
 public class SquirrelRenderer <T extends SquirrelEntity> extends MobRenderer<T, HierarchicalModel<T>> {
 
-    private static final ResourceLocation ADULT_TEXTURE = new ResourceLocation(DiversityOfCritters.MODID,"textures/entity/squirrel/squirrel.png");
+    private static final ResourceLocation[] ADULT_TEXTURES = {
+        new ResourceLocation(DiversityOfCritters.MODID, "textures/entity/squirrel/squirrel.png") // 0: Dark red
+    };
     private static final ResourceLocation BABY_TEXTURE = new ResourceLocation(DiversityOfCritters.MODID,"textures/entity/squirrel/baby_squirrel.png");
 
     private final HierarchicalModel<T> adultModel;
@@ -58,6 +60,7 @@ public class SquirrelRenderer <T extends SquirrelEntity> extends MobRenderer<T, 
         if (entity.isNewborn()) {
             return BABY_TEXTURE;
         }
-        return ADULT_TEXTURE;
+        int morph = entity.getMorph() & 0xFF;
+        return ADULT_TEXTURES[morph < ADULT_TEXTURES.length ? morph : 0];
     }
 }

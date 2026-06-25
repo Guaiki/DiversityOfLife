@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.client.screen;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
+import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.SetDiurnalMsg;
@@ -339,7 +340,9 @@ public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         String age = ageKey.getString() + ": " + ageVal.getString();
         graphics.drawString(this.font, age, sx, sy + lineH * 2, INFO_TEXT_COLOR, true);
 
-        graphics.drawString(this.font, "Morph: Gray (0)", sx, sy + lineH * 3, INFO_TEXT_COLOR, true);
+        int morphIdx = (entity instanceof SquirrelEntity sq) ? (sq.getMorph() & 0xFF) : 0;
+        String morphName = morphIdx < SquirrelEntity.MORPH_NAMES.length ? SquirrelEntity.MORPH_NAMES[morphIdx] : "Unknown";
+        graphics.drawString(this.font, "Morph: " + morphName + " (" + morphIdx + ")", sx, sy + lineH * 3, INFO_TEXT_COLOR, true);
 
         String breedStatus = "Breeding: " + (entity.canBreed() ? "ON" : "OFF");
         graphics.drawString(this.font, breedStatus, sx, sy + lineH * 4, INFO_TEXT_COLOR, true);
