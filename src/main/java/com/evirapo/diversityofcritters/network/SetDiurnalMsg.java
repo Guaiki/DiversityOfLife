@@ -34,8 +34,6 @@ public class SetDiurnalMsg {
 
             if (e instanceof com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter critter) {
                 critter.setDiurnal(msg.diurnal);
-
-                System.out.println("[SLEEP][SVR][GUI] SetDiurnal entity#" + critter.getId() + " -> " + msg.diurnal);
             }
         });
         ctx.setPacketHandled(true);

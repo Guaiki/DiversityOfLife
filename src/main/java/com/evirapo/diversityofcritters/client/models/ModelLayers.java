@@ -14,4 +14,7 @@ public class ModelLayers {
     public static final ModelLayerLocation SQUIRREL_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "squrriel"), "main");
     public static final ModelLayerLocation SQUIRREL_BABY_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "baby_squrriel"), "main");
 
+    public static final ModelLayerLocation SIFAKA_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "sifaka"), "main");
+    public static final ModelLayerLocation SIFAKA_BABY_LAYER = new ModelLayerLocation(new ResourceLocation(DiversityOfCritters.MODID, "baby_sifaka"), "main");
+
 }

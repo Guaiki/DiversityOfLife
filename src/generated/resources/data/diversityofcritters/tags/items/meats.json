@@ -9,7 +9,6 @@
     "minecraft:mutton",
     "minecraft:cooked_mutton",
     "minecraft:porkchop",
-    "minecraft:cooked_porkchop",
-    "diversityofcritters:worm"
+    "minecraft:cooked_porkchop"
   ]
 }

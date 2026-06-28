@@ -703,16 +703,11 @@ public class SquirrelEntity extends DiverseCritter {
         if (this.isInWater() || this.isInWaterOrBubble()) return false;
         if (this.onGround()) return false;
         if (this.distanceToGround(GLIDE_MIN_AIR + 1) < GLIDE_MIN_AIR) return false;
-        // Block glide from short climbable structures (e.g. a 1-2 block log pillar
-        // sitting on an elevated platform: the outer-edge air distance can look large
-        // even though the squirrel only climbed 1-2 blocks).
         if (this.hasAdjacentClimbableBlock()) {
             int colHeight = this.adjacentClimbableColumnHeight(GLIDE_MIN_AIR);
             if (colHeight > 0 && colHeight < GLIDE_MIN_AIR) return false;
         }
 
-        // Dirección de lanzamiento: hacia el objetivo del path si hay uno activo,
-        // si no, alejarse de la pared (hang) o conservar el yaw actual (caída libre).
         float launchYaw;
         net.minecraft.world.level.pathfinder.Path glideNavPath = this.getNavigation().getPath();
         if (glideNavPath != null && !glideNavPath.isDone()) {
@@ -733,15 +728,12 @@ public class SquirrelEntity extends DiverseCritter {
         this.setClimbState(CLIMB_NONE);
         this.setGliding(true);
 
-        // Orientar el cuerpo en la dirección del planeo.
         this.setYRot(launchYaw);
         this.yRotO = launchYaw;
         this.setYBodyRot(launchYaw);
         this.yBodyRotO = launchYaw;
         this.setYHeadRot(launchYaw);
 
-        // Impulso inicial: avance suave + descenso leve. La física por tick
-        // la mantiene SquirrelGlideGoal.
         float yawRad = (float) Math.toRadians(launchYaw);
         double fx = -Math.sin(yawRad) * 0.30D;
         double fz =  Math.cos(yawRad) * 0.30D;
@@ -750,7 +742,6 @@ public class SquirrelEntity extends DiverseCritter {
         return true;
     }
 
-    /** Distancia (en bloques) hasta el primer bloque sólido debajo, hasta maxScan. */
     public int distanceToGround(int maxScan) {
         BlockPos.MutableBlockPos pos = this.blockPosition().mutable();
         for (int i = 0; i < maxScan; i++) {
@@ -762,11 +753,6 @@ public class SquirrelEntity extends DiverseCritter {
         return maxScan;
     }
 
-    /**
-     * When adjacent to a climbable structure, returns the height of the consecutive
-     * climbable column starting at (or just below) the squirrel's foot level.
-     * Returns 0 if no adjacent climbable block is found near foot level.
-     */
     public int adjacentClimbableColumnHeight(int maxScan) {
         int by = Mth.floor(this.getY());
         int bx = Mth.floor(this.getX());
@@ -788,11 +774,6 @@ public class SquirrelEntity extends DiverseCritter {
         return 0;
     }
 
-    /**
-     * Returns how many consecutive climbable blocks exist ABOVE the squirrel's
-     * foot level in the adjacent column. Used to prevent hang triggering on the
-     * top 1-2 blocks of a column (the model would float in open air there).
-     */
     public int adjacentClimbableBlocksAbove(int maxScan) {
         int by = Mth.floor(this.getY());
         int bx = Mth.floor(this.getX());
@@ -815,7 +796,6 @@ public class SquirrelEntity extends DiverseCritter {
         return 0;
     }
 
-    // --- EAT PLANT / HOLDING ITEM ---
     public boolean isEatingPlant() { return this.entityData.get(IS_EATING_PLANT); }
     public void setEatingPlant(boolean eating) { this.entityData.set(IS_EATING_PLANT, eating); }
 
@@ -890,8 +870,6 @@ public class SquirrelEntity extends DiverseCritter {
         if (this.postGlideCooldown > 0) this.postGlideCooldown--;
         if (this.postCrestCooldown > 0) this.postCrestCooldown--;
 
-        // Durante el glide, el sistema de climb queda totalmente suspendido:
-        // ningún wall-grab a mitad de planeo.
         if (this.isGliding()) {
             if (this.isClimbing()) this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             return;
@@ -991,7 +969,6 @@ public class SquirrelEntity extends DiverseCritter {
 
     @Override
     public CritterDietConfig getDietConfig() {
-        // Herbívoro: sólo acepta VEG y MIX, no carne.
         return new CritterDietConfig(false, true, true, 0, 200, 200, 300);
     }
 

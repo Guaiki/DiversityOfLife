@@ -2,8 +2,10 @@ package com.evirapo.diversityofcritters.network;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.client.screen.CivetStatScreen;
+import com.evirapo.diversityofcritters.client.screen.SifakaStatScreen;
 import com.evirapo.diversityofcritters.client.screen.SquirrelStatScreen;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import net.minecraft.client.Minecraft;
@@ -43,6 +45,8 @@ public record OpenStatsScreenPacket (int containerId, int entityId) {
                             Minecraft.getInstance().setScreen(new CivetStatScreen(menu, localplayer.getInventory(), critter));
                         } else if (critter instanceof SquirrelEntity) {
                             Minecraft.getInstance().setScreen(new SquirrelStatScreen(menu, localplayer.getInventory(), critter));
+                        } else if (critter instanceof SifakaEntity) {
+                            Minecraft.getInstance().setScreen(new SifakaStatScreen(menu, localplayer.getInventory(), critter));
                         }
                     }
                 }

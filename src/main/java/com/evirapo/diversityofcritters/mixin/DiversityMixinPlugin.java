@@ -12,7 +12,6 @@ public class DiversityMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
-        System.out.println("[DOC-DEBUG] DiversityMixinPlugin cargado. Paquete: " + mixinPackage);
     }
 
     @Override

@@ -22,6 +22,7 @@ public class DoCItemModelProvider extends ItemModelProvider {
     protected void registerModels() {
         simpleItem(DOCItems.CIVET_SPAWN_EGG);
         simpleItem(DOCItems.SQUIRREL_SPAWN_EGG);
+        simpleItem(DOCItems.SIFAKA_SPAWN_EGG);
         simpleItem(DOCItems.ZOO_BOOK);
     }
 

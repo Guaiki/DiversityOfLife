@@ -23,6 +23,7 @@ public class DOCEntitiesCreativeTab {
 
                         output.accept(DOCItems.CIVET_SPAWN_EGG.get());
                         output.accept(DOCItems.SQUIRREL_SPAWN_EGG.get());
+                        output.accept(DOCItems.SIFAKA_SPAWN_EGG.get());
 
                     })
                     .build());

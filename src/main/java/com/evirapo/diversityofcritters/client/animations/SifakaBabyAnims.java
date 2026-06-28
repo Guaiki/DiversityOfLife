@@ -125,7 +125,7 @@ public class SifakaBabyAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition preparing_sleep = AnimationDefinition.Builder.withLength(1.0F).looping()
+	public static final AnimationDefinition preparing_sleep = AnimationDefinition.Builder.withLength(1.0F)
 		.addAnimation("Bandedpalmcivetkit", new AnimationChannel(AnimationChannel.Targets.POSITION, 
 			new Keyframe(0.0F, KeyframeAnimations.posVec(0.0F, -1.25F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 			new Keyframe(1.0F, KeyframeAnimations.posVec(0.0F, 0.5F, 0.0F), AnimationChannel.Interpolations.CATMULLROM)
@@ -323,7 +323,7 @@ public class SifakaBabyAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition preparing_cry = AnimationDefinition.Builder.withLength(0.5F).looping()
+	public static final AnimationDefinition preparing_cry = AnimationDefinition.Builder.withLength(0.5F)
 		.addAnimation("Bandedpalmcivetkit", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.5F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
 		))
@@ -505,7 +505,7 @@ public class SifakaBabyAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition Stopping_cry = AnimationDefinition.Builder.withLength(0.5F).looping()
+	public static final AnimationDefinition stopping_cry = AnimationDefinition.Builder.withLength(0.5F)
 		.addAnimation("Bandedpalmcivetkit", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
 		))

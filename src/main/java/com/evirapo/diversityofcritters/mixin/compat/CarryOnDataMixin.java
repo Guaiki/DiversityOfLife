@@ -32,18 +32,9 @@ public class CarryOnDataMixin {
                     int currentAge = critter.getAge();
 
                     if (currentAge != correctAge) {
-                        System.out.println("[DOC-DEBUG] ¡CONFLICTO DETECTADO!");
-                        System.out.println("   - Edad guardada (NBT): " + correctAge);
-                        System.out.println("   - Edad actual (Vanilla): " + currentAge);
-
                         critter.setAge(correctAge);
-                        System.out.println("   -> CORRECCIÓN APLICADA. Nueva edad: " + critter.getAge());
                     }
-                } else {
-                    System.out.println("[DOC-DEBUG] ERRO: El NBT de CarryOn NO tiene 'DiverseAge'.");
                 }
-            } else {
-                System.out.println("[DOC-DEBUG] ERROR: CarryOnData nbt es null o no tiene tag 'entity'.");
             }
         }
     }

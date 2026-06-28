@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.client.models.*;
 import com.evirapo.diversityofcritters.client.renderer.CivetRenderer;
 import com.evirapo.diversityofcritters.client.renderer.LionRenderer;
+import com.evirapo.diversityofcritters.client.renderer.SifakaRenderer;
 import com.evirapo.diversityofcritters.client.renderer.SquirrelRenderer;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import net.minecraftforge.api.distmarker.Dist;
@@ -26,6 +27,9 @@ public class DOCClientEvents {
 
         event.registerLayerDefinition(ModelLayers.SQUIRREL_LAYER, SquirrelModel::createBodyLayer);
         event.registerLayerDefinition(ModelLayers.SQUIRREL_BABY_LAYER, SquirrelBabyModel::createBodyLayer);
+
+        event.registerLayerDefinition(ModelLayers.SIFAKA_LAYER, SifakaModel::createBodyLayer);
+        event.registerLayerDefinition(ModelLayers.SIFAKA_BABY_LAYER, SifakaBabyModel::createBodyLayer);
     }
 
     @SubscribeEvent
@@ -33,5 +37,6 @@ public class DOCClientEvents {
         event.registerEntityRenderer(DOCEntities.LION.get(), LionRenderer::new);
         event.registerEntityRenderer(DOCEntities.CIVET.get(), CivetRenderer::new);
         event.registerEntityRenderer(DOCEntities.SQUIRREL.get(), SquirrelRenderer::new);
+        event.registerEntityRenderer(DOCEntities.SIFAKA.get(), SifakaRenderer::new);
     }
 }

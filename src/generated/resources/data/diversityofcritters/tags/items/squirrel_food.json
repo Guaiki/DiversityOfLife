@@ -1,14 +1,15 @@
 {
   "values": [
-    "minecraft:wheat_seeds",
-    "minecraft:beetroot_seeds",
-    "minecraft:melon_seeds",
-    "minecraft:pumpkin_seeds",
-    "minecraft:torchflower_seeds",
+    "minecraft:apple",
     "minecraft:sweet_berries",
     "minecraft:glow_berries",
-    "minecraft:apple",
     "minecraft:melon_slice",
-    "minecraft:egg"
+    "minecraft:pumpkin",
+    "minecraft:wheat_seeds",
+    "minecraft:pumpkin_seeds",
+    "minecraft:melon_seeds",
+    "minecraft:beetroot_seeds",
+    "minecraft:brown_mushroom",
+    "minecraft:red_mushroom"
   ]
 }

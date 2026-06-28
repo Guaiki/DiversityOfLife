@@ -93,6 +93,14 @@ public class SquirrelBabyModel  <T extends SquirrelEntity> extends HierarchicalM
     public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
         this.root().getAllParts().forEach(ModelPart::resetPose);
 
+        this.animate(entity.preparingSleepState, SquirrelBabyAnims.preparing_sleep, ageInTicks, 1f);
+        this.animate(entity.sleepState,          SquirrelBabyAnims.sleep,           ageInTicks, 1f);
+        this.animate(entity.awakeningState,      SquirrelBabyAnims.awakening,       ageInTicks, 1f);
+
+        if (entity.preparingSleepState.isStarted() || entity.sleepState.isStarted() || entity.awakeningState.isStarted()) {
+            return;
+        }
+
         float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 20.0F);
         float walkWeight = 1.0F - idleWeight;
 
@@ -103,10 +111,6 @@ public class SquirrelBabyModel  <T extends SquirrelEntity> extends HierarchicalM
         if (walkWeight > 0) {
             this.animateCrawling(SquirrelBabyAnims.move, limbSwing, limbSwingAmount, 8.0f, walkWeight);
         }
-
-        this.animate(entity.preparingSleepState, SquirrelBabyAnims.preparing_sleep, ageInTicks, 1f);
-        this.animate(entity.sleepState,          SquirrelBabyAnims.sleep,           ageInTicks, 1f);
-        this.animate(entity.awakeningState,      SquirrelBabyAnims.awakening,       ageInTicks, 1f);
 
         this.animate(entity.preparingCryState, SquirrelBabyAnims.preparing_cry, ageInTicks, 1f);
         this.animate(entity.cryingState,       SquirrelBabyAnims.cry,           ageInTicks, 1f);

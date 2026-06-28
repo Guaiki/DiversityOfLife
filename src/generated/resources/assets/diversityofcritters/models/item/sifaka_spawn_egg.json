@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "diversityofcritters:item/lion_spawn_egg"
+    "layer0": "diversityofcritters:item/sifaka_spawn_egg"
   }
 }

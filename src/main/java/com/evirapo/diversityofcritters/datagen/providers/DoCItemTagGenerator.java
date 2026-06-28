@@ -35,5 +35,50 @@ public class DoCItemTagGenerator extends ItemTagsProvider {
                 Items.PORKCHOP,
                 Items.COOKED_PORKCHOP
         );
+
+        this.tag(DoCTags.Items.SQUIRREL_FOOD).add(
+                Items.APPLE,
+                Items.SWEET_BERRIES,
+                Items.GLOW_BERRIES,
+                Items.MELON_SLICE,
+                Items.PUMPKIN,
+                Items.WHEAT_SEEDS,
+                Items.PUMPKIN_SEEDS,
+                Items.MELON_SEEDS,
+                Items.BEETROOT_SEEDS,
+                Items.BROWN_MUSHROOM,
+                Items.RED_MUSHROOM
+        );
+
+        this.tag(DoCTags.Items.SIFAKA_FOOD).add(
+                Items.OAK_LEAVES,
+                Items.BIRCH_LEAVES,
+                Items.SPRUCE_LEAVES,
+                Items.JUNGLE_LEAVES,
+                Items.ACACIA_LEAVES,
+                Items.DARK_OAK_LEAVES,
+                Items.AZALEA_LEAVES,
+                Items.FLOWERING_AZALEA_LEAVES,
+                Items.CHERRY_LEAVES,
+                Items.MANGROVE_LEAVES,
+                Items.APPLE,
+                Items.SWEET_BERRIES,
+                Items.GLOW_BERRIES,
+                Items.MELON_SLICE,
+                Items.DANDELION,
+                Items.POPPY,
+                Items.BLUE_ORCHID,
+                Items.ALLIUM,
+                Items.AZURE_BLUET,
+                Items.RED_TULIP,
+                Items.ORANGE_TULIP,
+                Items.WHITE_TULIP,
+                Items.PINK_TULIP,
+                Items.OXEYE_DAISY,
+                Items.CORNFLOWER,
+                Items.LILY_OF_THE_VALLEY,
+                Items.CARROT,
+                Items.BEETROOT
+        );
     }
 }

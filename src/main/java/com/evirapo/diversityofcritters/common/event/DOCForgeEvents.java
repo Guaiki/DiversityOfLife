@@ -68,13 +68,6 @@ public class DOCForgeEvents {
 
                 if (stuck) {
                     sameStackCount++;
-                    // After 5 samples (1 second) at same location, dump full stack
-                    if (sameStackCount == 5) {
-                        LOGGER.warn("[CivetWatchdog] SERVER THREAD APPEARS FROZEN! Stack trace:");
-                        for (StackTraceElement frame : stack) {
-                            LOGGER.warn("  at {}", frame);
-                        }
-                    }
                 } else {
                     sameStackCount = 0;
                 }
@@ -85,13 +78,11 @@ public class DOCForgeEvents {
             }
         }, 500, 200, TimeUnit.MILLISECONDS);
 
-        LOGGER.info("[CivetWatchdog] Server thread watchdog started.");
     }
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         if (watchdogTask != null) watchdogTask.cancel(false);
         if (watchdogExecutor != null) watchdogExecutor.shutdownNow();
-        LOGGER.info("[CivetWatchdog] Watchdog stopped.");
     }
 }

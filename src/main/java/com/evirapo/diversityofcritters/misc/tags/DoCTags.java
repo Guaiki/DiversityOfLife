@@ -16,6 +16,8 @@ public class DoCTags {
 
         public static final TagKey<Item> SQUIRREL_FOOD = create("squirrel_food");
 
+        public static final TagKey<Item> SIFAKA_FOOD = create("sifaka_food");
+
         private static TagKey<Item> create(String pName) {
             return TagKey.create(Registries.ITEM, new ResourceLocation(DiversityOfCritters.MODID, pName));
         }
