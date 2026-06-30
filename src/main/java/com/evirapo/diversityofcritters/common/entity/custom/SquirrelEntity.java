@@ -103,6 +103,7 @@ public class SquirrelEntity extends DiverseCritter {
 
     private boolean prevCleaningClient = false;
     private int clientCleanTick = 0;
+    private int clientCleanEndingTick = 0;
 
     private boolean prevDrinkingClient = false;
     private int clientDrinkTick = 0;
@@ -279,13 +280,20 @@ public class SquirrelEntity extends DiverseCritter {
             }
 
             boolean currentCleaning = isCleaning();
-            if (currentCleaning != prevCleaningClient) {
+            if (currentCleaning && !prevCleaningClient) {
                 this.clientCleanTick = 0;
-                this.prevCleaningClient = currentCleaning;
+                this.clientCleanEndingTick = 0;
+            } else if (!currentCleaning && prevCleaningClient) {
+                this.clientCleanEndingTick = 1;
+                this.clientCleanTick = 0;
             }
             if (currentCleaning) {
                 this.clientCleanTick++;
+            } else if (this.clientCleanEndingTick > 0) {
+                this.clientCleanEndingTick++;
+                if (this.clientCleanEndingTick > 10) this.clientCleanEndingTick = 0;
             }
+            this.prevCleaningClient = currentCleaning;
 
             boolean currentDrinking = IsDrinking();
             if (currentDrinking && !prevDrinkingClient) {
@@ -440,14 +448,11 @@ public class SquirrelEntity extends DiverseCritter {
             else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
         }
 
-        boolean cleaning = isCleaning();
-        int cleanActive = this.clientCleanTick;
-        int cleanStart = 10;
-        int cleanLoop  = 60;
-        int cleanEnd   = 10;
-        int cleanTotal = cleanStart + cleanLoop + cleanEnd;
-
-        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal && !isOrderedSitPlaying;
+        boolean cleaning        = isCleaning();
+        boolean isCleanStarting = cleaning && this.clientCleanTick <= 10;
+        boolean isCleanIdle     = cleaning && this.clientCleanTick > 10;
+        boolean isCleanEnding   = !cleaning && this.clientCleanEndingTick > 0;
+        boolean isCleanPlaying  = (isCleanStarting || isCleanIdle || isCleanEnding) && !isOrderedSitPlaying;
 
         boolean drinking = IsDrinking();
         boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
@@ -500,9 +505,9 @@ public class SquirrelEntity extends DiverseCritter {
         }
 
         if (isCleanPlaying) {
-            this.cleanStartingState.animateWhen(cleanActive <= cleanStart, this.tickCount);
-            this.cleanIdleState.animateWhen(cleanActive > cleanStart && cleanActive <= cleanStart + cleanLoop, this.tickCount);
-            this.cleanEndingState.animateWhen(cleanActive > cleanStart + cleanLoop, this.tickCount);
+            this.cleanStartingState.animateWhen(isCleanStarting, this.tickCount);
+            this.cleanIdleState.animateWhen(isCleanIdle, this.tickCount);
+            this.cleanEndingState.animateWhen(isCleanEnding, this.tickCount);
         } else {
             this.cleanStartingState.stop();
             this.cleanIdleState.stop();

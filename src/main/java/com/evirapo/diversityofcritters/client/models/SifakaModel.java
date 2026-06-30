@@ -17,6 +17,7 @@ import org.joml.Vector3f;
 public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 	private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
 
+	private final ModelPart meshRoot;
 	private final ModelPart Thewholesifakamodel;
 	private final ModelPart Rightleg;
 	private final ModelPart Rightthumb;
@@ -41,6 +42,7 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 	private final ModelPart Rightarm;
 
 	public SifakaModel(ModelPart root) {
+		this.meshRoot = root;
 		this.Thewholesifakamodel = root.getChild("Thewholesifakamodel");
 		this.Rightleg = this.Thewholesifakamodel.getChild("Rightleg");
 		this.Rightthumb = this.Rightleg.getChild("Rightthumb");
@@ -243,7 +245,7 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 
 	@Override
 	public ModelPart root() {
-		return Thewholesifakamodel;
+		return meshRoot;
 	}
 
 	public void translateToRightHand(com.mojang.blaze3d.vertex.PoseStack poseStack) {

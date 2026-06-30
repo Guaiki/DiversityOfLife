@@ -12,7 +12,6 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
     private int ticksUntilNextAttack;
     private int attackDelayStored; //7
     private int ticksUntilNextAttackStored; //13
-    private boolean shouldCountTillNextAttack = false;
 
     public AnimatedAttackGoal(PathfinderMob pMob, double pSpeedModifier, boolean pFollowingTargetEvenIfNotSeen, int pAttackDelay, int pTicksUntilNextAttack) {
         super(pMob, pSpeedModifier, pFollowingTargetEvenIfNotSeen);
@@ -31,7 +30,6 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
     @Override
     protected void checkAndPerformAttack(LivingEntity pEnemy, double pDistToEnemySqr) {
         if (isEnemyWithinAttackDistance(pEnemy, pDistToEnemySqr)) {
-            shouldCountTillNextAttack = true;
 
             if(isTimeToStartAttackAnimation()) {
                 if (entity instanceof IAnimatedAttacker attacker)
@@ -44,14 +42,10 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
             }
 
         } else {
-            resetAttackCooldown();
-            shouldCountTillNextAttack = false;
-
             if (entity instanceof IAnimatedAttacker attacker){
                 attacker.setAttacking(false);
-                attacker.setAttackAnimationTimeout(0);;
+                attacker.setAttackAnimationTimeout(0);
             }
-
         }
     }
 
@@ -85,9 +79,7 @@ public class AnimatedAttackGoal extends MeleeAttackGoal {
     @Override
     public void tick() {
         super.tick();
-        if(shouldCountTillNextAttack) {
-            this.ticksUntilNextAttack = Math.max(this.ticksUntilNextAttack - 1, 0);
-        }
+        this.ticksUntilNextAttack = Math.max(this.ticksUntilNextAttack - 1, 0);
     }
 
     @Override

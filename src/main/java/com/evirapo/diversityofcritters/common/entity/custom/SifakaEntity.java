@@ -26,7 +26,6 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.entity.animal.Rabbit;
@@ -99,6 +98,7 @@ public class SifakaEntity extends DiverseCritter {
 
     private boolean prevCleaningClient = false;
     private int clientCleanTick = 0;
+    private int clientCleanEndingTick = 0;
 
     private boolean prevDrinkingClient = false;
     private int clientDrinkTick = 0;
@@ -170,8 +170,6 @@ public class SifakaEntity extends DiverseCritter {
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(7, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
-
         this.goalSelector.addGoal(8, new CritterCleanGoal(this));
         this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, SifakaEntity.class, 1.2D, 16.0D));
         this.forFoodGoal = new CritterEatItemGoal(this, DoCTags.Items.SIFAKA_FOOD);
@@ -194,9 +192,6 @@ public class SifakaEntity extends DiverseCritter {
         });
         this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
-
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
     }
 
     @Override
@@ -259,12 +254,22 @@ public class SifakaEntity extends DiverseCritter {
                 this.clientIdleTick++;
             }
 
+            // MODIFICADO: Sistema de ticks para la limpieza (incluye ending tick de 0.5s = 10 ticks)
             boolean currentCleaning = isCleaning();
-            if (currentCleaning != prevCleaningClient) {
+            if (currentCleaning && !prevCleaningClient) {
                 this.clientCleanTick = 0;
-                this.prevCleaningClient = currentCleaning;
+                this.clientCleanEndingTick = 0;
+            } else if (!currentCleaning && prevCleaningClient) {
+                this.clientCleanEndingTick = 1;
+                this.clientCleanTick = 0;
             }
-            if (currentCleaning) this.clientCleanTick++;
+            if (currentCleaning) {
+                this.clientCleanTick++;
+            } else if (this.clientCleanEndingTick > 0) {
+                this.clientCleanEndingTick++;
+                if (this.clientCleanEndingTick > 10) this.clientCleanEndingTick = 0;
+            }
+            this.prevCleaningClient = currentCleaning;
 
             boolean currentDrinking = IsDrinking();
             if (currentDrinking && !prevDrinkingClient) {
@@ -356,11 +361,6 @@ public class SifakaEntity extends DiverseCritter {
         if (this.isNewborn() || !this.onGround() || this.isClimbing() || this.isInWaterOrBubble()) {
             return;
         }
-        // Suppress hop when on top of or adjacent to a climbable block. The block-below
-        // check handles standing on top of a column; hasAdjacentClimbableBlock covers the
-        // transition zone where the entity's center has already passed the log edge but is
-        // still within probe range — exactly where the hop would launch it away instead of
-        // letting it drop into CLIMB_DOWN.
         if (this.level().getBlockState(this.blockPosition().below()).is(DoCTags.Blocks.CIVET_CLIMBABLE)
                 || this.hasAdjacentClimbableBlock()) {
             this.walkHopTick = 3;
@@ -454,13 +454,12 @@ public class SifakaEntity extends DiverseCritter {
             else if (v == IdleVariant.LAY  && ticksActive <= layTotal)  isVariantPlaying = true;
         }
 
-        boolean cleaning  = isCleaning();
-        int cleanActive   = this.clientCleanTick;
-        int cleanStart    = 10;
-        int cleanLoop     = 60;
-        int cleanEnd      = 10;
-        int cleanTotal    = cleanStart + cleanLoop + cleanEnd;
-        boolean isCleanPlaying = cleaning && cleanActive <= cleanTotal && !isOrderedSitPlaying;
+        // MODIFICADO: Ahora el estado de limpieza depende del nuevo sistema de Ticks (Starting / Idle / Ending)
+        boolean cleaning        = isCleaning();
+        boolean isCleanStarting = cleaning && this.clientCleanTick <= 10;
+        boolean isCleanIdle     = cleaning && this.clientCleanTick > 10;
+        boolean isCleanEnding   = !cleaning && this.clientCleanEndingTick > 0;
+        boolean isCleanPlaying  = (isCleanStarting || isCleanIdle || isCleanEnding) && !isOrderedSitPlaying;
 
         boolean drinking        = IsDrinking();
         boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
@@ -506,10 +505,11 @@ public class SifakaEntity extends DiverseCritter {
             this.idleLayEndingState.stop();
         }
 
+        // MODIFICADO: Se asocian los estados de limpieza a las nuevas variables
         if (isCleanPlaying) {
-            this.cleanStartingState.animateWhen(cleanActive <= cleanStart, this.tickCount);
-            this.cleanIdleState.animateWhen(cleanActive > cleanStart && cleanActive <= cleanStart + cleanLoop, this.tickCount);
-            this.cleanEndingState.animateWhen(cleanActive > cleanStart + cleanLoop, this.tickCount);
+            this.cleanStartingState.animateWhen(isCleanStarting, this.tickCount);
+            this.cleanIdleState.animateWhen(isCleanIdle, this.tickCount);
+            this.cleanEndingState.animateWhen(isCleanEnding, this.tickCount);
         } else {
             this.cleanStartingState.stop();
             this.cleanIdleState.stop();
@@ -543,11 +543,16 @@ public class SifakaEntity extends DiverseCritter {
         this.climbingDownState.animateWhen(climbDown, this.tickCount);
         this.climbIdleState.animateWhen(climbHang, this.tickCount);
 
-        if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
-            this.attackAnimationTimeout = 10;
-            attackAnimationState.start(this.tickCount);
+        if (this.isAttacking()) {
+            if (this.attackAnimationTimeout <= 0) {
+                this.attackAnimationTimeout = 10;
+                this.attackAnimationState.start(this.tickCount);
+            } else {
+                --this.attackAnimationTimeout;
+            }
         } else {
-            --this.attackAnimationTimeout;
+            this.attackAnimationState.stop();
+            this.attackAnimationTimeout = 0;
         }
     }
 
@@ -685,10 +690,10 @@ public class SifakaEntity extends DiverseCritter {
         double halfD = (box.maxZ - box.minZ) * 0.5;
 
         int[][] offsets = {
-            { Mth.floor(cx + halfW + probeDistance), Mth.floor(cz) },
-            { Mth.floor(cx - halfW - probeDistance), Mth.floor(cz) },
-            { Mth.floor(cx), Mth.floor(cz + halfD + probeDistance) },
-            { Mth.floor(cx), Mth.floor(cz - halfD - probeDistance) }
+                { Mth.floor(cx + halfW + probeDistance), Mth.floor(cz) },
+                { Mth.floor(cx - halfW - probeDistance), Mth.floor(cz) },
+                { Mth.floor(cx), Mth.floor(cz + halfD + probeDistance) },
+                { Mth.floor(cx), Mth.floor(cz - halfD - probeDistance) }
         };
 
         for (int[] off : offsets) {
@@ -696,7 +701,7 @@ public class SifakaEntity extends DiverseCritter {
                 BlockPos posFoot = new BlockPos(off[0], footY + dy, off[1]);
                 BlockPos posEye  = new BlockPos(off[0], eyeY  + dy, off[1]);
                 if (this.level().getBlockState(posFoot).is(DoCTags.Blocks.CIVET_CLIMBABLE)
-                 || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
+                        || this.level().getBlockState(posEye).is(DoCTags.Blocks.CIVET_CLIMBABLE)) {
                     return true;
                 }
             }
@@ -717,10 +722,10 @@ public class SifakaEntity extends DiverseCritter {
         double halfD = (box.maxZ - box.minZ) * 0.5;
 
         double[][] probes = {
-            { cx + halfW + probeDistance, cz,                           -90.0 },
-            { cx - halfW - probeDistance, cz,                            90.0 },
-            { cx,                         cz + halfD + probeDistance,     0.0 },
-            { cx,                         cz - halfD - probeDistance,   180.0 }
+                { cx + halfW + probeDistance, cz,                           -90.0 },
+                { cx - halfW - probeDistance, cz,                            90.0 },
+                { cx,                         cz + halfD + probeDistance,     0.0 },
+                { cx,                         cz - halfD - probeDistance,   180.0 }
         };
 
         for (double[] probe : probes) {
