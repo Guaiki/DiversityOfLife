@@ -45,6 +45,9 @@ public class DOCItems {
     public static final RegistryObject<Item> DIG_BOX = ITEM_TYPES.register("dig_box",
             () -> new BlockItem(DOCBlocks.DIG_BOX.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> AIR_CONDITIONER = ITEM_TYPES.register("air_conditioner",
+            () -> new BlockItem(DOCBlocks.AIR_CONDITIONER.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> BRUSH = ITEM_TYPES.register("brush",
             () -> new BrushItem(new Item.Properties().stacksTo(1).durability(64)));
 

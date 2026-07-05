@@ -210,7 +210,7 @@ public class SifakaStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         float hungerPct      = entity.getHungerPercentage() / 100f;
         float thirstPct      = entity.getThirstPercentage() / 100f;
         float enrichmentPct  = entity.getEnrichmentPercentage() / 100f;
-        float temperaturePct = 1.0f;
+        float temperaturePct = (entity.getTemperatureTier().ordinal() + 1) / 7.0f;
         float humidityPct    = 1.0f;
         float hygienePct     = entity.getHygienePercentage() / 100f;
 
@@ -279,7 +279,7 @@ public class SifakaStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         graphics.drawString(this.font, nametag, -nametagW / 2, 0, NAMETAG_COLOR, true);
         pose.popPose();
 
-        String title = "Verreaux's Sifaka";
+        String title = "The Verreaux's Sifaka";
         int titleW   = this.font.width(title);
         graphics.drawString(this.font, title, ((SCALED_W - titleW) / 2) + TITLE_OFFSET_X, TITLE_OFFSET_Y, TITLE_COLOR, false);
 
@@ -323,6 +323,12 @@ public class SifakaStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         graphics.drawString(this.font, "Breeding: " + (entity.canBreed() ? "ON" : "OFF"), sx, sy + lineH * 4, INFO_TEXT_COLOR, true);
 
         graphics.drawString(this.font, "Status: " + (entity.isTame() ? "Tamed" : "Wild"), sx, sy + lineH * 5, INFO_TEXT_COLOR, true);
+
+        int tempZone = entity.getTemperatureZone();
+        String tempZoneName = tempZone == 0 ? "Comfort" : (tempZone == 1 ? "Stress" : "Danger");
+        int tempColor = tempZone == 0 ? 0x55FF55 : (tempZone == 1 ? 0xFFFF55 : 0xFF5555);
+        String temp = "Temp: " + entity.getTemperatureTier().getDisplayName() + " (" + tempZoneName + ")";
+        graphics.drawString(this.font, temp, sx, sy + lineH * 6, tempColor, true);
 
         pose.popPose();
     }

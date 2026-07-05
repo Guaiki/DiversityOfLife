@@ -29,5 +29,8 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, ToggleBreedMsg.class,
                 ToggleBreedMsg::encode, ToggleBreedMsg::decode, ToggleBreedMsg::handle);
+
+        CHANNEL.registerMessage(id++, SetAirConditionerMsg.class,
+                SetAirConditionerMsg::encode, SetAirConditionerMsg::decode, SetAirConditionerMsg::handle);
     }
 }

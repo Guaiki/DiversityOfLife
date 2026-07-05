@@ -25,6 +25,9 @@ public class DOCBlocks {
     public static final RegistryObject<Block> DIG_BOX = BLOCKS.register("dig_box",
             () -> new DigBoxBlock(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS).noOcclusion()));
 
+    public static final RegistryObject<Block> AIR_CONDITIONER = BLOCKS.register("air_conditioner",
+            () -> new AirConditionerBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
+
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
     }

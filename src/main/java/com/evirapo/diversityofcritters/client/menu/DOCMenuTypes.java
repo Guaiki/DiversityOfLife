@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.client.menu;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.block.AirConditionerMenu;
 import com.evirapo.diversityofcritters.common.block.BowlMenu;
 import com.evirapo.diversityofcritters.common.block.DigBoxMenu;
 import net.minecraft.world.flag.FeatureFlags;
@@ -23,6 +24,9 @@ public class DOCMenuTypes {
 
     public static final RegistryObject<MenuType<DigBoxMenu>> DIG_BOX_MENU =
             MENUS.register("dig_box_menu", () -> IForgeMenuType.create(DigBoxMenu::new));
+
+    public static final RegistryObject<MenuType<AirConditionerMenu>> AIR_CONDITIONER_MENU =
+            MENUS.register("air_conditioner_menu", () -> IForgeMenuType.create(AirConditionerMenu::new));
 
     public static void register(IEventBus eventBus) {
         MENUS.register(eventBus);

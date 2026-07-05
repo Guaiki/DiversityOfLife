@@ -2,6 +2,8 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
+import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
@@ -71,6 +73,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Integer> TEMP_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
 
     int prevHunger;
     int prevThirst;
@@ -156,6 +159,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(IS_PREGNANT, false);
         this.entityData.define(CAN_BREED, true);
         this.entityData.define(IDLE_VARIANT, (byte) 0);
+        this.entityData.define(TEMP_TIER, TemperatureTier.MODERATE.ordinal());
     }
 
     @Override
@@ -289,6 +293,44 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     public boolean isDoingSpecialActivity() { return false; }
 
+    // --- TEMPERATURE ---
+    private static final int TEMP_CHECK_INTERVAL = 40;
+    private static final int TEMP_DANGER_DAMAGE_INTERVAL = 600; // 30s
+    private static final float TEMP_DANGER_DAMAGE = 2.0F;       // 1 corazón
+
+    /** Rango de confort por especie; sobrescribir en cada entidad. */
+    public TemperatureTier comfortTierMin() { return TemperatureTier.COOL; }
+    public TemperatureTier comfortTierMax() { return TemperatureTier.WARM; }
+
+    public TemperatureTier getTemperatureTier() { return TemperatureTier.byId(this.entityData.get(TEMP_TIER)); }
+
+    /** 0 = Confort, 1 = Estrés, 2+ = Peligro */
+    public int getTemperatureZone() {
+        return getTemperatureTier().distanceOutside(comfortTierMin(), comfortTierMax());
+    }
+
+    public boolean isTemperatureComfortable() { return getTemperatureZone() == 0; }
+
+    private double getTemperatureLossMultiplier() {
+        int zone = getTemperatureZone();
+        if (zone >= 2) return 2.0;
+        if (zone == 1) return 1.5;
+        return 1.0;
+    }
+
+    private void tickTemperature() {
+        if (this.tickCount % TEMP_CHECK_INTERVAL == 0) {
+            TemperatureTier tier = TemperatureSystem.getEffectiveTier(this.level(), this.blockPosition());
+            this.entityData.set(TEMP_TIER, tier.ordinal());
+        }
+
+        if (getTemperatureZone() >= 2 && this.tickCount % TEMP_DANGER_DAMAGE_INTERVAL == 0) {
+            boolean tooCold = getTemperatureTier().ordinal() < comfortTierMin().ordinal();
+            DamageSource source = tooCold ? this.damageSources().freeze() : this.damageSources().onFire();
+            this.hurt(source, TEMP_DANGER_DAMAGE);
+        }
+    }
+
     public boolean isClimbing() { return false; }
 
     public void onStartEatingItem(ItemStack stack) {}
@@ -318,8 +360,11 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
 
+            this.tickTemperature();
+            double tempMultiplier = getTemperatureLossMultiplier();
+
             if (this.getHunger() > 0) {
-                double lossPerTick = getHungerLossPerSecond() / 60.0;
+                double lossPerTick = getHungerLossPerSecond() / 60.0 * tempMultiplier;
                 hungerLossAccum += lossPerTick;
                 if (hungerLossAccum >= 1.0) {
                     int loss = (int) hungerLossAccum; hungerLossAccum -= loss;
@@ -327,7 +372,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
                 }
             }
             if (this.getThirst() > 0) {
-                double lossPerTick = getThirstLossPerSecond() / 60.0;
+                double lossPerTick = getThirstLossPerSecond() / 60.0 * tempMultiplier;
                 thirstLossAccum += lossPerTick;
                 if (thirstLossAccum >= 1.0) {
                     int loss = (int) thirstLossAccum; thirstLossAccum -= loss;
@@ -660,6 +705,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (this.isPregnant() || otherCritter.isPregnant()) return false;
         if (this.isOrderedToSit() || otherCritter.isOrderedToSit()) return false;
         if (this.isBaby() || otherCritter.isBaby()) return false;
+        if (!this.isTemperatureComfortable() || !otherCritter.isTemperatureComfortable()) return false;
 
         return this.breedCooldown <= 0 && otherCritter.breedCooldown <= 0;
     }

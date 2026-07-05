@@ -51,6 +51,16 @@ import java.util.function.Predicate;
 
 public class CivetEntity extends DiverseCritter {
 
+    // Civeta de palma bandeada: tropical del sudeste asiático
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
+    }
+
     public final AnimationState idleAnimationState = new AnimationState();
     public final AnimationState idleStandUpState   = new AnimationState();
     public final AnimationState idleSniffLeftState = new AnimationState();

@@ -47,6 +47,16 @@ import java.util.function.Predicate;
 
 public class SquirrelEntity extends DiverseCritter {
 
+    // Ardilla voladora gigante: bosques templados de montaña
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.COOL;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+    }
+
     // --- ANIMATION STATES ---
     public final AnimationState idleAnimationState   = new AnimationState();
     public final AnimationState idleStandUpState     = new AnimationState();

@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.block;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.block.entity.AirConditionerBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.BowlBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.DigBoxBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -26,6 +27,11 @@ public class DOCBlockEntities {
             BLOCK_ENTITIES.register("dig_box_be", () ->
                     BlockEntityType.Builder.of(DigBoxBlockEntity::new,
                             DOCBlocks.DIG_BOX.get()).build(null));
+
+    public static final RegistryObject<BlockEntityType<AirConditionerBlockEntity>> AIR_CONDITIONER_BE =
+            BLOCK_ENTITIES.register("air_conditioner_be", () ->
+                    BlockEntityType.Builder.of(AirConditionerBlockEntity::new,
+                            DOCBlocks.AIR_CONDITIONER.get()).build(null));
 
     public static void register(IEventBus eventBus) {
         BLOCK_ENTITIES.register(eventBus);

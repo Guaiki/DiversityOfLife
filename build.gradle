@@ -129,6 +129,12 @@ repositories {
             url "https://maven.blamejared.com/"
         }
     }
+    maven {
+        url "https://cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
 }
 
 dependencies {
@@ -141,6 +147,8 @@ dependencies {
 
     compileOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")
     runtimeOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")
+    implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
+    implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
 
     implementation "io.github.llamalad7:mixinextras-forge:0.3.6"
     annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.6"

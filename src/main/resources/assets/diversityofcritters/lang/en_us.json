@@ -45,6 +45,9 @@
   "screen.diversityofcritters.species": "Species",
   "container.diversityofcritters.bowl": "Bowl",
   "block.diversityofcritters.dig_box": "Dig Box",
+  "block.diversityofcritters.air_conditioner": "Air Conditioner",
+  "gui.diversityofcritters.air_conditioner.temperature": "Temperature",
+  "gui.diversityofcritters.air_conditioner.size": "Size (Blocks)",
 
   "item.diversityofcritters.worm": "Worm"
 }

@@ -228,7 +228,7 @@ public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         float hungerPct      = entity.getHungerPercentage()      / 100f;
         float thirstPct      = entity.getThirstPercentage()      / 100f;
         float enrichmentPct  = entity.getEnrichmentPercentage()  / 100f;
-        float temperaturePct = 1.0f;
+        float temperaturePct = (entity.getTemperatureTier().ordinal() + 1) / 7.0f;
         float humidityPct    = 1.0f;
         float hygienePct     = entity.getHygienePercentage()     / 100f;
 
@@ -349,6 +349,12 @@ public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
 
         String status = "Status: " + (entity.isTame() ? "Tamed" : "Wild");
         graphics.drawString(this.font, status, sx, sy + lineH * 5, INFO_TEXT_COLOR, true);
+
+        int tempZone = entity.getTemperatureZone();
+        String tempZoneName = tempZone == 0 ? "Comfort" : (tempZone == 1 ? "Stress" : "Danger");
+        int tempColor = tempZone == 0 ? 0x55FF55 : (tempZone == 1 ? 0xFFFF55 : 0xFF5555);
+        String temp = "Temp: " + entity.getTemperatureTier().getDisplayName() + " (" + tempZoneName + ")";
+        graphics.drawString(this.font, temp, sx, sy + lineH * 6, tempColor, true);
 
         pose.popPose();
     }

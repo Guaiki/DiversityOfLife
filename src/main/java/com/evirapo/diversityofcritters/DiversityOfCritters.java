@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters;
 
 import com.evirapo.diversityofcritters.client.menu.DOCMenuTypes;
+import com.evirapo.diversityofcritters.client.screen.AirConditionerScreen;
 import com.evirapo.diversityofcritters.client.screen.BowlScreen;
 import com.evirapo.diversityofcritters.client.screen.DigBoxScreen;
 import com.evirapo.diversityofcritters.common.block.DOCBlockEntities;
@@ -59,6 +60,7 @@ public class DiversityOfCritters {
         event.enqueueWork(() -> {
             MenuScreens.register(DOCMenuTypes.BOWL.get(), BowlScreen::new);
             MenuScreens.register(DOCMenuTypes.DIG_BOX_MENU.get(), DigBoxScreen::new);
+            MenuScreens.register(DOCMenuTypes.AIR_CONDITIONER_MENU.get(), AirConditionerScreen::new);
         });
     }
 

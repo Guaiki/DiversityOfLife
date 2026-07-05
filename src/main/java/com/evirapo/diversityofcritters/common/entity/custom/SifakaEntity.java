@@ -49,6 +49,16 @@ import java.util.function.Predicate;
 
 public class SifakaEntity extends DiverseCritter {
 
+    // Sifaka de Verreaux: bosques secos y calurosos de Madagascar
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
+    }
+
     public final AnimationState idleAnimationState    = new AnimationState();
     public final AnimationState idleStandUpState      = new AnimationState();
     public final AnimationState idleSniffLeftState    = new AnimationState();
