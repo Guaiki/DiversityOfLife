@@ -6,7 +6,8 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "compat.CarryOnDataMixin",
-    "compat.CarryRenderHelperMixin"
+    "compat.CarryRenderHelperMixin",
+    "compat.SereneSeasonsMeltMixin"
   ],
   "client": [
   ],

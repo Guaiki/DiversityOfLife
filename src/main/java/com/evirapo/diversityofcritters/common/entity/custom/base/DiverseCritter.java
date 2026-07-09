@@ -74,6 +74,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Integer> TEMP_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
 
     int prevHunger;
     int prevThirst;
@@ -160,6 +161,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(CAN_BREED, true);
         this.entityData.define(IDLE_VARIANT, (byte) 0);
         this.entityData.define(TEMP_TIER, TemperatureTier.MODERATE.ordinal());
+        this.entityData.define(TEMP_COMFORT, 100);
     }
 
     @Override
@@ -179,6 +181,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putBoolean("CanBreed", this.canBreed());
         pCompound.putInt("PregnancyTimer", this.pregnancyTimer);
         pCompound.putInt("BreedCooldown", this.breedCooldown);
+        pCompound.putInt("TempComfort", this.getTemperatureComfort());
     }
 
     private Integer loadedNbtAge = null;
@@ -213,6 +216,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (pCompound.contains("CanBreed")) this.setCanBreed(pCompound.getBoolean("CanBreed"));
         if (pCompound.contains("PregnancyTimer")) this.pregnancyTimer = pCompound.getInt("PregnancyTimer");
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
+        if (pCompound.contains("TempComfort")) this.setTemperatureComfort(pCompound.getInt("TempComfort"));
     }
 
     public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
@@ -297,6 +301,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final int TEMP_CHECK_INTERVAL = 40;
     private static final int TEMP_DANGER_DAMAGE_INTERVAL = 600; // 30s
     private static final float TEMP_DANGER_DAMAGE = 2.0F;       // 1 corazón
+    private static final int TEMP_COMFORT_GAIN_PER_SECOND = 4;  // lleno desde 0 en 25s
+    private static final int TEMP_STRESS_LOSS_PER_SECOND = 2;   // vacío desde 100 en 50s
+    private static final int TEMP_DANGER_LOSS_PER_SECOND = 4;   // vacío desde 100 en 25s
 
     /** Rango de confort por especie; sobrescribir en cada entidad. */
     public TemperatureTier comfortTierMin() { return TemperatureTier.COOL; }
@@ -311,6 +318,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     public boolean isTemperatureComfortable() { return getTemperatureZone() == 0; }
 
+    /** Barra de temperatura (0-100): sube cuando el animal está en su rango, baja fuera de él. */
+    public int getTemperatureComfort() { return this.entityData.get(TEMP_COMFORT); }
+    public void setTemperatureComfort(int value) {
+        this.entityData.set(TEMP_COMFORT, Math.max(0, Math.min(100, value)));
+    }
+
     private double getTemperatureLossMultiplier() {
         int zone = getTemperatureZone();
         if (zone >= 2) return 2.0;
@@ -322,6 +335,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (this.tickCount % TEMP_CHECK_INTERVAL == 0) {
             TemperatureTier tier = TemperatureSystem.getEffectiveTier(this.level(), this.blockPosition());
             this.entityData.set(TEMP_TIER, tier.ordinal());
+        }
+
+        if (this.tickCount % 20 == 0) {
+            int zone = getTemperatureZone();
+            int delta = zone == 0 ? TEMP_COMFORT_GAIN_PER_SECOND
+                    : (zone == 1 ? -TEMP_STRESS_LOSS_PER_SECOND : -TEMP_DANGER_LOSS_PER_SECOND);
+            setTemperatureComfort(getTemperatureComfort() + delta);
         }
 
         if (getTemperatureZone() >= 2 && this.tickCount % TEMP_DANGER_DAMAGE_INTERVAL == 0) {

@@ -24,6 +24,9 @@ public class DiversityMixinPlugin implements IMixinConfigPlugin {
             boolean isCarryOnLoaded = FMLLoader.getLoadingModList().getModFileById("carryon") != null;
             return isCarryOnLoaded;
         }
+        if (mixinClassName.contains("compat.SereneSeasons")) {
+            return FMLLoader.getLoadingModList().getModFileById("sereneseasons") != null;
+        }
         return true;
     }
 

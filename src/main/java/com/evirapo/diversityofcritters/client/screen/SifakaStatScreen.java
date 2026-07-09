@@ -210,7 +210,7 @@ public class SifakaStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         float hungerPct      = entity.getHungerPercentage() / 100f;
         float thirstPct      = entity.getThirstPercentage() / 100f;
         float enrichmentPct  = entity.getEnrichmentPercentage() / 100f;
-        float temperaturePct = (entity.getTemperatureTier().ordinal() + 1) / 7.0f;
+        float temperaturePct = entity.getTemperatureComfort() / 100f;
         float humidityPct    = 1.0f;
         float hygienePct     = entity.getHygienePercentage() / 100f;
 

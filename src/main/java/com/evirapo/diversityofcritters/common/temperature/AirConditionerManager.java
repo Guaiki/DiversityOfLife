@@ -28,6 +28,15 @@ public class AirConditionerManager {
         if (map != null) map.remove(pos);
     }
 
+    /**
+     * true si la posición está dentro del área de un Air Conditioner en modo frío
+     * (FREEZING/COLD): ahí la nieve y el hielo no deben derretirse (vanilla o Serene Seasons).
+     */
+    public static boolean isProtectedFromMelt(Level level, BlockPos pos) {
+        TemperatureTier tier = getOverride(level, pos);
+        return tier != null && tier.ordinal() <= TemperatureTier.COLD.ordinal();
+    }
+
     /** Devuelve el tier del Air Conditioner más cercano que cubra la posición, o null si ninguno. */
     @Nullable
     public static TemperatureTier getOverride(Level level, BlockPos pos) {
