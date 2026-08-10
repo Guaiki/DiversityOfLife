@@ -467,11 +467,11 @@ public class SifakaEntity extends DiverseCritter {
 
         boolean isVariantPlaying = false;
         if (!isOrderedSitPlaying) {
-            if (v == IdleVariant.STAND_UP  && ticksActive <= 40)       isVariantPlaying = true;
+            if (v == IdleVariant.STRETCH  && ticksActive <= 40)       isVariantPlaying = true;
             else if (v == IdleVariant.SNIFF_LEFT  && ticksActive <= 40) isVariantPlaying = true;
             else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
             else if (v == IdleVariant.SIT  && ticksActive <= sitTotal)  isVariantPlaying = true;
-            else if (v == IdleVariant.LAY  && ticksActive <= layTotal)  isVariantPlaying = true;
+            else if (v == IdleVariant.STAND_UP  && ticksActive <= layTotal)  isVariantPlaying = true;
         }
 
         // MODIFICADO: Ahora el estado de limpieza depende del nuevo sistema de Ticks (Starting / Idle / Ending)
@@ -501,7 +501,7 @@ public class SifakaEntity extends DiverseCritter {
         this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
         this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
 
-        this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP  && isVariantPlaying, this.tickCount);
+        this.idleStandUpState.animateWhen(v == IdleVariant.STRETCH  && isVariantPlaying, this.tickCount);
         this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT  && isVariantPlaying, this.tickCount);
         this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
 
@@ -515,7 +515,7 @@ public class SifakaEntity extends DiverseCritter {
             this.idleSitEndingState.stop();
         }
 
-        if (v == IdleVariant.LAY && isVariantPlaying) {
+        if (v == IdleVariant.STAND_UP && isVariantPlaying) {
             this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
             this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
             this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
@@ -668,8 +668,10 @@ public class SifakaEntity extends DiverseCritter {
     @Override public int maxThirst()      { return 4000; }
     @Override public int maxEnrichment()  { return 4000; }
     @Override public int maxHygiene()     { return 4000; }
-    @Override public int getPreparingSleepDuration() { return this.isNewborn() ? 20 : 25; }
-    @Override public int getAwakeningDuration()      { return this.isNewborn() ? 20 : 24; }
+    // Ticks de juego, y exactamente la longitud del clip: 2.0 s = 40 en el adulto, 1.0 s = 20 en
+    // el recién nacido. Ver la nota en SleepBehaviorGoal#phaseUntilTick.
+    @Override public int getPreparingSleepDuration() { return this.isNewborn() ? 20 : 40; }
+    @Override public int getAwakeningDuration()      { return this.isNewborn() ? 20 : 40; }
     @Override protected boolean getDefaultDiurnal()  { return true; }
     @Override protected double getHungerLossPerSecond()     { return 3.33; }
     @Override protected double getThirstLossPerSecond()     { return 5.0;  }

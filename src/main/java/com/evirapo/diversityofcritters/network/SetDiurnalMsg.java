@@ -33,7 +33,7 @@ public class SetDiurnalMsg {
             var e = level.getEntity(msg.entityId);
 
             if (e instanceof com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter critter) {
-                critter.setDiurnal(msg.diurnal);
+                critter.setDiurnalByPlayer(msg.diurnal);
             }
         });
         ctx.setPacketHandled(true);

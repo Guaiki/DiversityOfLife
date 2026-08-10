@@ -304,6 +304,29 @@ porque compiten por `MOVE`.
 **Consecuencia: `setExitAnimation` ya no hace falta.** Era necesario solo porque en la v1 la cadena
 la dirigía el flag. Se cae de la lista de cambios en la librería.
 
+### 3.5 bis — Regla obligatoria: todo `REPEATING` lleva `playCondition`
+
+Aprendida a base de romperla en la fase 2. `MobAnimator.tick()` **auto-arranca cualquier animación
+`REPEATING` cuya condición se cumpla**, y la condición por defecto de `BaseAnimation` es `anim -> true`:
+
+```java
+if (!anim.isPlaying() && base.getLoop().repeats() && anim.canPlay()) { ...; anim.start(); }
+```
+
+Registrar el bucle de una cadena "sin condición, ya lo dirige el goal" hace que se encienda solo en
+cuanto nada mejor esté sonando, y como los bucles de actividad tienen mejor prioridad que `idle`,
+se queda pegado para siempre. Es lo que pasó con `ordered_sit_loop`: la ardilla se quedaba sentada
+aunque no estuviera domesticada y el goal ni se ejecutara.
+
+- **`enter` y `exit`**: `PLAY_ONCE`, sin condición. Nunca auto-arrancan; sólo el goal los lanza con
+  `play()`, que es lo que permite que la salida suene con el flag ya apagado.
+- **`loop`**: `REPEATING`, **siempre** con `playCondition` sobre el flag sincronizado de la actividad
+  (`isOrderedToSit()`, `isCleaning()`, `IsDrinking()`…). El goal sigue siendo quien lanza la entrada;
+  la condición sólo evita el auto-arranque espurio y detiene el bucle si el flag cae por su cuenta.
+
+Que las tres fases compartan prioridad es lo que impide que el bucle, ya con su condición cumplida,
+pise a su propia entrada: el guard es `current.getPriority() <= base.getPriority()`.
+
 ### 3.6 Qué NO va por aquí
 
 Las animaciones **derivadas de estado** siguen con `playCondition` puro, sin goal que las dirija:
@@ -476,12 +499,40 @@ línea cuando queramos probarlo.
 **Fase 1 — Cableado.** Repo maven, `fg.deobf`, `mods.toml`, ATs.
 *Aceptación*: el mod arranca con `deluxelib` y sin entidades de test en el juego.
 
-**Fase 2 — `DiverseCritter`.** `Animatable`, `MobAnimator`, `IS_MOVING`, `AnimationLockGoal`, cadenas
-comunes (`sleep_*`, `ordered_sit_*`, `cry_*`) con `PhasedActivityGoal`.
-*Aceptación*: dormir, sentarse por orden y llorar con crossfade y sin deslizamiento durante los exits.
+**Fase 2 — `DiverseCritter`.** ✅ Hecha, con el alcance recortado por dos hallazgos:
 
-**Fase 3 — `SquirrelEntity`.** Resto de cadenas, `Rig`, borrado de `setupAnimationStatesClient`,
-goals de §5. *Aceptación*, en juego:
+- `Animatable`, `MobAnimator`, `IS_MOVING` con histéresis y `AnimationLockGoal` a prioridad 0 (lo
+  heredan las tres especies vía `super.registerGoals()`).
+- Locomoción de la ardilla (`idle`/`walk`/`run`) migrada al modelo de Athenian/Arpy, fuera todo el
+  cálculo de pesos a mano.
+- `ordered_sit_*` migrada en la ardilla: `CritterOrderedSitGoal` sustituye a `SitWhenOrderedToGoal`,
+  y el clip de salida lleva `locksMovement()`.
+- **`cry_*` queda para la fase 3/4, no por ser código muerto.** Se renderiza en los modelos de
+  **bebé** (`SquirrelBabyModel`, `SifakaBabyModel`, `CivetBabyModel`), cada uno con sus propios
+  clips (`SquirrelBabyAnims.preparing_cry` / `cry` / `stopping_cry`); los modelos adultos no la
+  tocan, y el renderer elige uno u otro según `isNewborn()`. Tiene los mismos problemas que las
+  demás cadenas —máquina de estados sólo-cliente en `handleCryingAnimationClient()`, y `BabyCryGoal`
+  no retiene durante los 10 ticks del clip de parada— pero migrarla implica meter los modelos de
+  bebé en la librería, que es un frente aparte.
+- **`sleep_*` se deja como está.** Es la única cadena que ya retiene bien (`SleepBehaviorGoal`
+  sostiene la fase AWAKENING), y su enum de 4 estados no encaja en 3 fases + una salida que
+  sobrevive al goal. Migrarla arriesga lo único que funciona a cambio de nada.
+
+Añadido a la librería sobre la marcha: `PhasedActivityGoal.repeatIndefinitely()`, porque sentarse
+dura lo que el jugador quiera y no un número de repeticiones. Publicada como `1.4.1-1.20.1`.
+
+**Fase 3 — `SquirrelEntity`.** ✅ Hecha salvo el `Rig`. Migradas `drink_*`, `clean_*`, `eat_*` y las
+cinco variantes de idle; `setupAnimationStatesClient()` pasa de 123 a 21 líneas (sólo quedan trepada,
+planeo, natación y el idle del bebé); fuera 18 `AnimationState`, los 12 contadores `client*Tick`,
+`isVariantActive` y el `busyGraceTicks` transitorio. Goals nuevos: `CritterCleanChainGoal`,
+`CritterDrinkChainGoal`, `SquirrelEatLeavesChainGoal`, `CritterIdleVariantGoal` (los viejos siguen
+en pie para Sifaka y Civet hasta la fase 4). `isDoingSpecialActivity()` ampliado con `isClimbing()`.
+
+**Aplazado a un pase propio: el `Rig` y `LookAtAdditive`.** Cambiar la rotación de cabeza de
+asignación directa a aditivo con auto-atenuación por `blockAdditive()` afecta a todos los estados a
+la vez, y mezclarlo con la migración de cuatro cadenas haría imposible aislar una regresión.
+
+*Aceptación*, en juego:
 1. Acicalado → caminar: sin deslizamiento durante los 10 ticks de salida.
 2. Beber: N sorbos audibles = N repeticiones configuradas, sin corte duro entre fases.
 3. Colgar de un tronco: no arranca el acicalado; sin temblor de cabeza.
@@ -494,7 +545,27 @@ goals de §5. *Aceptación*, en juego:
 **Fase 4 — `SifakaEntity` y `CivetEntity`.** Civet añade `dig_*` y `scratch_*`. Ambos añaden
 `attack`, donde entra `AnimatableMeleeAttackGoal` y se retira `IAnimatedAttacker`.
 
-**Fase 5 — Opcional.** A/B de `applyWalk`; `registerDeath` + `CustomMobRenderer`.
+**Fase 5 — Los bebés.** (Redefinida: en la v2 esta fase eran mejoras opcionales, pero al decidir la
+"opción b" —dejar los bebés enteros para el final— pasó a ser la suya. Las opcionales bajan a la 6.)
+
+Cada especie tiene un modelo de bebé con **jerarquía de huesos propia** (la raíz de
+`SquirrelBabyModel` se llama `Bandedpalmcivetkit`) y su propio juego de clips: idle, move (gateo),
+sleep ×3 y cry ×3. Por eso **no pueden compartir la capa 0 con el adulto**: los clips del adulto
+renderizados sobre los huesos del bebé darían basura.
+
+Dos salidas, y la segunda es mejor:
+
+- (a) Añadir `!isNewborn()` a las ~20 `playCondition` del adulto y `isNewborn()` a las del bebé.
+- (b) **Registrar las del bebé en la capa 1** y que `SquirrelBabyModel` llame a
+  `applyBlended(..., 1)`. Cada modelo lee sólo su capa, sin contaminación cruzada y sin veinte
+  gates nuevos. Es además el primer uso real del soporte multicapa de la librería.
+
+Incluye pasar `BabyCryGoal` a `PhasedActivityGoal` (hoy no retiene durante los 10 ticks del clip de
+parada) y borrar `handleCryingAnimationClient()`, que es la última máquina de estados sólo-cliente
+que queda.
+
+**Fase 6 — Opcional.** A/B de `applyWalk` contra el overlay actual; `registerDeath` +
+`CustomMobRenderer` si algún día se animan muertes.
 
 ---
 

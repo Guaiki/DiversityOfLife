@@ -77,6 +77,11 @@ minecraft {
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
             property 'forge.logging.console.level', 'debug'
 
+            // Descomentar para que DeluxeLib loguee cada START/STOP/BLEND de animación
+            // ([DLXANIM] en la consola, con S/C según el lado). Es la forma rápida de ver si una
+            // playCondition se está evaluando como esperas. Ruidoso con varios mobs en pantalla.
+            // property 'deluxelib.animDebug', 'true'
+
             mods {
                 "${mod_id}" {
                     source sourceSets.main
@@ -124,6 +129,14 @@ repositories {
     //     dir 'libs'
     // }
     mavenCentral()
+
+    // DeluxeLib (animaciones). Se publica desde C:\Andres\Trabajo\Deluxe_Lib con `gradlew publish`;
+    // hay que republicar cada vez que cambie la librería o este build no verá los cambios.
+    maven {
+        url = "file:///C:/Andres/Trabajo/Deluxe_Lib/mcmodsrepo"
+        content { includeGroup "net.darkblade.deluxelib" }
+    }
+
     repositories {
         maven {
             url "https://maven.blamejared.com/"
@@ -144,6 +157,9 @@ dependencies {
     // If the group id is "net.minecraft" and the artifact id is one of ["client", "server", "joined"],
     // then special handling is done to allow a setup of a vanilla dependency without the use of an external repository.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // fg.deobf es obligatorio: el jar publicado está reobfuscado a SRG, igual que uno de CurseForge.
+    implementation fg.deobf("net.darkblade.deluxelib:deluxelib:1.4.3-1.20.1")
 
     compileOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")
     runtimeOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")

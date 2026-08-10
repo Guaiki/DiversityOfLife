@@ -9,6 +9,13 @@ import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
+import net.darkblade.deluxelib.anim.AnimSource;
+import net.darkblade.deluxelib.anim.Animatable;
+import net.darkblade.deluxelib.anim.Loop;
+import net.darkblade.deluxelib.anim.StandardAnimation;
+import net.darkblade.deluxelib.anim.MobAnimator;
+import net.darkblade.deluxelib.entity.MovementHysteresis;
+import net.darkblade.deluxelib.entity.ai.goal.AnimationLockGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -38,8 +45,10 @@ import net.minecraftforge.network.PacketDistributor;
 import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
-public abstract class DiverseCritter extends TamableAnimal implements ContainerListener, IAnimatedAttacker {
+public abstract class DiverseCritter extends TamableAnimal
+        implements ContainerListener, IAnimatedAttacker, Animatable<DiverseCritter> {
 
     public enum SleepState {
         AWAKE(0), PREPARING(1), SLEEPING(2), AWAKENING(3);
@@ -51,8 +60,19 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
+    /**
+     * Florituras de reposo. {@code STRETCH} es un clip suelto (estirarse) y {@code STAND_UP} es una
+     * cadena de tres fases (erguirse sobre las patas traseras, aguantar, bajar).
+     *
+     * <p>Los nombres estuvieron cruzados hasta 2026-08-10: el export de Blockbench llamaba "Lay" a
+     * lo que en realidad es erguirse, y "Stand up" a lo que es estirarse. Los bytes de
+     * {@code toIdleByte} se mantuvieron al corregirlo, así que los mundos guardados siguen válidos.
+     */
+    public enum IdleVariant { NONE, STRETCH, SNIFF_LEFT, SNIFF_RIGHT, SIT, STAND_UP }
 
+    /** Sincronizado porque las playCondition de idle/walk/run se evalúan en servidor pero el cliente
+     *  necesita el mismo valor: deltaMovement no se sincroniza para mobs. Ver {@link #isMoving()}. */
+    private static final EntityDataAccessor<Boolean> IS_MOVING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> IS_JUVENILE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
@@ -114,6 +134,145 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     private SleepState prevSleepState = SleepState.AWAKE;
 
+    // --- ANIMACIONES (DeluxeLib) ---
+    private final MobAnimator<DiverseCritter> animator = new MobAnimator<>(this);
+    /** Suaviza el "se está moviendo" para que el umbral crudo no parpadee entre idle y walk. */
+    private final MovementHysteresis movingHysteresis = new MovementHysteresis();
+
+    @Override
+    public @javax.annotation.Nonnull MobAnimator<DiverseCritter> animator() {
+        return this.animator;
+    }
+
+    /**
+     * La llama DeluxeLib en EntityJoinLevelEvent, en ambos lados. Vacío por defecto: cada especie
+     * registra las suyas. Las que no lo hagan simplemente no tienen animator con contenido.
+     */
+    @Override
+    public void registerAnimations() {
+    }
+
+    // Prioridades de la capa 0. Número más bajo gana: si la especie planea, trepa, nada o duerme,
+    // eso manda sobre cualquier actividad, y las actividades mandan sobre la locomoción.
+    protected static final int P_GLIDE = 0;
+    protected static final int P_CLIMB = 1;
+    protected static final int P_SWIM = 2;
+    protected static final int P_SLEEP = 3;
+    protected static final int P_ATTACK = 4;
+    protected static final int P_ORDERED_SIT = 5;
+    protected static final int P_ACTIVITY = 6;
+    protected static final int P_IDLE_VARIANT = 7;
+    protected static final int P_WALK = 8;
+    protected static final int P_IDLE = 9;
+
+    /**
+     * Registra una cadena {@code <nombre>_enter/_loop/_exit} en la capa 0, las tres con la misma
+     * prioridad. Devuelve el bucle porque **siempre** hay que ponerle una {@code playCondition}: sin
+     * ella {@code MobAnimator} lo auto-arrancaría solo, y al tener mejor prioridad que idle se
+     * quedaría pegado para siempre.
+     *
+     * <p>Que las tres compartan prioridad es lo que impide que el bucle pise a su propia entrada:
+     * el guard del auto-arranque es {@code current.getPriority() <= base.getPriority()}.
+     *
+     * <p>La salida lleva {@code locksMovement()}, así que {@code AnimationLockGoal} clava al critter
+     * mientras suena y no se desliza con la pose de settle a medias.
+     */
+    protected final StandardAnimation registerChain(String name,
+                                                    Supplier<Object> enter, float enterSecs,
+                                                    Supplier<Object> loop, float loopSecs,
+                                                    Supplier<Object> exit, float exitSecs, int priority) {
+        return this.registerChain(name, enter, enterSecs, loop, loopSecs, exit, exitSecs, priority, LAYER_ADULT);
+    }
+
+    /**
+     * Capa 0: el modelo adulto. Capa 1: el de bebé, que tiene una jerarquía de huesos completamente
+     * distinta —la raíz de {@code SquirrelBabyModel} se llama {@code Bandedpalmcivetkit}— así que sus
+     * clips no pueden convivir con los del adulto: cada modelo lee sólo su capa y no hay
+     * contaminación cruzada ni que repetir un gate {@code isNewborn()} en veinte condiciones.
+     */
+    protected static final int LAYER_ADULT = 0;
+    protected static final int LAYER_BABY = 1;
+
+    /** @see #registerChain(String, Supplier, float, Supplier, float, Supplier, float, int) */
+    protected final StandardAnimation registerChain(String name,
+                                                    Supplier<Object> enter, float enterSecs,
+                                                    Supplier<Object> loop, float loopSecs,
+                                                    Supplier<Object> exit, float exitSecs,
+                                                    int priority, int layer) {
+        StandardAnimation e = new StandardAnimation(name + "_enter",
+                new AnimSource(enter), Loop.PLAY_ONCE, layer, priority, enterSecs);
+        StandardAnimation l = new StandardAnimation(name + "_loop",
+                new AnimSource(loop), Loop.REPEATING, layer, priority, loopSecs);
+        StandardAnimation x = new StandardAnimation(name + "_exit",
+                new AnimSource(exit), Loop.PLAY_ONCE, layer, priority, exitSecs);
+
+        e.blendInMs(150).blendOutMs(120).setNextAnimation(name + "_loop");
+        l.blendInMs(120).blendOutMs(150);
+        x.blendInMs(120).blendOutMs(200).locksMovement();
+
+        this.animator().register(e, l, x);
+        return l;
+    }
+
+    /**
+     * Gesto o estado de un solo clip: se registra como {@code <nombre>_loop}.
+     *
+     * <p>{@code PLAY_ONCE} cuando es un gesto que debe sonar una vez y ceder (lo usa
+     * {@code CritterIdleGestureGoal}, que cierra el goal cuando el animator dice que terminó), y
+     * {@code REPEATING} cuando es un estado continuo como nadar o trepar.
+     */
+    protected final StandardAnimation registerSingle(String name, Supplier<Object> clip,
+                                                     float seconds, Loop loop, int priority) {
+        return this.registerSingle(name, clip, seconds, loop, priority, LAYER_ADULT);
+    }
+
+    /** @see #registerSingle(String, Supplier, float, Loop, int) */
+    protected final StandardAnimation registerSingle(String name, Supplier<Object> clip,
+                                                     float seconds, Loop loop, int priority, int layer) {
+        StandardAnimation a = new StandardAnimation(name + "_loop",
+                new AnimSource(clip), loop, layer, priority, seconds);
+        a.blendInMs(150).blendOutMs(200);
+        this.animator().register(a);
+        return a;
+    }
+
+    /**
+     * Congela al critter mientras suene un clip marcado con {@code locksMovement()} — los de salida
+     * de las cadenas de actividad. Va a prioridad 0 para ganarle MOVE/LOOK a la locomoción, y no
+     * reclama JUMP, así que {@code CustomFloatGoal} sigue flotando en el agua.
+     *
+     * <p>Las subclases llaman a {@code super.registerGoals()} antes de registrar los suyos, así que
+     * lo heredan las tres especies sin tocarlas.
+     */
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(0, new AnimationLockGoal(this));
+    }
+
+    /** Con histéresis y sincronizado — ver {@link #IS_MOVING}. Lo usan las playCondition de
+     *  idle/walk/run. */
+    public boolean isMoving() {
+        return this.entityData.get(IS_MOVING);
+    }
+
+    /**
+     * True mientras el critter está metido en una actividad con animación propia: beber, acicalarse,
+     * sentarse por orden, una variante de reposo, o cualquier clip que esté clavando el movimiento.
+     *
+     * <p>Sirve para que un gesto cosmético no se apile encima de una acción en curso. No se puede
+     * resolver sólo con {@code isMovementLocked()}: un gesto es precisamente algo que NO clava el
+     * movimiento, así que las actividades que están en su fase de bucle no aparecerían ahí.
+     */
+    public boolean isPerformingActivity() {
+        return this.IsDrinking()
+                || this.isCleaning()
+                || this.isOrderedToSit()
+                || this.isIdleLocked()
+                || this.isDoingSpecialActivity()
+                || this.animator().isMovementLocked();
+    }
+
     protected DiverseCritter(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.createInventory();
@@ -146,6 +305,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
+        this.entityData.define(IS_MOVING, false);
         this.entityData.define(IS_MALE, true);
         this.entityData.define(HUNGER, maxHunger());
         this.entityData.define(THIRST, maxThirst());
@@ -284,18 +444,43 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public boolean isDiurnal() { return this.entityData.get(DIURNAL); }
     public void setDiurnal(boolean value) { this.entityData.set(DIURNAL, value); }
 
+    /**
+     * Cambia el cronotipo por acción del jugador (botones sol/luna de la ficha).
+     *
+     * <p>Aparte de mover el flag deja marcado que el ciclo de sueño debe re-evaluarse en el acto.
+     * Sin esto el cambio se nota pero tarda: dormirse tiene un retardo repartido de hasta medio
+     * minuto, y entre siesta y siesta hay una espera de 30 a 90 s, así que pulsar el botón parecía
+     * no hacer nada. Sólo lo pone esta vía, no {@link #setDiurnal}, para que restaurar el flag
+     * desde NBT al cargar el mundo no dispare una siesta inmediata en todo lo que se cargue.
+     *
+     * @see com.evirapo.diversityofcritters.common.entity.ai.SleepBehaviorGoal#canUse()
+     */
+    public void setDiurnalByPlayer(boolean value) {
+        this.setDiurnal(value);
+        this.scheduleChanged = true;
+    }
+
+    /** Servidor. Lo consume {@code SleepBehaviorGoal}; devolverlo lo desarma. */
+    public boolean consumeScheduleChanged() {
+        boolean changed = this.scheduleChanged;
+        this.scheduleChanged = false;
+        return changed;
+    }
+
+    private boolean scheduleChanged;
+
     public void clearStates() { this.setSleepState(SleepState.AWAKE); this.setCleaning(false); }
 
     private static byte toIdleByte(IdleVariant v) {
         return switch (v) {
-            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
-            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
+            case NONE -> 0; case STRETCH -> 1; case SNIFF_LEFT -> 2;
+            case SNIFF_RIGHT -> 3; case SIT -> 4; case STAND_UP -> 5;
         };
     }
     private static IdleVariant idleFromByte(byte b) {
         return switch (b) {
-            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
-            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
+            case 1 -> IdleVariant.STRETCH; case 2 -> IdleVariant.SNIFF_LEFT;
+            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.STAND_UP;
             default -> IdleVariant.NONE;
         };
     }
@@ -747,6 +932,24 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public void aiStep() {
         if (getSleepState() != SleepState.AWAKE) setTarget(null);
         super.aiStep();
+        if (!this.level().isClientSide) {
+            // Como GuardingMeleeEntity (DeluxeLib). El orden importa: se mide DESPUES de
+            // super.aiStep(), que es donde corre el move control y travel() aplica la velocidad de
+            // este tick. Medirlo antes lee el estado previo al movimiento.
+            //
+            // Se añade "tiene camino pendiente" a la ENTRADA de la histéresis en vez de consultarlo
+            // desde las playCondition. Athenian lo hace en la condición porque nada le recrea la
+            // ruta desde fuera; aquí sí: triggerFoodSearch() llama a stop()+moveTo() hasta cinco
+            // veces por segundo mientras haya comida en el suelo, así que isDone() parpadea y las
+            // animaciones parpadeaban con él. Pasando por la histéresis, esos seis ticks de
+            // retención absorben el vaivén y el flag sale estable.
+            boolean movingNow = this.getDeltaMovement().horizontalDistanceSqr() > 2.5E-7
+                    || !this.getNavigation().isDone();
+            boolean moving = this.movingHysteresis.tick(movingNow);
+            if (moving != this.entityData.get(IS_MOVING)) {
+                this.entityData.set(IS_MOVING, moving);
+            }
+        }
     }
 
     @Override

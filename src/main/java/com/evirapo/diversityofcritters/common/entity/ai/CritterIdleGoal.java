@@ -52,10 +52,10 @@ public class CritterIdleGoal extends Goal {
         entity.getNavigation().stop();
 
         switch (currentVariant) {
-            case STAND_UP                -> durationTimer = 40;
+            case STRETCH                 -> durationTimer = 40;
             case SNIFF_LEFT, SNIFF_RIGHT -> durationTimer = 40;
-            case SIT  -> durationTimer = 110;
-            case LAY  -> durationTimer = 120;
+            case SIT      -> durationTimer = 110;
+            case STAND_UP -> durationTimer = 120;
             default   -> durationTimer = 0;
         }
     }
@@ -68,10 +68,10 @@ public class CritterIdleGoal extends Goal {
     @Override
     public void stop() {
         int cd = switch (currentVariant) {
-            case STAND_UP -> 40;
+            case STRETCH -> 40;
             case SNIFF_LEFT, SNIFF_RIGHT -> 40;
             case SIT -> 110;
-            case LAY -> 120;
+            case STAND_UP -> 120;
             default -> 40;
         };
         entity.idleVariantCooldown = cd;
@@ -81,10 +81,10 @@ public class CritterIdleGoal extends Goal {
 
     private DiverseCritter.IdleVariant pickVariant() {
         int roll = entity.getRandom().nextInt(100);
-        if      (roll < 20) return DiverseCritter.IdleVariant.STAND_UP;
+        if      (roll < 20) return DiverseCritter.IdleVariant.STRETCH;
         else if (roll < 45) return DiverseCritter.IdleVariant.SNIFF_LEFT;
         else if (roll < 70) return DiverseCritter.IdleVariant.SNIFF_RIGHT;
         else if (roll < 85) return DiverseCritter.IdleVariant.SIT;
-        else                return DiverseCritter.IdleVariant.LAY;
+        else                return DiverseCritter.IdleVariant.STAND_UP;
     }
 }

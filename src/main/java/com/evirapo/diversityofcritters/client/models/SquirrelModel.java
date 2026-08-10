@@ -6,17 +6,46 @@ import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import net.minecraft.client.animation.AnimationDefinition;
-import net.minecraft.client.animation.KeyframeAnimations;
+import net.darkblade.deluxelib.anim.Animation;
+import net.darkblade.deluxelib.anim.MobAnimator;
+import net.darkblade.deluxelib.client.anim.AnimBlend;
+import net.darkblade.deluxelib.client.rig.AnimContext;
+import net.darkblade.deluxelib.client.rig.component.LookAtAdditive;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
-import org.joml.Vector3f;
+
+import java.util.Set;
 
 public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T> {
 
-    private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
+    /** Animaciones de la capa 0 durante las cuales la ardilla sigue al jugador con la cabeza. */
+    private static final Set<String> HEAD_TRACKING_ANIMS = Set.of("idle", "walk", "run");
+
+    /**
+     * Seguimiento de cabeza como aditivo sobre los keyframes, en vez de la asignación directa que
+     * había antes.
+     *
+     * <p>El gate es una <b>whitelist</b>: solo sigue durante locomoción normal. Antes era una lista
+     * de excepciones a mano (`!climbing && !gliding && !orderedSitPlaying`) que ya se había quedado
+     * corta — no excluía beber, acicalarse, comer ni las variantes de reposo, así que la ardilla te
+     * seguía con la cabeza mientras bebía. Una whitelist falla del lado seguro: una cadena nueva no
+     * hereda seguimiento por olvidarse de marcarla.
+     *
+     * <p>Cubre también trepar, planear, nadar y dormir sin nombrarlos: durante esos estados la capa
+     * 0 está vacía, así que no hay animación actual y la whitelist no casa.
+     *
+     * <p>Los límites son los de vanilla ({@code getMaxHeadYRot} 75, {@code getMaxHeadXRot} 40), para
+     * no cambiar el alcance del giro respecto a lo que había.
+     */
+    private final LookAtAdditive<T, SquirrelModel<T>> lookAt =
+            new LookAtAdditive<T, SquirrelModel<T>>(m -> m.Head, 75.0F, 40.0F)
+                    .enabledWhile(entity -> {
+                        Animation current = entity.animator().getCurrent(0);
+                        return current != MobAnimator.EMPTY
+                                && HEAD_TRACKING_ANIMS.contains(current.getName());
+                    });
 
     // Flags para renderToBuffer — se actualizan en setupAnim cada frame.
     private boolean isClimbingRender = false;
@@ -232,17 +261,19 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     //  ANIMATION
     // ─────────────────────────────────────────────────────────────────────────
 
+    // El parámetro es T, no SquirrelEntity: con `T extends SquirrelEntity` las dos borran a lo mismo
+    // y Java lo aceptaba generando un puente sintético, pero entonces `entity` no encaja donde se
+    // espera un T (como en LookAtAdditive.apply).
     @Override
-    public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount,
+    public void setupAnim(T entity, float limbSwing, float limbSwingAmount,
                           float ageInTicks, float netHeadYaw, float headPitch) {
 
         this.root().getAllParts().forEach(ModelPart::resetPose);
 
-        boolean sleepingLike    = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
-        boolean gliding         = entity.isGliding();
-        boolean climbing        = entity.isClimbing();
-        boolean swimming        = entity.isInWaterOrBubble();
-        boolean orderedSitPlaying = entity.isOrderedSitPlaying();
+        boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
+        boolean gliding      = entity.isGliding();
+        boolean climbing     = entity.isClimbing();
+        boolean swimming     = entity.isInWaterOrBubble();
 
         float headScale = entity.isJuvenile() ? 1.05F : 1.0F;
         this.Head.xScale = headScale;
@@ -253,13 +284,23 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
             this.applyStatic(SquirrelAnims.BABY);
         }
 
-        this.animate(entity.preparingSleepState, SquirrelAnims.preparing_sleep, ageInTicks, 1f);
-        this.animate(entity.sleepState,          SquirrelAnims.Sleep,           ageInTicks, 1f);
-        this.animate(entity.awakeningState,      SquirrelAnims.awakening,       ageInTicks, 1f);
+        // ─── ANIMACIÓN ───────────────────────────────────────────────────────
+        // Una sola llamada, sin ramas: TODAS las animaciones de la ardilla adulta viven en la capa 0
+        // del MobAnimator —locomoción, cadenas de actividad, variantes de reposo, trepada, planeo,
+        // natación y dormir— y es la prioridad la que decide cuál se ve. Este modelo ya no elige
+        // ninguna.
+        AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 0);
+
+        // Aditivo, después de los keyframes. Su whitelist decide cuándo aplica (ver el campo).
+        this.lookAt.apply(entity, this,
+                AnimContext.of(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch));
+
+        // ─── AJUSTES DE RENDER ───────────────────────────────────────────────
+        // Lo único que queda aquí: visibilidad de partes, desplazamientos de pose y las banderas que
+        // lee renderToBuffer. Nada de esto son keyframes.
 
         if (sleepingLike) {
-            this.Glide.xScale       = 0.0F; this.Glide.yScale       = 0.0F; this.Glide.zScale       = 0.0F;
-            this.Glide_torse.xScale = 0.0F; this.Glide_torse.yScale = 0.0F; this.Glide_torse.zScale = 0.0F;
+            this.hideGlideMembrane();
             this.isClimbingRender     = false;
             this.isClimbingDownRender = false;
             return;
@@ -268,91 +309,30 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         this.isClimbingRender     = climbing && !gliding;
         this.isClimbingDownRender = entity.isClimbingDown() && !gliding;
 
-        if (!climbing && !gliding && !orderedSitPlaying) {
-            this.Head.xRot = headPitch  * ((float) Math.PI / 180F);
-            this.Head.yRot = netHeadYaw * ((float) Math.PI / 180F);
-        }
-
         if (gliding) {
-            this.animate(entity.glideState, SquirrelAnims.GLIDING, ageInTicks, 1.0F);
-            return;
+            return;   // planeando la membrana se queda visible
         }
 
-        // ─── CLIMB ───────────────────────────────────────────────────────────
         if (climbing) {
-            this.animate(entity.climbingUpState,   SquirrelAnims.CLIMBING_UP,   ageInTicks, 1.0F);
-            this.animate(entity.climbingDownState, SquirrelAnims.CLIMBING_DOWN, ageInTicks, 1.0F);
-            this.animate(entity.climbIdleState,    SquirrelAnims.CLIMB_IDLE,    ageInTicks, 1.0F);
-            if (entity.climbingUpState.isStarted()) {
+            if (entity.isClimbingUp()) {
                 // bone12's pivot lands on the wall surface after the global -90° X rotation.
                 // Moving Tail -3 in model Y pushes it +3 world-Z (away from wall), clearing the geometry.
                 this.Tail.y -= 3.0F;
             }
-        }
-        else if (swimming) {
-            float swimSpeed = 1.0F + limbSwingAmount;
-            this.animate(entity.swimAnimationState, SquirrelAnims.Swim, ageInTicks, swimSpeed);
+        } else if (swimming) {
             this.squirrel.y += 4.0F;
             this.Head.xRot -= 0.3F;
         }
-        else {
-            boolean busyBody = entity.isCleaning()
-                    || entity.IsDrinking()
-                    || entity.drinkEndingState.isStarted()
-                    || entity.cleanEndingState.isStarted()
-                    || entity.eatPlantEndingState.isStarted()
-                    || entity.isVariantActive
-                    || entity.isEatingPlant();
 
-            float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
-            float idleWeight   = busyBody ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
-            float sprintWeight = entity.sprintProgress;
-            float walkWeight   = 1.0F - sprintWeight;
-
-            if (idleWeight > 0.01F) {
-                animateWithWeight(entity.idleAnimationState, SquirrelAnims.Idle, ageInTicks, idleWeight);
-            }
-            if (walkWeight > 0.01F) {
-                animateWalkWithWeight(SquirrelAnims.Walk, limbSwing, limbSwingAmount, 2.0F, 2.5F, walkWeight);
-            }
-            if (sprintWeight > 0.01F) {
-                animateWalkWithWeight(SquirrelAnims.Run, limbSwing, limbSwingAmount, 2.0F, 2.5F, sprintWeight);
-            }
-
-            this.animate(entity.idleStandUpState,    SquirrelAnims.stand_up,    ageInTicks, 1.0F);
-            this.animate(entity.idleSniffLeftState,  SquirrelAnims.SniffLeft,   ageInTicks, 1.0F);
-            this.animate(entity.idleSniffRightState, SquirrelAnims.SniffRight,  ageInTicks, 1.0F);
-
-            this.animate(entity.idleSitStartingState, SquirrelAnims.SIT_STARTING, ageInTicks, 1.0F);
-            this.animate(entity.idleSitState,         SquirrelAnims.SIT_IDLE,     ageInTicks, 1.0F);
-            this.animate(entity.idleSitEndingState,   SquirrelAnims.SIT_ENDING,   ageInTicks, 1.0F);
-
-            this.animate(entity.idleLayStartingState, SquirrelAnims.LAY_STARTING, ageInTicks, 1.0F);
-            this.animate(entity.idleLayState,         SquirrelAnims.LAY_IDLE,     ageInTicks, 1.0F);
-            this.animate(entity.idleLayEndingState,   SquirrelAnims.LAY_ENDING,   ageInTicks, 1.0F);
-
-            this.animate(entity.eatPlantStartingState, SquirrelAnims.EATING_STARTING, ageInTicks, 1.0F);
-            this.animate(entity.eatPlantIdleState,     SquirrelAnims.EATING_IDLE,     ageInTicks, 1.0F);
-            this.animate(entity.eatPlantEndingState,   SquirrelAnims.EATING_ENDING,   ageInTicks, 1.0F);
+        this.hideGlideMembrane();
+        if (!entity.isClimbingUp()) {
+            this.bone12.xScale = 0.0F; this.bone12.yScale = 0.0F; this.bone12.zScale = 0.0F;
         }
+    }
 
-        this.animate(entity.cleanStartingState, SquirrelAnims.GROOMING_STARTING, ageInTicks, 1.0F);
-        this.animate(entity.cleanIdleState,     SquirrelAnims.GROOMING_IDLE,     ageInTicks, 1.0F);
-        this.animate(entity.cleanEndingState,   SquirrelAnims.GROOMING_ENDING,   ageInTicks, 1.0F);
-
-        this.animate(entity.drinkStartingState, SquirrelAnims.DRINK_STARTING, ageInTicks, 1.0F);
-        this.animate(entity.drinkIdleState,     SquirrelAnims.DRINK_IDLE,     ageInTicks, 1.0F);
-        this.animate(entity.drinkEndingState,   SquirrelAnims.DRINK_ENDING,   ageInTicks, 1.0F);
-
-        this.animate(entity.orderedSitStartingState, SquirrelAnims.SIT_STARTING, ageInTicks, 1.0F);
-        this.animate(entity.orderedSitIdleState,     SquirrelAnims.SIT_IDLE,     ageInTicks, 1.0F);
-        this.animate(entity.orderedSitEndingState,   SquirrelAnims.SIT_ENDING,   ageInTicks, 1.0F);
-
+    private void hideGlideMembrane() {
         this.Glide.xScale       = 0.0F; this.Glide.yScale       = 0.0F; this.Glide.zScale       = 0.0F;
         this.Glide_torse.xScale = 0.0F; this.Glide_torse.yScale = 0.0F; this.Glide_torse.zScale = 0.0F;
-        if (!entity.climbingUpState.isStarted()) {
-            this.bone12.xScale  = 0.0F; this.bone12.yScale      = 0.0F; this.bone12.zScale      = 0.0F;
-        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -398,23 +378,4 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         return squirrel;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  HELPERS
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private void animateWithWeight(net.minecraft.world.entity.AnimationState state,
-                                   AnimationDefinition definition,
-                                   float ageInTicks, float weight) {
-        state.updateTime(ageInTicks, 1.0F);
-        state.ifStarted(s -> KeyframeAnimations.animate(
-                this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
-    }
-
-    private void animateWalkWithWeight(AnimationDefinition definition,
-                                       float limbSwing, float limbSwingAmount,
-                                       float speed, float intensity, float weight) {
-        long time       = (long) (limbSwing * 50.0F * speed);
-        float finalScale = Math.min(limbSwingAmount * intensity, 1.0F) * weight;
-        KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
-    }
 }
