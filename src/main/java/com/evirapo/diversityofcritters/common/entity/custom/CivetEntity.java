@@ -61,6 +61,16 @@ public class CivetEntity extends DiverseCritter {
         return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
     }
 
+    // Selva tropical húmeda del sudeste asiático
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.WET;
+    }
+
     public final AnimationState idleAnimationState = new AnimationState();
     public final AnimationState idleStandUpState   = new AnimationState();
     public final AnimationState idleSniffLeftState = new AnimationState();

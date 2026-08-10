@@ -57,6 +57,16 @@ public class SquirrelEntity extends DiverseCritter {
         return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
     }
 
+    // Bosques templados de montaña, húmedos pero no tropicales
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.MODERATE;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
+    }
+
     // --- ANIMATION STATES ---
     public final AnimationState idleAnimationState   = new AnimationState();
     public final AnimationState idleStandUpState     = new AnimationState();
@@ -126,10 +136,8 @@ public class SquirrelEntity extends DiverseCritter {
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
-    /** Progreso de sprint (0 = walk, 1 = run), interpolado en el cliente. */
     public float sprintProgress = 0.0F;
 
-    /** True mientras una variante idle esté activa. */
     public boolean isVariantActive = false;
 
     private int postDescentCooldown = 0;

@@ -28,6 +28,9 @@ public class DOCBlocks {
     public static final RegistryObject<Block> AIR_CONDITIONER = BLOCKS.register("air_conditioner",
             () -> new AirConditionerBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
 
+    public static final RegistryObject<Block> HUMIDIFIER = BLOCKS.register("humidifier",
+            () -> new HumidifierBlock(BlockBehaviour.Properties.copy(Blocks.PRISMARINE)));
+
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
     }

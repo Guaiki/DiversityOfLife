@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.block.entity.AirConditionerBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.BowlBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.DigBoxBlockEntity;
+import com.evirapo.diversityofcritters.common.block.entity.HumidifierBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -32,6 +33,11 @@ public class DOCBlockEntities {
             BLOCK_ENTITIES.register("air_conditioner_be", () ->
                     BlockEntityType.Builder.of(AirConditionerBlockEntity::new,
                             DOCBlocks.AIR_CONDITIONER.get()).build(null));
+
+    public static final RegistryObject<BlockEntityType<HumidifierBlockEntity>> HUMIDIFIER_BE =
+            BLOCK_ENTITIES.register("humidifier_be", () ->
+                    BlockEntityType.Builder.of(HumidifierBlockEntity::new,
+                            DOCBlocks.HUMIDIFIER.get()).build(null));
 
     public static void register(IEventBus eventBus) {
         BLOCK_ENTITIES.register(eventBus);

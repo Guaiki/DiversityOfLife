@@ -32,5 +32,8 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, SetAirConditionerMsg.class,
                 SetAirConditionerMsg::encode, SetAirConditionerMsg::decode, SetAirConditionerMsg::handle);
+
+        CHANNEL.registerMessage(id++, SetHumidifierMsg.class,
+                SetHumidifierMsg::encode, SetHumidifierMsg::decode, SetHumidifierMsg::handle);
     }
 }

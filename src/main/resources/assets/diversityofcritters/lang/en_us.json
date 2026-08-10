@@ -49,5 +49,9 @@
   "gui.diversityofcritters.air_conditioner.temperature": "Temperature",
   "gui.diversityofcritters.air_conditioner.size": "Size (Blocks)",
 
+  "block.diversityofcritters.humidifier": "Humidifier",
+  "gui.diversityofcritters.humidifier.humidity": "Humidity",
+  "gui.diversityofcritters.humidifier.size": "Size (Blocks)",
+
   "item.diversityofcritters.worm": "Worm"
 }

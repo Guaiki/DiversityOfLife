@@ -236,7 +236,7 @@ public class CivetStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         float thirstPct     = entity.getThirstPercentage() / 100f;
         float enrichmentPct = entity.getEnrichmentPercentage() / 100f;
         float temperaturePct = entity.getTemperatureComfort() / 100f;
-        float humidityPct    = 1.0f;
+        float humidityPct    = entity.getHumidityComfort() / 100f;
         float hygienePct     = entity.getHygienePercentage() / 100f;
 
         float[] pcts = { hungerPct, thirstPct, enrichmentPct, temperaturePct, humidityPct, hygienePct };
@@ -362,6 +362,12 @@ public class CivetStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         int tempColor = tempZone == 0 ? 0x55FF55 : (tempZone == 1 ? 0xFFFF55 : 0xFF5555);
         String temp = "Temp: " + entity.getTemperatureTier().getDisplayName() + " (" + tempZoneName + ")";
         graphics.drawString(this.font, temp, sx, sy + lineH * 6, tempColor, true);
+
+        int humidityZone = entity.getHumidityZone();
+        String humidityZoneName = humidityZone == 0 ? "Comfort" : (humidityZone == 1 ? "Stress" : "Danger");
+        int humidityColor = humidityZone == 0 ? 0x55FF55 : (humidityZone == 1 ? 0xFFFF55 : 0xFF5555);
+        String humidity = "Humidity: " + entity.getHumidityTier().getDisplayName() + " (" + humidityZoneName + ")";
+        graphics.drawString(this.font, humidity, sx, sy + lineH * 7, humidityColor, true);
 
         pose.popPose();
     }

@@ -59,6 +59,16 @@ public class SifakaEntity extends DiverseCritter {
         return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
     }
 
+    // Bosques secos y espinosos del oeste de Madagascar
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.LOW;
+    }
+    @Override
+    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.MODERATE;
+    }
+
     public final AnimationState idleAnimationState    = new AnimationState();
     public final AnimationState idleStandUpState      = new AnimationState();
     public final AnimationState idleSniffLeftState    = new AnimationState();

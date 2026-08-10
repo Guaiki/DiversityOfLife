@@ -2,6 +2,8 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.humidity.HumiditySystem;
+import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
@@ -75,6 +77,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Integer> TEMP_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> HUMIDITY_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> HUMIDITY_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
 
     int prevHunger;
     int prevThirst;
@@ -162,6 +166,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(IDLE_VARIANT, (byte) 0);
         this.entityData.define(TEMP_TIER, TemperatureTier.MODERATE.ordinal());
         this.entityData.define(TEMP_COMFORT, 100);
+        this.entityData.define(HUMIDITY_TIER, HumidityTier.MODERATE.ordinal());
+        this.entityData.define(HUMIDITY_COMFORT, 100);
     }
 
     @Override
@@ -182,6 +188,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putInt("PregnancyTimer", this.pregnancyTimer);
         pCompound.putInt("BreedCooldown", this.breedCooldown);
         pCompound.putInt("TempComfort", this.getTemperatureComfort());
+        pCompound.putInt("HumidityComfort", this.getHumidityComfort());
     }
 
     private Integer loadedNbtAge = null;
@@ -217,6 +224,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (pCompound.contains("PregnancyTimer")) this.pregnancyTimer = pCompound.getInt("PregnancyTimer");
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
         if (pCompound.contains("TempComfort")) this.setTemperatureComfort(pCompound.getInt("TempComfort"));
+        if (pCompound.contains("HumidityComfort")) this.setHumidityComfort(pCompound.getInt("HumidityComfort"));
     }
 
     public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
@@ -351,6 +359,58 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
+    // --- HUMIDITY ---
+    private static final int HUMIDITY_CHECK_INTERVAL = 40;
+    private static final int HUMIDITY_DANGER_DAMAGE_INTERVAL = 600; // 30s
+    private static final float HUMIDITY_DANGER_DAMAGE = 2.0F;       // 1 corazón
+    private static final int HUMIDITY_COMFORT_GAIN_PER_SECOND = 4;  // lleno desde 0 en 25s
+    private static final int HUMIDITY_STRESS_LOSS_PER_SECOND = 2;   // vacío desde 100 en 50s
+    private static final int HUMIDITY_DANGER_LOSS_PER_SECOND = 4;   // vacío desde 100 en 25s
+
+    /** Rango de confort por especie; sobrescribir en cada entidad. */
+    public HumidityTier comfortHumidityMin() { return HumidityTier.MODERATE; }
+    public HumidityTier comfortHumidityMax() { return HumidityTier.HUMID; }
+
+    public HumidityTier getHumidityTier() { return HumidityTier.byId(this.entityData.get(HUMIDITY_TIER)); }
+
+    /** 0 = Confort, 1 = Estrés, 2+ = Peligro */
+    public int getHumidityZone() {
+        return getHumidityTier().distanceOutside(comfortHumidityMin(), comfortHumidityMax());
+    }
+
+    public boolean isHumidityComfortable() { return getHumidityZone() == 0; }
+
+    /** Barra de humedad (0-100): sube cuando el animal está en su rango, baja fuera de él. */
+    public int getHumidityComfort() { return this.entityData.get(HUMIDITY_COMFORT); }
+    public void setHumidityComfort(int value) {
+        this.entityData.set(HUMIDITY_COMFORT, Math.max(0, Math.min(100, value)));
+    }
+
+    private double getHumidityLossMultiplier() {
+        int zone = getHumidityZone();
+        if (zone >= 2) return 2.0;
+        if (zone == 1) return 1.5;
+        return 1.0;
+    }
+
+    private void tickHumidity() {
+        if (this.tickCount % HUMIDITY_CHECK_INTERVAL == 0) {
+            HumidityTier tier = HumiditySystem.getEffectiveTier(this.level(), this.blockPosition());
+            this.entityData.set(HUMIDITY_TIER, tier.ordinal());
+        }
+
+        if (this.tickCount % 20 == 0) {
+            int zone = getHumidityZone();
+            int delta = zone == 0 ? HUMIDITY_COMFORT_GAIN_PER_SECOND
+                    : (zone == 1 ? -HUMIDITY_STRESS_LOSS_PER_SECOND : -HUMIDITY_DANGER_LOSS_PER_SECOND);
+            setHumidityComfort(getHumidityComfort() + delta);
+        }
+
+        if (getHumidityZone() >= 2 && this.tickCount % HUMIDITY_DANGER_DAMAGE_INTERVAL == 0) {
+            this.hurt(this.damageSources().dryOut(), HUMIDITY_DANGER_DAMAGE);
+        }
+    }
+
     public boolean isClimbing() { return false; }
 
     public void onStartEatingItem(ItemStack stack) {}
@@ -381,7 +441,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
             }
 
             this.tickTemperature();
-            double tempMultiplier = getTemperatureLossMultiplier();
+            this.tickHumidity();
+            double tempMultiplier = Math.max(getTemperatureLossMultiplier(), getHumidityLossMultiplier());
 
             if (this.getHunger() > 0) {
                 double lossPerTick = getHungerLossPerSecond() / 60.0 * tempMultiplier;
@@ -726,6 +787,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (this.isOrderedToSit() || otherCritter.isOrderedToSit()) return false;
         if (this.isBaby() || otherCritter.isBaby()) return false;
         if (!this.isTemperatureComfortable() || !otherCritter.isTemperatureComfortable()) return false;
+        if (!this.isHumidityComfortable() || !otherCritter.isHumidityComfortable()) return false;
 
         return this.breedCooldown <= 0 && otherCritter.breedCooldown <= 0;
     }
