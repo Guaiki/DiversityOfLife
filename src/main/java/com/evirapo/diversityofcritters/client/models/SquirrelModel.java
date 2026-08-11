@@ -56,8 +56,12 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     private final ModelPart Body;
     private final ModelPart Glide_torse;
     private final ModelPart Head;
+    private final ModelPart Eyes;
     private final ModelPart Eye1;
     private final ModelPart Eye2;
+    /** Mallas de ojo cerrado. Ver {@link #hideSleepEyes()}. */
+    private final ModelPart Sleep_eye1;
+    private final ModelPart Sleep_eye2;
     private final ModelPart Ear1;
     private final ModelPart Ear2;
     private final ModelPart Mouth;
@@ -87,8 +91,11 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         this.Body        = this.squirrel.getChild("Body");
         this.Glide_torse = this.Body.getChild("Glide_torse");
         this.Head        = this.Body.getChild("Head");
-        this.Eye1        = this.Head.getChild("Eye1");
-        this.Eye2        = this.Head.getChild("Eye2");
+        this.Eyes        = this.Head.getChild("Eyes");
+        this.Eye1        = this.Eyes.getChild("Eye1");
+        this.Eye2        = this.Eyes.getChild("Eye2");
+        this.Sleep_eye1  = this.Eyes.getChild("Sleep_eye1");
+        this.Sleep_eye2  = this.Eyes.getChild("Sleep_eye2");
         this.Ear1        = this.Head.getChild("Ear1");
         this.Ear2        = this.Head.getChild("Ear2");
         this.Mouth       = this.Head.getChild("Mouth");
@@ -154,12 +161,26 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                 CubeListBuilder.create().texOffs(42, 61).addBox(0.0F, -2.5F, 0.0F, 3.0F, 5.0F, 0.0F, new CubeDeformation(0.0F)),
                 PartPose.offsetAndRotation(3.5F, 0.9195F, -3.9571F, 0.0F, -0.7854F, 0.0F));
 
-        PartDefinition Eye1 = Head.addOrReplaceChild("Eye1",
+        // Los cuatro ojos cuelgan de un grupo comun. Eye1/Eye2 son los abiertos y Sleep_eye1/2 los
+        // cerrados: las animaciones no mueven parpados, intercambian la malla por escala. Al dormir,
+        // `Sleep` aplasta los abiertos (yScale 0) y muestra los cerrados.
+        PartDefinition Eyes = Head.addOrReplaceChild("Eyes",
+                CubeListBuilder.create(), PartPose.offset(0.0F, 0.0F, 0.0F));
+
+        PartDefinition Eye1 = Eyes.addOrReplaceChild("Eye1",
                 CubeListBuilder.create().texOffs(24, 83).addBox(-1.0F, -0.5F, -0.5F, 2.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)),
                 PartPose.offset(-2.525F, -0.0805F, -5.4821F));
 
-        PartDefinition Eye2 = Head.addOrReplaceChild("Eye2",
+        PartDefinition Eye2 = Eyes.addOrReplaceChild("Eye2",
                 CubeListBuilder.create().texOffs(94, 87).addBox(-1.0F, -0.5F, -0.5F, 2.0F, 1.0F, 1.0F, new CubeDeformation(0.0F)),
+                PartPose.offset(2.525F, -0.0805F, -5.4821F));
+
+        PartDefinition Sleep_eye1 = Eyes.addOrReplaceChild("Sleep_eye1",
+                CubeListBuilder.create().texOffs(13, 101).addBox(-1.0F, -0.5F, -0.5F, 2.0F, 1.0F, 2.0F, new CubeDeformation(0.0F)),
+                PartPose.offset(-2.525F, -0.0805F, -5.4821F));
+
+        PartDefinition Sleep_eye2 = Eyes.addOrReplaceChild("Sleep_eye2",
+                CubeListBuilder.create().texOffs(1, 99).mirror().addBox(-1.0F, -0.5F, -0.5F, 2.0F, 1.0F, 2.0F, new CubeDeformation(0.0F)).mirror(false),
                 PartPose.offset(2.525F, -0.0805F, -5.4821F));
 
         Head.addOrReplaceChild("Ear1", CubeListBuilder.create(), PartPose.offset(3.5F, -0.5805F, -1.9571F));
@@ -195,7 +216,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                 CubeListBuilder.create().texOffs(94, 89).addBox(-0.5F, 0.0F, -2.0F, 1.0F, 0.0F, 2.0F, new CubeDeformation(0.0F)),
                 PartPose.offset(0.0F, -0.25F, 0.5F));
 
-        PartDefinition Tail = Body.addOrReplaceChild("Tail", CubeListBuilder.create(), PartPose.offset(-0.5F, -3.0F, 9.0F));
+        PartDefinition Tail = Body.addOrReplaceChild("Tail", CubeListBuilder.create(), PartPose.offset(0.0F, -3.0F, 9.0F));
 
         Tail.addOrReplaceChild("bone6",
                 CubeListBuilder.create()
@@ -203,11 +224,11 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                         .texOffs(48, 54).addBox(-3.5F, -17.0833F, 2.0F, 7.0F, 5.0F, 12.0F, new CubeDeformation(0.0F))
                         .texOffs(0, 77) .addBox(-3.5F, -12.0833F, 2.0F, 7.0F, 8.0F, 5.0F, new CubeDeformation(0.0F))
                         .texOffs(62, 71).addBox(-3.5F, -4.0833F, 0.0F, 7.0F, 5.0F, 7.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(0.5F, 1.0833F, 0.0F));
+                PartPose.offset(0.0F, 1.0833F, 0.0F));
 
         Tail.addOrReplaceChild("bone12",
                 CubeListBuilder.create().texOffs(0, 0).addBox(-3.0F, -6.0F, -1.0F, 7.0F, 5.0F, 25.0F, new CubeDeformation(0.0F)),
-                PartPose.offset(0.0F, 3.0F, 1.0F));
+                PartPose.offset(-0.5F, 3.0F, 1.0F));
 
         Body.addOrReplaceChild("Torse",
                 CubeListBuilder.create()
@@ -299,6 +320,10 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         // Lo único que queda aquí: visibilidad de partes, desplazamientos de pose y las banderas que
         // lee renderToBuffer. Nada de esto son keyframes.
 
+        if (entity.getSleepState() != DiverseCritter.SleepState.SLEEPING) {
+            this.hideSleepEyes();
+        }
+
         if (sleepingLike) {
             this.hideGlideMembrane();
             this.isClimbingRender     = false;
@@ -328,6 +353,22 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         if (!entity.isClimbingUp()) {
             this.bone12.xScale = 0.0F; this.bone12.yScale = 0.0F; this.bone12.zScale = 0.0F;
         }
+    }
+
+    /**
+     * Esconde las mallas de ojo cerrado salvo mientras duerme de verdad.
+     *
+     * <p>Hace falta porque la escala en reposo es 1, o sea visible, y quien decide lo contrario es
+     * cada clip: casi todos ponen {@code Sleep_eye1/2} a 0 y sólo {@code Sleep} las muestra. Pero
+     * cuatro no las mencionan —{@code CLIMB_IDLE}, {@code CLIMBING_UP}, {@code CLIMBING_DOWN} y la
+     * pose estática {@code BABY}, que son las que no salen del export—, así que sin esto la ardilla
+     * trepaba con los ojos cerrados dibujados encima de los abiertos.
+     *
+     * <p>De paso tapa el mismo choque en {@code Attack}, que pone a 1 las dos mallas a la vez.
+     */
+    private void hideSleepEyes() {
+        this.Sleep_eye1.xScale = 0.0F; this.Sleep_eye1.yScale = 0.0F; this.Sleep_eye1.zScale = 0.0F;
+        this.Sleep_eye2.xScale = 0.0F; this.Sleep_eye2.yScale = 0.0F; this.Sleep_eye2.zScale = 0.0F;
     }
 
     private void hideGlideMembrane() {
