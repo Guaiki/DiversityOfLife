@@ -169,6 +169,16 @@ dependencies {
     implementation "io.github.llamalad7:mixinextras-forge:0.3.6"
     annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.6"
 
+    // Procesador de anotaciones de Mixin. Sin él, el bloque `mixin { add ... }` de abajo configura
+    // los argumentos pero no corre nadie que los use, y el jar sale SIN refmap.
+    //
+    // En desarrollo no se nota: Minecraft está deobfuscado y un @Redirect que apunta a
+    // `ServerLevel;setBlockAndUpdate` casa por nombre. En producción Forge ejecuta Minecraft con
+    // nombres SRG (`m_46597_`), y el refmap es justo la tabla que traduce del nombre del código al
+    // del runtime. Sin ella el mixin no encuentra su objetivo, y con `required: true` eso no es un
+    // aviso: es un crash al cargar el mod.
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
