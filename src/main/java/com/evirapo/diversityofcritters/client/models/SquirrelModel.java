@@ -20,25 +20,8 @@ import java.util.Set;
 
 public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T> {
 
-    /** Animaciones de la capa 0 durante las cuales la ardilla sigue al jugador con la cabeza. */
     private static final Set<String> HEAD_TRACKING_ANIMS = Set.of("idle", "walk", "run");
 
-    /**
-     * Seguimiento de cabeza como aditivo sobre los keyframes, en vez de la asignación directa que
-     * había antes.
-     *
-     * <p>El gate es una <b>whitelist</b>: solo sigue durante locomoción normal. Antes era una lista
-     * de excepciones a mano (`!climbing && !gliding && !orderedSitPlaying`) que ya se había quedado
-     * corta — no excluía beber, acicalarse, comer ni las variantes de reposo, así que la ardilla te
-     * seguía con la cabeza mientras bebía. Una whitelist falla del lado seguro: una cadena nueva no
-     * hereda seguimiento por olvidarse de marcarla.
-     *
-     * <p>Cubre también trepar, planear, nadar y dormir sin nombrarlos: durante esos estados la capa
-     * 0 está vacía, así que no hay animación actual y la whitelist no casa.
-     *
-     * <p>Los límites son los de vanilla ({@code getMaxHeadYRot} 75, {@code getMaxHeadXRot} 40), para
-     * no cambiar el alcance del giro respecto a lo que había.
-     */
     private final LookAtAdditive<T, SquirrelModel<T>> lookAt =
             new LookAtAdditive<T, SquirrelModel<T>>(m -> m.Head, 75.0F, 40.0F)
                     .enabledWhile(entity -> {
@@ -59,7 +42,6 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     private final ModelPart Eyes;
     private final ModelPart Eye1;
     private final ModelPart Eye2;
-    /** Mallas de ojo cerrado. Ver {@link #hideSleepEyes()}. */
     private final ModelPart Sleep_eye1;
     private final ModelPart Sleep_eye2;
     private final ModelPart Ear1;
@@ -161,9 +143,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                 CubeListBuilder.create().texOffs(42, 61).addBox(0.0F, -2.5F, 0.0F, 3.0F, 5.0F, 0.0F, new CubeDeformation(0.0F)),
                 PartPose.offsetAndRotation(3.5F, 0.9195F, -3.9571F, 0.0F, -0.7854F, 0.0F));
 
-        // Los cuatro ojos cuelgan de un grupo comun. Eye1/Eye2 son los abiertos y Sleep_eye1/2 los
-        // cerrados: las animaciones no mueven parpados, intercambian la malla por escala. Al dormir,
-        // `Sleep` aplasta los abiertos (yScale 0) y muestra los cerrados.
+
         PartDefinition Eyes = Head.addOrReplaceChild("Eyes",
                 CubeListBuilder.create(), PartPose.offset(0.0F, 0.0F, 0.0F));
 
@@ -282,9 +262,6 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     //  ANIMATION
     // ─────────────────────────────────────────────────────────────────────────
 
-    // El parámetro es T, no SquirrelEntity: con `T extends SquirrelEntity` las dos borran a lo mismo
-    // y Java lo aceptaba generando un puente sintético, pero entonces `entity` no encaja donde se
-    // espera un T (como en LookAtAdditive.apply).
     @Override
     public void setupAnim(T entity, float limbSwing, float limbSwingAmount,
                           float ageInTicks, float netHeadYaw, float headPitch) {
@@ -305,25 +282,11 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
             this.applyStatic(SquirrelAnims.BABY);
         }
 
-        // ─── ANIMACIÓN ───────────────────────────────────────────────────────
-        // Una sola llamada, sin ramas: TODAS las animaciones de la ardilla adulta viven en la capa 0
-        // del MobAnimator —locomoción, cadenas de actividad, variantes de reposo, trepada, planeo,
-        // natación y dormir— y es la prioridad la que decide cuál se ve. Este modelo ya no elige
-        // ninguna.
         AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 0);
 
-        // Aditivo, después de los keyframes. Su whitelist decide cuándo aplica (ver el campo).
         this.lookAt.apply(entity, this,
                 AnimContext.of(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch));
 
-        // ─── AJUSTES DE RENDER ───────────────────────────────────────────────
-        // Lo único que queda aquí: visibilidad de partes, desplazamientos de pose y las banderas que
-        // lee renderToBuffer. Nada de esto son keyframes.
-
-        // Muerta no hay clip de locomocion (groundLocomotionAllowed pide isAlive) y ningun otro
-        // gana la capa 0, asi que las mallas de ojo cerrado se quedan en su escala de reposo, que
-        // es 1: visibles encima de las abiertas. Es el unico hueco que queda sin cubrir por
-        // keyframes, y por eso es el unico sitio donde el modelo las apaga a mano.
         if (!entity.isAlive()) {
             this.hideSleepEyes();
         }
@@ -339,13 +302,11 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         this.isClimbingDownRender = entity.isClimbingDown() && !gliding;
 
         if (gliding) {
-            return;   // planeando la membrana se queda visible
+            return;
         }
 
         if (climbing) {
             if (entity.isClimbingUp()) {
-                // bone12's pivot lands on the wall surface after the global -90° X rotation.
-                // Moving Tail -3 in model Y pushes it +3 world-Z (away from wall), clearing the geometry.
                 this.Tail.y -= 3.0F;
             }
         } else if (swimming) {
@@ -355,11 +316,6 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
 
         this.hideGlideMembrane();
 
-        // La cola tiene dos mallas: bone6 la peluda y bone12 la plana. Cada clip decide cual se ve,
-        // pero en reposo bone12 esta a escala 1, asi que hay que apagarla salvo donde manda el clip
-        // que la usa: CLIMBING_UP y Swim, los dos unicos que esconden bone6 sin salir antes por el
-        // return de dormir o planear. Nadar mientras trepa no cuenta: ahi gana el clip de trepada
-        // (prioridad 1 contra 2) y ese deja bone6 visible. Muerta tampoco: Swim pide isAlive().
         boolean flatTail = entity.isClimbingUp()
                 || (swimming && !climbing && entity.isAlive());
         if (!flatTail) {
@@ -367,16 +323,6 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         }
     }
 
-    /**
-     * Apaga las mallas de ojo cerrado. Sólo para la ardilla muerta; el resto lo llevan los clips.
-     *
-     * <p>Antes se llamaba en todo frame que no fuera dormir, y eso mataba el parpadeo: el guiño no
-     * es un estado sino un intercambio con keyframes —{@code Eye1/2} bajan a yScale 0 y
-     * {@code Sleep_eye1/2} suben a 1 durante ~0.17 s—, así que forzarlas a 0 cada frame lo borraba
-     * antes de dibujarlo. Los clips de trepada, que eran los únicos sin canal propio y por los que
-     * existía este apagón, ya lo traen (yScale 0, como los demás), y al ir por keyframes se funden
-     * bien en los crossfades en vez de saltar.
-     */
     private void hideSleepEyes() {
         this.Sleep_eye1.xScale = 0.0F; this.Sleep_eye1.yScale = 0.0F; this.Sleep_eye1.zScale = 0.0F;
         this.Sleep_eye2.xScale = 0.0F; this.Sleep_eye2.yScale = 0.0F; this.Sleep_eye2.zScale = 0.0F;
