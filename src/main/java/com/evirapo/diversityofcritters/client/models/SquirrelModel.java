@@ -320,7 +320,11 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         // Lo único que queda aquí: visibilidad de partes, desplazamientos de pose y las banderas que
         // lee renderToBuffer. Nada de esto son keyframes.
 
-        if (entity.getSleepState() != DiverseCritter.SleepState.SLEEPING) {
+        // Muerta no hay clip de locomocion (groundLocomotionAllowed pide isAlive) y ningun otro
+        // gana la capa 0, asi que las mallas de ojo cerrado se quedan en su escala de reposo, que
+        // es 1: visibles encima de las abiertas. Es el unico hueco que queda sin cubrir por
+        // keyframes, y por eso es el unico sitio donde el modelo las apaga a mano.
+        if (!entity.isAlive()) {
             this.hideSleepEyes();
         }
 
@@ -350,21 +354,28 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         }
 
         this.hideGlideMembrane();
-        if (!entity.isClimbingUp()) {
+
+        // La cola tiene dos mallas: bone6 la peluda y bone12 la plana. Cada clip decide cual se ve,
+        // pero en reposo bone12 esta a escala 1, asi que hay que apagarla salvo donde manda el clip
+        // que la usa: CLIMBING_UP y Swim, los dos unicos que esconden bone6 sin salir antes por el
+        // return de dormir o planear. Nadar mientras trepa no cuenta: ahi gana el clip de trepada
+        // (prioridad 1 contra 2) y ese deja bone6 visible. Muerta tampoco: Swim pide isAlive().
+        boolean flatTail = entity.isClimbingUp()
+                || (swimming && !climbing && entity.isAlive());
+        if (!flatTail) {
             this.bone12.xScale = 0.0F; this.bone12.yScale = 0.0F; this.bone12.zScale = 0.0F;
         }
     }
 
     /**
-     * Esconde las mallas de ojo cerrado salvo mientras duerme de verdad.
+     * Apaga las mallas de ojo cerrado. Sólo para la ardilla muerta; el resto lo llevan los clips.
      *
-     * <p>Hace falta porque la escala en reposo es 1, o sea visible, y quien decide lo contrario es
-     * cada clip: casi todos ponen {@code Sleep_eye1/2} a 0 y sólo {@code Sleep} las muestra. Pero
-     * cuatro no las mencionan —{@code CLIMB_IDLE}, {@code CLIMBING_UP}, {@code CLIMBING_DOWN} y la
-     * pose estática {@code BABY}, que son las que no salen del export—, así que sin esto la ardilla
-     * trepaba con los ojos cerrados dibujados encima de los abiertos.
-     *
-     * <p>De paso tapa el mismo choque en {@code Attack}, que pone a 1 las dos mallas a la vez.
+     * <p>Antes se llamaba en todo frame que no fuera dormir, y eso mataba el parpadeo: el guiño no
+     * es un estado sino un intercambio con keyframes —{@code Eye1/2} bajan a yScale 0 y
+     * {@code Sleep_eye1/2} suben a 1 durante ~0.17 s—, así que forzarlas a 0 cada frame lo borraba
+     * antes de dibujarlo. Los clips de trepada, que eran los únicos sin canal propio y por los que
+     * existía este apagón, ya lo traen (yScale 0, como los demás), y al ir por keyframes se funden
+     * bien en los crossfades en vez de saltar.
      */
     private void hideSleepEyes() {
         this.Sleep_eye1.xScale = 0.0F; this.Sleep_eye1.yScale = 0.0F; this.Sleep_eye1.zScale = 0.0F;
