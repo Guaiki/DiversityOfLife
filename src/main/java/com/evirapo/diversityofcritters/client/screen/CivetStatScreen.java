@@ -77,6 +77,14 @@ public class CivetStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
     private static final int INFO_START_TEX_Y = 60;
     private static final int INFO_LINE_SPACING = 16;
     private static final float INFO_TEXT_SCALE = 0.85f;
+
+    /**
+     * Fondo real del marco, en px de textura. La imagen mide {@link #TEX_H} de alto, pero sus doce
+     * ultimas filas son transparentes y el panel acaba aqui: lo que se dibuje mas abajo se ve fuera.
+     */
+    private static final int PANEL_BOTTOM_TEX_Y = 143;
+    /** Margen interior bajo la ultima linea de informacion, en px de textura. */
+    private static final int INFO_BOTTOM_MARGIN = 4;
     private static final int INFO_TEXT_COLOR = 0xFFFFFF;
 
     // ╔════════════════════════════════════════════════════════════════════════╗
@@ -335,40 +343,60 @@ public class CivetStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
 
         int sx = (int)(startX / INFO_TEXT_SCALE);
         int sy = (int)(startY / INFO_TEXT_SCALE);
-        int lineH = (int)(INFO_LINE_SPACING / INFO_TEXT_SCALE);
-
-        String sci = "Hemigalus derbyanus";
-        graphics.drawString(this.font, sci, sx, sy, INFO_TEXT_COLOR, true);
-
-        String hp = "Health: " + (int)entity.getHealth() + "/" + (int)entity.getMaxHealth();
-        graphics.drawString(this.font, hp, sx, sy + lineH, INFO_TEXT_COLOR, true);
 
         Component ageVal = Component.translatable("screen.diversityofcritters.is_baby." + entity.isBaby());
         Component ageKey = Component.translatable("screen.diversityofcritters.age");
-        String age = ageKey.getString() + ": " + ageVal.getString();
-        graphics.drawString(this.font, age, sx, sy + lineH * 2, INFO_TEXT_COLOR, true);
-
-        String morph = "Morph: Gray (0)";
-        graphics.drawString(this.font, morph, sx, sy + lineH * 3, INFO_TEXT_COLOR, true);
-
-        String breedStatus = "Breeding: " + (entity.canBreed() ? "ON" : "OFF");
-        graphics.drawString(this.font, breedStatus, sx, sy + lineH * 4, INFO_TEXT_COLOR, true);
-
-        String status = "Status: " + (entity.isTame() ? "Tamed" : "Wild");
-        graphics.drawString(this.font, status, sx, sy + lineH * 5, INFO_TEXT_COLOR, true);
 
         int tempZone = entity.getTemperatureZone();
         String tempZoneName = tempZone == 0 ? "Comfort" : (tempZone == 1 ? "Stress" : "Danger");
         int tempColor = tempZone == 0 ? 0x55FF55 : (tempZone == 1 ? 0xFFFF55 : 0xFF5555);
         String temp = "Temp: " + entity.getTemperatureTier().getDisplayName() + " (" + tempZoneName + ")";
-        graphics.drawString(this.font, temp, sx, sy + lineH * 6, tempColor, true);
 
         int humidityZone = entity.getHumidityZone();
         String humidityZoneName = humidityZone == 0 ? "Comfort" : (humidityZone == 1 ? "Stress" : "Danger");
         int humidityColor = humidityZone == 0 ? 0x55FF55 : (humidityZone == 1 ? 0xFFFF55 : 0xFF5555);
         String humidity = "Humidity: " + entity.getHumidityTier().getDisplayName() + " (" + humidityZoneName + ")";
-        graphics.drawString(this.font, humidity, sx, sy + lineH * 7, humidityColor, true);
+
+        String[] info = {
+                "Hemigalus derbyanus",
+                "Health: " + (int)entity.getHealth() + "/" + (int)entity.getMaxHealth(),
+                ageKey.getString() + ": " + ageVal.getString(),
+                "Morph: Gray (0)",
+                "Breeding: " + (entity.canBreed() ? "ON" : "OFF"),
+                "Status: " + (entity.isTame() ? "Tamed" : "Wild"),
+                temp,
+                humidity,
+        };
+        int[] infoColors = {
+                INFO_TEXT_COLOR, INFO_TEXT_COLOR, INFO_TEXT_COLOR, INFO_TEXT_COLOR,
+                INFO_TEXT_COLOR, INFO_TEXT_COLOR, tempColor, humidityColor,
+        };
+
+        float lineH = infoLineHeight(sy, info.length);
+        for (int i = 0; i < info.length; i++) {
+            graphics.drawString(this.font, info[i], sx, sy + Math.round(lineH * i), infoColors[i], true);
+        }
 
         pose.popPose();
+    }
+
+    /**
+     * Alto de linea del bloque de informacion, repartido para que la ultima linea caiga dentro del
+     * marco en vez de un valor fijo.
+     *
+     * <p>Antes se usaba {@link #INFO_LINE_SPACING} tal cual, y con ocho lineas la ultima acababa por
+     * debajo de {@link #PANEL_BOTTOM_TEX_Y}, o sea dibujada fuera del panel. Repartiendo la banda
+     * disponible entre las lineas que haya, anadir una novena las aprieta en lugar de tirarla fuera.
+     *
+     * <p>Se trabaja en el espacio local del {@code pose.scale(INFO_TEXT_SCALE)}, que es donde dibuja
+     * {@code drawString}. {@link #INFO_LINE_SPACING} pasa a ser el tope: si sobra sitio, las lineas
+     * no se separan mas de lo que ya estaban.
+     */
+    private float infoLineHeight(int topLocal, int lineCount) {
+        float maxSpacing = INFO_LINE_SPACING / INFO_TEXT_SCALE;
+        if (lineCount < 2) return maxSpacing;
+        float bottomLocal = (PANEL_BOTTOM_TEX_Y - INFO_BOTTOM_MARGIN) * SCALE / INFO_TEXT_SCALE;
+        float available = bottomLocal - topLocal - this.font.lineHeight;
+        return Math.min(maxSpacing, Math.max(1.0f, available / (lineCount - 1)));
     }
 }

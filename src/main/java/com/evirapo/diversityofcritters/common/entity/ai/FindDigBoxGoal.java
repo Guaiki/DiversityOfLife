@@ -2,8 +2,9 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.block.entity.DigBoxBlockEntity;
-import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.custom.base.IDiggingCritter;
+import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -15,11 +16,13 @@ import net.minecraftforge.common.capabilities.ForgeCapabilities;
 
 import javax.annotation.Nullable;
 import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class FindDigBoxGoal extends Goal {
 
     private final DiverseCritter critter;
+    private final IDiggingCritter digger;
     private final double speed;
     private final int searchRadius;
 
@@ -31,8 +34,10 @@ public class FindDigBoxGoal extends Goal {
     private boolean isFinishing = false;
     private int finishingTimer = 0;
 
-    public FindDigBoxGoal(DiverseCritter critter, double speed, int searchRadius) {
+    public <E extends DiverseCritter & IDiggingCritter> FindDigBoxGoal(
+            E critter, double speed, int searchRadius) {
         this.critter = critter;
+        this.digger = critter;
         this.speed = speed;
         this.searchRadius = searchRadius;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
@@ -43,8 +48,14 @@ public class FindDigBoxGoal extends Goal {
         if (critter.level().isClientSide() || critter.isNewborn()) return false;
         if (!critter.isEnrichmentNeeded()) return false;
 
-        boxPos = findNearestValidDigBox();
-        return boxPos != null;
+        // Saltarse las cajas que ya tiene apartadas otro critter: si la mas cercana esta ocupada se
+        // coge la siguiente, y si no queda ninguna libre este goal cede y le toca a cavar en tierra.
+        boxPos = findNearestValidDigBox(CritterClaims.digClaims(critter, searchRadius * 2.0D));
+        if (boxPos == null) return false;
+
+        // Reservar al elegir, no al llegar: durante el camino es cuando otro critter buscaria.
+        this.digger.setDigTarget(boxPos);
+        return true;
     }
 
     @Override
@@ -76,6 +87,7 @@ public class FindDigBoxGoal extends Goal {
         finishingTimer = 0;
         critter.getNavigation().stop();
         setCritterDigging(false);
+        this.digger.setDigTarget(null);
     }
 
     @Override
@@ -125,9 +137,7 @@ public class FindDigBoxGoal extends Goal {
     }
 
     private void setCritterDigging(boolean isDigging) {
-        if (critter instanceof CivetEntity civet) {
-            civet.setDigging(isDigging);
-        }
+        this.digger.setDigging(isDigging);
     }
 
     private void performDigDrop() {
@@ -155,7 +165,7 @@ public class FindDigBoxGoal extends Goal {
     }
 
     @Nullable
-    private BlockPos findNearestValidDigBox() {
+    private BlockPos findNearestValidDigBox(Set<BlockPos> claimed) {
         BlockPos origin = critter.blockPosition();
         BlockPos bestPos = null;
         double bestDistSq = Double.MAX_VALUE;
@@ -166,11 +176,11 @@ public class FindDigBoxGoal extends Goal {
                 for (int dz = -r; dz <= r; dz++) {
                     BlockPos pos = origin.offset(dx, dy, dz);
 
-                    if (isValidDigBox(pos)) {
+                    if (isValidDigBox(pos) && !claimed.contains(pos)) {
                         double distSq = origin.distSqr(pos);
                         if (distSq < bestDistSq) {
                             bestDistSq = distSq;
-                            bestPos = pos;
+                            bestPos = pos.immutable();
                         }
                     }
                 }

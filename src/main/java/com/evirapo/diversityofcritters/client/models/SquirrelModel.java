@@ -30,7 +30,6 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                                 && HEAD_TRACKING_ANIMS.contains(current.getName());
                     });
 
-    // Flags para renderToBuffer — se actualizan en setupAnim cada frame.
     private boolean isClimbingRender = false;
     private boolean isClimbingDownRender = false;
 

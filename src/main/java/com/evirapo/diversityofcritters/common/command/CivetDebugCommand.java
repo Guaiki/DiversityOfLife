@@ -2,6 +2,13 @@ package com.evirapo.diversityofcritters.common.command;
 
 import com.evirapo.diversityofcritters.common.entity.ai.FindFoodBowlGoal;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
+import net.darkblade.deluxelib.entity.ai.goal.PhasedActivityGoal;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -13,6 +20,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Set;
 
 public class CivetDebugCommand {
 
@@ -140,8 +148,121 @@ public class CivetDebugCommand {
             send(source, "  §6- " + goal.getGoal().getClass().getSimpleName() + extra);
         });
 
+        activityGates(source, civet);
+
+        if (civets.size() > 1) {
+            send(source, "§e--- LAS " + civets.size() + " CIVETAS DEL RADIO ---");
+            for (CivetEntity c : civets) {
+                send(source, "  §7[" + c.getId() + "] " + oneLiner(c));
+            }
+        }
+
         send(source, "§e=== END ===");
         return 1;
+    }
+
+    /**
+     * Por que un critter no arranca a cavar o aranarse. Replica las puertas de
+     * {@code CritterDigDirtChainGoal.shouldStart()} y {@code CritterScratchLogChainGoal.shouldStart()}
+     * en el mismo orden, para que "no hace nada" deje de ser una conjetura.
+     */
+    private static void activityGates(CommandSourceStack source, CivetEntity civet) {
+        send(source, "§e--- PUERTAS DE ACTIVIDAD (cavar / aranar) ---");
+
+        send(source, gate(civet.isEnrichmentNeeded(), "enrichment")
+                + " §7" + civet.getEnrichment() + "/" + civet.maxEnrichment()
+                + " (hace falta <= " + (civet.maxEnrichment() / 2) + ")");
+        send(source, gate(!civet.isNewborn(), "!newborn"));
+        send(source, gate(civet.getSleepState() == DiverseCritter.SleepState.AWAKE, "awake")
+                + " §7sleepState=" + civet.getSleepState());
+        send(source, gate(!civet.isAttacking(), "!attacking"));
+        send(source, gate(!civet.isOrderedToSit(), "!orderedSit"));
+        send(source, gate(!civet.isIdleLocked(), "!idleLocked")
+                + " §7variant=" + civet.getIdleVariant());
+        send(source, gate(!civet.isDoingSpecialActivity(), "!specialActivity")
+                + " §7climb=" + civet.isClimbing()
+                + " dig=" + civet.isDigging()
+                + " scratch=" + civet.isScratching());
+
+        send(source, "§7reserva propia:  dig=" + civet.getDigTarget()
+                + "   scratch=" + civet.getScratchTarget());
+
+        Set<net.minecraft.core.BlockPos> digClaims = CritterClaims.digClaims(civet, 8.0D);
+        Set<net.minecraft.core.BlockPos> scrClaims = CritterClaims.scratchClaims(civet, 32.0D);
+        send(source, "§7reservas ajenas: dig=" + digClaims + "   scratch=" + scrClaims);
+
+        BlockPos dirt = findDirt(civet, digClaims);
+        send(source, gate(dirt != null, "hay tierra libre") + " §7" + dirt
+                + (dirt == null ? "" : "  ruta=" + (civet.getNavigation().createPath(dirt.above(), 0) != null)));
+
+        BlockPos log = findLog(civet, scrClaims);
+        send(source, gate(log != null, "hay tronco libre") + " §7" + log);
+
+        send(source, "§6Goals de cadena (running / fase):");
+        civet.goalSelector.getAvailableGoals().forEach(wg -> {
+            if (wg.getGoal() instanceof PhasedActivityGoal<?> phased) {
+                send(source, "  §6- " + wg.getGoal().getClass().getSimpleName()
+                        + " §7running=" + wg.isRunning() + " phase=" + phased.phase());
+            }
+        });
+        send(source, "§8(si todas las puertas estan en verde y ningun goal corre, es el cooldown:");
+        send(source, "§8 200-400 llamadas a canUse(), que en ticks pares son 400-800 ticks = 20-40 s)");
+    }
+
+    private static String oneLiner(CivetEntity c) {
+        return "enr=" + c.getEnrichment() + "/" + c.maxEnrichment()
+                + " sleep=" + c.getSleepState()
+                + " variant=" + c.getIdleVariant()
+                + " climb=" + climbStateName(c.getClimbState())
+                + " dig=" + c.isDigging() + " scr=" + c.isScratching()
+                + " digTgt=" + c.getDigTarget() + " scrTgt=" + c.getScratchTarget();
+    }
+
+    /** Misma busqueda que CritterDigDirtChainGoal.findDirtBlock. */
+    private static BlockPos findDirt(CivetEntity civet, Set<BlockPos> claimed) {
+        BlockPos origin = civet.blockPosition();
+        for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-4, -1, -4), origin.offset(4, 1, 4))) {
+            BlockState state = civet.level().getBlockState(pos);
+            boolean diggable = (state.is(BlockTags.DIRT) || state.is(Blocks.GRASS_BLOCK))
+                    && civet.level().isEmptyBlock(pos.above());
+            if (diggable && !claimed.contains(pos)) return pos.immutable();
+        }
+        return null;
+    }
+
+    /** Misma busqueda que CritterScratchLogChainGoal.findNearestLog, con su casilla de apoyo. */
+    private static BlockPos findLog(CivetEntity civet, Set<BlockPos> claimed) {
+        BlockPos origin = civet.blockPosition();
+        BlockPos best = null;
+        double bestDistSq = Double.MAX_VALUE;
+        for (int dx = -16; dx <= 16; dx++) {
+            for (int dy = 0; dy <= 2; dy++) {
+                for (int dz = -16; dz <= 16; dz++) {
+                    BlockPos pos = origin.offset(dx, dy, dz);
+                    if (claimed.contains(pos)) continue;
+                    if (!civet.level().getBlockState(pos).is(BlockTags.LOGS)) continue;
+                    if (standNextTo(civet, pos) == null) continue;
+                    double d = origin.distSqr(pos);
+                    if (d < bestDistSq) { bestDistSq = d; best = pos.immutable(); }
+                }
+            }
+        }
+        return best;
+    }
+
+    private static BlockPos standNextTo(CivetEntity civet, BlockPos log) {
+        for (Direction dir : new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST}) {
+            BlockPos side = log.relative(dir);
+            boolean free = civet.level().getBlockState(side).getCollisionShape(civet.level(), side).isEmpty();
+            boolean floor = civet.level().getBlockState(side.below())
+                    .isFaceSturdy(civet.level(), side.below(), Direction.UP);
+            if (free && floor) return side;
+        }
+        return null;
+    }
+
+    private static String gate(boolean open, String name) {
+        return (open ? "§a  OK  " : "§c CIERRA ") + "§f" + name;
     }
 
     private static String isClimbable(CommandSourceStack source, CivetEntity civet, BlockPos pos) {

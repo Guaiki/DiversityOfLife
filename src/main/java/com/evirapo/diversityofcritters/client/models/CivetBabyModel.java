@@ -1,23 +1,17 @@
 package com.evirapo.diversityofcritters.client.models;
 
-import com.evirapo.diversityofcritters.client.animations.CivetBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.animation.AnimationDefinition;
-import net.minecraft.client.animation.KeyframeAnimations;
+import net.darkblade.deluxelib.client.anim.AnimBlend;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
-import net.minecraft.world.entity.AnimationState;
-import org.joml.Vector3f;
 
 public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
     private final ModelPart Bandedpalmcivetkit;
-
-    private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
 
     public CivetBabyModel(ModelPart root) {
         this.Bandedpalmcivetkit = root.getChild("Bandedpalmcivetkit");
@@ -56,41 +50,16 @@ public class CivetBabyModel<T extends CivetEntity> extends HierarchicalModel<T> 
     }
 
     @Override
-    public void setupAnim(CivetEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(T entity, float limbSwing, float limbSwingAmount,
+                          float ageInTicks, float netHeadYaw, float headPitch) {
         this.root().getAllParts().forEach(ModelPart::resetPose);
 
-        float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 20.0F);
-        float walkWeight = 1.0F - idleWeight;
-
-        if (idleWeight > 0) {
-            this.animateWithWeight(entity.idleAnimationState, CivetBabyAnims.idle, ageInTicks, 1.0F, idleWeight);
-        }
-
-        if (walkWeight > 0) {
-            this.animateCrawling(CivetBabyAnims.move, limbSwing, limbSwingAmount, 8.0f, walkWeight);
-        }
-
-        this.animate(entity.preparingSleepState, CivetBabyAnims.preparing_sleep, ageInTicks, 1f);
-        this.animate(entity.sleepState,          CivetBabyAnims.sleep,           ageInTicks, 1f);
-        this.animate(entity.awakeningState,      CivetBabyAnims.awakening,       ageInTicks, 1f);
-
-        this.animate(entity.preparingCryState, CivetBabyAnims.preparing_cry, ageInTicks, 1f);
-        this.animate(entity.cryingState,       CivetBabyAnims.cry,           ageInTicks, 1f);
-        this.animate(entity.stoppingCryState,  CivetBabyAnims.stopping_cry,  ageInTicks, 1f);
-    }
-
-    protected void animateWithWeight(AnimationState state, AnimationDefinition definition, float ageInTicks, float speed, float weight) {
-        state.updateTime(ageInTicks, speed);
-        state.ifStarted(s -> {
-            KeyframeAnimations.animate(this, definition, s.getAccumulatedTime(), 1.0F * weight, ANIMATION_VECTOR_CACHE);
-        });
-    }
-
-    protected void animateCrawling(AnimationDefinition definition, float limbSwing, float limbSwingAmount, float speedMultiplier, float weight) {
-        long time = (long)(limbSwing * 50.0F * speedMultiplier);
-        float finalScale = 1.0F * weight;
-
-        KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
+        // Una sola llamada, a la CAPA 1. El bebé tiene su propia jerarquía de huesos (la raíz se
+        // llama Bandedpalmcivetkit), así que sus clips viven en una capa aparte de los del adulto y
+        // cada modelo lee sólo la suya: cero contaminación cruzada y ningún gate isNewborn()
+        // repartido por el modelo. La prioridad decide qué se ve — dormir gana al llanto, y el
+        // llanto a gatear.
+        AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 1);
     }
 
     @Override

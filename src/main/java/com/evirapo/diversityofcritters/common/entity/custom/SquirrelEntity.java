@@ -154,8 +154,6 @@ public class SquirrelEntity extends DiverseCritter {
 
         this.goalSelector.addGoal(3, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(3, new FindCryingBabyGoal(this, 1.4D, 24.0D));
-        // Sustituye a SitWhenOrderedToGoal: mismo comportamiento, pero además es dueño de la cadena
-        // ordered_sit_* y su clip de salida ya no se corta al levantarse.
         this.goalSelector.addGoal(4, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(5, new NaturalMateGoal(this, 1.0D));
 
