@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.common.event;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.command.CivetDebugCommand;
+import com.evirapo.diversityofcritters.common.command.WarinessDebugCommand;
 import com.evirapo.diversityofcritters.common.command.SetNeedsCommand;
 import com.evirapo.diversityofcritters.common.command.SetPregnancyCommand;
 import com.mojang.logging.LogUtils;
@@ -38,6 +39,7 @@ public class DOCForgeEvents {
         SetPregnancyCommand.register(event.getDispatcher());
         SetNeedsCommand.register(event.getDispatcher());
         CivetDebugCommand.register(event.getDispatcher());
+        WarinessDebugCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent

@@ -95,6 +95,8 @@ public abstract class DiverseCritter extends TamableAnimal
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Boolean> IS_ALERT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_FLEEING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TEMP_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
@@ -159,6 +161,12 @@ public abstract class DiverseCritter extends TamableAnimal
     protected static final int P_SWIM = 2;
     protected static final int P_SLEEP = 3;
     protected static final int P_ATTACK = 4;
+    /**
+     * Misma que {@link #P_ATTACK} a proposito. No chocan: {@code CritterAlertGoal} esta en prioridad
+     * de goal 2 y desaloja al goal de ataque (7), asi que dejan de producirse impactos y con ellos
+     * los clips de ataque.
+     */
+    protected static final int P_ALERT = 4;
     protected static final int P_ORDERED_SIT = 5;
     protected static final int P_ACTIVITY = 6;
     protected static final int P_IDLE_VARIANT = 7;
@@ -324,6 +332,8 @@ public abstract class DiverseCritter extends TamableAnimal
         this.entityData.define(IS_PREGNANT, false);
         this.entityData.define(CAN_BREED, true);
         this.entityData.define(IDLE_VARIANT, (byte) 0);
+        this.entityData.define(IS_ALERT, false);
+        this.entityData.define(IS_FLEEING, false);
         this.entityData.define(TEMP_TIER, TemperatureTier.MODERATE.ordinal());
         this.entityData.define(TEMP_COMFORT, 100);
         this.entityData.define(HUMIDITY_TIER, HumidityTier.MODERATE.ordinal());
@@ -1036,4 +1046,72 @@ public abstract class DiverseCritter extends TamableAnimal
             super.ageUp(pAmount, true);
         }
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  WARINESS & FLIGHT
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Los escribe {@code ThreatSensor} en servidor; el cliente los lee para las playCondition, y el
+     * comando {@code /doc_wariness} para introspeccion.
+     *
+     * <p><b>{@code IS_FLEEING} no dibuja nada.</b> El galope sale de {@link #isMoving()} y
+     * {@code isSprinting()}, que ya viajan sincronizados. Existe para que otro goal pueda preguntar
+     * "esta huyendo?" sin hablar con el sensor, que es solo de servidor.
+     */
+    public boolean isAlert() { return this.entityData.get(IS_ALERT); }
+    public void setAlert(boolean value) { this.entityData.set(IS_ALERT, value); }
+
+    public boolean isFleeing() { return this.entityData.get(IS_FLEEING); }
+    public void setFleeing(boolean value) { this.entityData.set(IS_FLEEING, value); }
+
+    /**
+     * Opt-in por especie del sistema de wariness.
+     *
+     * <p><b>Falso por defecto a proposito.</b> La ardilla y la sifaka no tienen clips de alerta, y
+     * encenderlas las dejaria congeladas cuatro segundos con la pose de idle puesta, que se lee como
+     * un bug y no como miedo. Cuando lleguen sus clips se suman sobrescribiendo esto y registrando
+     * {@code alert_enter} / {@code alert_loop}.
+     */
+    public boolean isWary() { return false; }
+
+    /**
+     * Que cuenta como amenaza. Por defecto cualquier jugador que no sea espectador; los de creativo
+     * SI cuentan, para poder probar el sistema volando.
+     *
+     * <p><b>Deuda declarada:</b> anadir depredadores exige tocar dos sitios — sobrescribir esto y
+     * ampliar la consulta de {@code ThreatSensor.scan()}, que hoy pide solo {@code Player.class}
+     * porque es lo barato y va indexado por chunk. Hoy ningun mob del juego caza a estos critters,
+     * asi que esa rama seria codigo sin nada que la dispare.
+     */
+    public boolean isThreat(LivingEntity other) {
+        return other instanceof Player player && !player.isSpectator();
+    }
+
+    /** Zona roja: huida inmediata. */
+    public double innerThreatRadius() { return 4.0D; }
+
+    /** Zona amarilla: alerta y arranque del temporizador. */
+    public double outerThreatRadius() { return 10.0D; }
+
+    /** Cuanto aguanta alertado antes de salir corriendo. 80 ticks = 4 s. */
+    public int alertDwellTicks() { return 80; }
+
+    /** Multiplicador de velocidad al huir. */
+    public double fleeSpeed() { return 1.6D; }
+
+    /**
+     * Distancia a la que deja de huir. <b>Invariante: mayor que {@link #outerThreatRadius()}.</b>
+     *
+     * <p>Es el anti-loop: al terminar la huida la amenaza ya esta fuera de la zona amarilla, asi que
+     * no puede re-alertarse en el acto. {@code ThreatSensor} loguea y clampa si se configura mal —
+     * no lo comprueba con {@code assert}, que Java desactiva en runtime.
+     */
+    public double safeDistance() { return 16.0D; }
+
+    /** Techo de la huida, para el acorralado que nunca alcanzaria safeDistance. 200 ticks = 10 s. */
+    public int maxFleeTicks() { return 200; }
+
+    /** Espera sin amenazas antes de volver a dormirse. 6000 ticks = 5 min. */
+    public int reSleepCooldownTicks() { return 6000; }
 }
