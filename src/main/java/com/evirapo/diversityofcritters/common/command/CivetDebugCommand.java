@@ -151,7 +151,7 @@ public class CivetDebugCommand {
         activityGates(source, civet);
 
         if (civets.size() > 1) {
-            send(source, "§e--- LAS " + civets.size() + " CIVETAS DEL RADIO ---");
+            send(source, "§e--- ALL " + civets.size() + " CIVETS IN RANGE ---");
             for (CivetEntity c : civets) {
                 send(source, "  §7[" + c.getId() + "] " + oneLiner(c));
             }
@@ -167,11 +167,11 @@ public class CivetDebugCommand {
      * en el mismo orden, para que "no hace nada" deje de ser una conjetura.
      */
     private static void activityGates(CommandSourceStack source, CivetEntity civet) {
-        send(source, "§e--- PUERTAS DE ACTIVIDAD (cavar / aranar) ---");
+        send(source, "§e--- ACTIVITY GATES (dig / scratch) ---");
 
         send(source, gate(civet.isEnrichmentNeeded(), "enrichment")
                 + " §7" + civet.getEnrichment() + "/" + civet.maxEnrichment()
-                + " (hace falta <= " + (civet.maxEnrichment() / 2) + ")");
+                + " (needs <= " + (civet.maxEnrichment() / 2) + ")");
         send(source, gate(!civet.isNewborn(), "!newborn"));
         send(source, gate(civet.getSleepState() == DiverseCritter.SleepState.AWAKE, "awake")
                 + " §7sleepState=" + civet.getSleepState());
@@ -184,29 +184,29 @@ public class CivetDebugCommand {
                 + " dig=" + civet.isDigging()
                 + " scratch=" + civet.isScratching());
 
-        send(source, "§7reserva propia:  dig=" + civet.getDigTarget()
+        send(source, "§7own claim:    dig=" + civet.getDigTarget()
                 + "   scratch=" + civet.getScratchTarget());
 
         Set<net.minecraft.core.BlockPos> digClaims = CritterClaims.digClaims(civet, 8.0D);
         Set<net.minecraft.core.BlockPos> scrClaims = CritterClaims.scratchClaims(civet, 32.0D);
-        send(source, "§7reservas ajenas: dig=" + digClaims + "   scratch=" + scrClaims);
+        send(source, "§7others' claims: dig=" + digClaims + "   scratch=" + scrClaims);
 
         BlockPos dirt = findDirt(civet, digClaims);
-        send(source, gate(dirt != null, "hay tierra libre") + " §7" + dirt
-                + (dirt == null ? "" : "  ruta=" + (civet.getNavigation().createPath(dirt.above(), 0) != null)));
+        send(source, gate(dirt != null, "free dirt") + " §7" + dirt
+                + (dirt == null ? "" : "  path=" + (civet.getNavigation().createPath(dirt.above(), 0) != null)));
 
         BlockPos log = findLog(civet, scrClaims);
-        send(source, gate(log != null, "hay tronco libre") + " §7" + log);
+        send(source, gate(log != null, "free log") + " §7" + log);
 
-        send(source, "§6Goals de cadena (running / fase):");
+        send(source, "§6Chain goals (running / phase):"); 
         civet.goalSelector.getAvailableGoals().forEach(wg -> {
             if (wg.getGoal() instanceof PhasedActivityGoal<?> phased) {
                 send(source, "  §6- " + wg.getGoal().getClass().getSimpleName()
                         + " §7running=" + wg.isRunning() + " phase=" + phased.phase());
             }
         });
-        send(source, "§8(si todas las puertas estan en verde y ningun goal corre, es el cooldown:");
-        send(source, "§8 200-400 llamadas a canUse(), que en ticks pares son 400-800 ticks = 20-40 s)");
+        send(source, "§8(all gates green and no goal running means it is the cooldown:");
+        send(source, "§8 200-400 canUse() calls, which on even ticks is 400-800 ticks = 20-40 s)");
     }
 
     private static String oneLiner(CivetEntity c) {
@@ -262,7 +262,7 @@ public class CivetDebugCommand {
     }
 
     private static String gate(boolean open, String name) {
-        return (open ? "§a  OK  " : "§c CIERRA ") + "§f" + name;
+        return (open ? "§a  OK   " : "§c BLOCKS ") + "§f" + name;
     }
 
     private static String isClimbable(CommandSourceStack source, CivetEntity civet, BlockPos pos) {

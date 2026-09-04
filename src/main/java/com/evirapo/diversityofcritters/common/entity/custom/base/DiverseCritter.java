@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
 import com.evirapo.diversityofcritters.common.humidity.HumiditySystem;
 import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
@@ -140,6 +141,14 @@ public abstract class DiverseCritter extends TamableAnimal
     private final MobAnimator<DiverseCritter> animator = new MobAnimator<>(this);
     /** Suaviza el "se está moviendo" para que el umbral crudo no parpadee entre idle y walk. */
     private final MovementHysteresis movingHysteresis = new MovementHysteresis();
+
+    /**
+     * Deteccion de amenazas y maquina de alerta/huida. Vive aqui y no en un goal porque el sueno
+     * necesita consultarla mientras es EL quien retiene al bicho; ver el javadoc de la clase.
+     */
+    private final ThreatSensor threatSensor = new ThreatSensor(this);
+
+    public ThreatSensor sensor() { return this.threatSensor; }
 
     @Override
     public @javax.annotation.Nonnull MobAnimator<DiverseCritter> animator() {
@@ -959,6 +968,10 @@ public abstract class DiverseCritter extends TamableAnimal
             if (moving != this.entityData.get(IS_MOVING)) {
                 this.entityData.set(IS_MOVING, moving);
             }
+
+            // Despues de la histeresis a proposito: el sensor no la usa hoy, pero cualquier condicion
+            // que anadamos a isThreat() o al estado vera el flag de movimiento ya asentado.
+            this.threatSensor.tick();
         }
     }
 

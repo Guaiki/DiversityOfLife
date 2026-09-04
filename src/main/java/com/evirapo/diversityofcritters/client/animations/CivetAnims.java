@@ -5,19 +5,7 @@ import net.minecraft.client.animation.AnimationDefinition;
 import net.minecraft.client.animation.Keyframe;
 import net.minecraft.client.animation.KeyframeAnimations;
 
-/**
- * Clips de la civeta adulta. Generado desde el export de Blockbench con
- * {@code tools/swap_civet_anims.py}; no editar a mano salvo {@link #BABY}, que es una pose estatica
- * escrita aqui y que el script conserva.
- *
- * <p>No todos estan registrados en el animator: {@link #ALERT_STARTING} y {@link #ALERT} todavia
- * no tienen comportamiento que los dispare y viven aqui a la espera.
- *
- * <p>"Eating" y "Pet" salen del export pero NO se copian: no las usaba nadie. Estan fuera de
- * MAPPING a proposito, asi que el script las lista como ignoradas en cada pasada.
- */
 public class CivetAnims {
-
 
     public static final AnimationDefinition BABY = AnimationDefinition.Builder.withLength(0.0F)
 			.addAnimation("Head", new AnimationChannel(AnimationChannel.Targets.SCALE,

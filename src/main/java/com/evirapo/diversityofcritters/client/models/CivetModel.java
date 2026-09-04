@@ -20,15 +20,8 @@ import java.util.Set;
 
 public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
-    /** Sólo en locomoción de suelo se sigue al jugador con la cabeza; ver {@link #lookAt}. */
     private static final Set<String> HEAD_TRACKING_ANIMS = Set.of("idle", "walk", "run");
 
-    /**
-     * Sustituye a la asignación directa {@code Head.xRot = headPitch} del modelo anterior, que había
-     * que ir apagando a mano en cada estado (dormir, trepar, sentarse por orden…). Como aditivo se
-     * suma encima de los keyframes y se atenúa con rampa en vez de cortar, y el gate es una lista de
-     * animaciones en vez de una cadena de negaciones.
-     */
     private final LookAtAdditive<T, CivetModel<T>> lookAt =
             new LookAtAdditive<T, CivetModel<T>>(m -> m.Head, 75.0F, 40.0F)
                     .enabledWhile(entity -> {
@@ -241,7 +234,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
         this.Head.yScale = headScale;
         this.Head.zScale = headScale;
 
-        // Antes del blend: la pose de bebé es la base sobre la que los keyframes suman offsets.
         if (this.young) {
             this.applyStatic(CivetAnims.BABY);
         }
@@ -251,19 +243,10 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
         this.lookAt.apply(entity, this,
                 AnimContext.of(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch));
 
-        // Al morir, toda playCondition de la capa 0 lleva isAlive(), así que la capa se vacía y las
-        // partes intercambiables vuelven a la pose de horneado, que las tiene TODAS a escala 1: dos
-        // torsos superpuestos y las cuatro colas a la vez.
-        //
-        // Va DESPUÉS del blend y decidido por estado de la entidad, no por "el animator está vacío":
-        // el animator queda vacío en cuanto cae la condición, pero la pila de desvanecimiento sigue
-        // sumando sus offsets de escala durante otros 150-300 ms. Ponerlo antes dejaba esos offsets
-        // cayendo encima de un cero (escala negativa = geometría invertida) durante ese hueco.
         if (!entity.isAlive()) {
             this.applyDefaultPartVisibility();
         }
 
-        // renderToBuffer gira el modelo −90° al trepar; se lee aquí porque allí no llega la entidad.
         this.isClimbingRender     = climbing;
         this.isClimbingDownRender = entity.isClimbingDown();
 
@@ -273,11 +256,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
         }
     }
 
-    /**
-     * Las partes intercambiables del rig nuevo: cada animación elige por keyframes de escala qué
-     * torso (recto o encorvado), qué cola (recta o en las tres curvas) y qué ojos (abiertos o
-     * dormidos) se ven. Esto es la pose por defecto para cuando no suena ninguna.
-     */
+
     private void applyDefaultPartVisibility() {
         hide(this.Torse2);
         hide(this.Tail_L);

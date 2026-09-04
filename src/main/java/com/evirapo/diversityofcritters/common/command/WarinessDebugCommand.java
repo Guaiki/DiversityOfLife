@@ -1,10 +1,12 @@
 package com.evirapo.diversityofcritters.common.command;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -36,31 +38,59 @@ public class WarinessDebugCommand {
 
         if (critters.isEmpty()) {
             source.sendFailure(Component.literal(
-                    "[Wariness] No hay critters a " + (int) RADIUS + " bloques."));
+                    "[Wariness] No critters within " + (int) RADIUS + " blocks."));
             return 0;
         }
 
         send(source, "§e=== WARINESS (" + critters.size() + " critters) ===");
         for (DiverseCritter critter : critters) {
             send(source, "§f[" + critter.getId() + "] " + critter.getType().getDescriptionId());
-            send(source, "  §7zonas: roja=" + fmt(critter.innerThreatRadius())
-                    + "  amarilla=" + fmt(critter.outerThreatRadius())
-                    + "  segura=" + fmt(critter.safeDistance())
+            send(source, "  §7zones: inner=" + fmt(critter.innerThreatRadius())
+                    + "  outer=" + fmt(critter.outerThreatRadius())
+                    + "  safe=" + fmt(critter.safeDistance())
                     + "  dwell=" + critter.alertDwellTicks() + "t");
             send(source, "  §7flags: alert=" + critter.isAlert() + " fleeing=" + critter.isFleeing());
             send(source, "  " + reason(critter));
+            if (critter.sensor().isEnabled()) {
+                detail(source, critter);
+            }
         }
-        send(source, "§e=== FIN ===");
+        send(source, "§e=== END ===");
         return 1;
+    }
+
+    /** Lo que esta viendo y decidiendo el sensor ahora mismo. */
+    private static void detail(CommandSourceStack source, DiverseCritter critter) {
+        ThreatSensor sensor = critter.sensor();
+
+        send(source, "  §bstate: " + sensor.state()
+                + "   dwell left: " + sensor.dwellTicksLeft() + "t"
+                + (sensor.isTimerFrozen() ? " §e(FROZEN: everyone crouching)" : ""));
+
+        LivingEntity threat = sensor.nearestThreat();
+        if (threat == null) {
+            send(source, "  §bthreat: none");
+        } else {
+            boolean innerZone = sensor.nearestDistance() <= critter.innerThreatRadius();
+            send(source, "  §bthreat: " + threat.getName().getString()
+                    + " at " + fmt(sensor.nearestDistance())
+                    + (innerZone ? " §c[INNER]" : " §e[OUTER]"));
+        }
+
+        int since = critter.tickCount - sensor.lastThreatTick();
+        send(source, "  §bre-sleep in: " + Math.max(0, critter.reSleepCooldownTicks() - since)
+                + "t  (needs " + critter.reSleepCooldownTicks() + "t threat-free)");
+
+        sensor.spawnDebugRings(source.getLevel());
     }
 
     /** Por que esta apagado, o que esta haciendo si no lo esta. */
     private static String reason(DiverseCritter critter) {
-        if (!critter.isWary())   return "§cAPAGADO §7- la especie no ha hecho opt-in (isWary() = false)";
-        if (critter.isTame())    return "§cAPAGADO §7- domesticado; el sistema es solo para salvajes";
-        if (critter.isNewborn()) return "§cAPAGADO §7- recien nacido";
-        if (!critter.isAlive())  return "§cAPAGADO §7- muerto";
-        return "§aACTIVO";
+        if (!critter.isWary())   return "§cOFF §7- species has not opted in (isWary() = false)";
+        if (critter.isTame())    return "§cOFF §7- tamed; this system is for wild critters only";
+        if (critter.isNewborn()) return "§cOFF §7- newborn";
+        if (!critter.isAlive())  return "§cOFF §7- dead";
+        return "§aACTIVE";
     }
 
     private static String fmt(double v) {

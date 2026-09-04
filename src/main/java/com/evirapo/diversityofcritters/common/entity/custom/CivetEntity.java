@@ -7,9 +7,11 @@ import com.evirapo.diversityofcritters.common.entity.custom.base.IDiggingCritter
 import com.evirapo.diversityofcritters.common.entity.custom.base.IScratchingCritter;
 import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.client.animations.CivetBabyAnims;
+import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import net.darkblade.deluxelib.anim.AnimSource;
 import net.darkblade.deluxelib.entity.ai.goal.AnimatableMeleeAttackGoal;
 import net.darkblade.deluxelib.anim.Loop;
@@ -61,31 +63,23 @@ import java.util.function.Predicate;
 public class CivetEntity extends DiverseCritter
         implements IDiggingCritter, IScratchingCritter {
 
-    // Civeta de palma bandeada: tropical del sudeste asiático
     @Override
-    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+    public TemperatureTier comfortTierMin() {
+        return TemperatureTier.WARM;
     }
     @Override
-    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
-    }
-
-    // Selva tropical húmeda del sudeste asiático
-    @Override
-    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
-    }
-    @Override
-    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.WET;
+    public TemperatureTier comfortTierMax() {
+        return TemperatureTier.HOT;
     }
 
-    // Sin AnimationState: TODAS las animaciones de la civeta, adulta y bebe, viven en el
-    // MobAnimator que hereda de DiverseCritter -- el adulto en la capa 0 y el bebe en la 1.
-    // Las maquinas de estado solo-cliente que habia aqui (setupAnimationStatesClient con sus
-    // doce contadores client*Tick, y handleCryingAnimationClient) daban la fase equivocada a
-    // quien entrara en rango a mitad de una secuencia; ahora el servidor manda y se sincroniza.
+    @Override
+    public HumidityTier comfortHumidityMin() {
+        return HumidityTier.HUMID;
+    }
+    @Override
+    public HumidityTier comfortHumidityMax() {
+        return HumidityTier.WET;
+    }
 
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.FLOAT);
@@ -143,12 +137,8 @@ public class CivetEntity extends DiverseCritter
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
 
-        // Sustituye a BabyCryGoal: aquella dejaba las tres fases del llanto a contadores que solo
-        // existian en el cliente, y no retenia durante el clip de parada.
         this.goalSelector.addGoal(2, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
-        // Sustituye a SitWhenOrderedToGoal: mismo comportamiento, pero ademas es dueño de la cadena
-        // ordered_sit_* y su clip de salida ya no se corta al levantarse.
         this.goalSelector.addGoal(3, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(4, new NaturalMateGoal(this, 1.0D));
 
@@ -159,13 +149,6 @@ public class CivetEntity extends DiverseCritter
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        // Sustituye a AnimatedAttackGoal. Aquel encendia el flag sincronizado ATTACKING y la
-        // animacion se colgaba de el con una playCondition, asi que el clip empezaba cuando el flag
-        // llegaba al cliente y no cuando caia el golpe. Este dispara el clip en el instante del
-        // impacto, que es lo que hace que el swing se lea.
-        //
-        // Ojo: AnimatableMeleeAttackGoal NO reparte dano por su cuenta -- hace swing() y delega en
-        // onAttack. El doHurtTarget va aqui, igual que lo hacia performAttack().
         this.goalSelector.addGoal(7, new AnimatableMeleeAttackGoal(this, 1.25D, true)
                 .onAttack((target, anim) -> {
                     this.doHurtTarget(target);
@@ -197,8 +180,6 @@ public class CivetEntity extends DiverseCritter
         this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
 
-        // Sin flags: la prioridad da igual, va el ultimo por legibilidad. Los pesos son los del
-        // sorteo original (20 / 25 / 25); sentarse y tumbarse los lleva CritterIdleVariantGoal.
         this.goalSelector.addGoal(22, new CritterIdleGestureGoal(this, 120, 120)
                 .add(IdleVariant.STRETCH, "stretch", 20)
                 .add(IdleVariant.SNIFF_LEFT, "sniff_left", 25)
@@ -211,15 +192,7 @@ public class CivetEntity extends DiverseCritter
 
     // --- ANIMACIONES ---
 
-    /**
-     * Locomocion de suelo al estilo Athenian/Arpy: tres animaciones REPEATING en la capa 0 con
-     * playCondition mutuamente excluyentes. El crossfade lo hace el BlendState de DeluxeLib, no
-     * pesos calculados a mano en el modelo, y el clip corre a su propio ritmo en vez de ir atado a
-     * limbSwing (adios a {@code sprintProgress} y a {@code animateWalkWithWeight}).
-     *
-     * <p>Las duraciones son las longitudes reales de los clips en {@link CivetAnims}; si se vuelven
-     * a exportar desde Blockbench con otra longitud hay que actualizarlas aqui.
-     */
+
     @Override
     public void registerAnimations() {
         StandardAnimation idle = new StandardAnimation("idle",
@@ -233,21 +206,11 @@ public class CivetEntity extends DiverseCritter
         walk.blendInMs(150).blendOutMs(150);
         run.blendInMs(150).blendOutMs(150);
 
-        // Un unico signo de movimiento: isMoving(), que combina velocidad y camino pendiente pasados
-        // por la histeresis de DiverseCritter.aiStep. Leer la navegacion en crudo aqui hacia
-        // parpadear idle/walk cada vez que algo recreaba la ruta desde fuera de un goal.
         idle.setPlayCondition(a -> groundLocomotionAllowed() && !this.isMoving());
         walk.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && !this.isSprinting());
         run.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && this.isSprinting());
 
-        // --- Sentarse por orden: cadena de 3 fases dirigida por CritterOrderedSitGoal ---
-        // Entrada y salida son PLAY_ONCE y solo arrancan con play() desde el goal; eso es lo que
-        // permite que la salida suene entera cuando isOrderedToSit() ya es false. El bucle SI lleva
-        // playCondition: sin ella MobAnimator.tick() lo auto-arrancaria y, al ganarle a idle, la
-        // civeta se quedaria sentada para siempre aunque no estuviera domesticada.
-        //
-        // Misma prioridad las tres, para que el bucle no auto-arranque encima de su propia entrada
-        // (el guard de MobAnimator es `current.getPriority() <= base.getPriority()`).
+
         StandardAnimation sitEnter = new StandardAnimation("ordered_sit_enter",
                 new AnimSource(() -> CivetAnims.SIT_STARTING), Loop.PLAY_ONCE, 0, P_ORDERED_SIT, 0.5F);
         StandardAnimation sitLoop = new StandardAnimation("ordered_sit_loop",
@@ -258,13 +221,10 @@ public class CivetEntity extends DiverseCritter
         sitEnter.blendInMs(150).blendOutMs(120).setNextAnimation("ordered_sit_loop");
         sitLoop.blendInMs(120).blendOutMs(150);
         sitLoop.setPlayCondition(a -> this.isOrderedToSit());
-        // locksMovement: AnimationLockGoal congela a la civeta mientras dura la salida, que es lo que
-        // impedia que se deslizara con la pose de levantarse a medias.
         sitExit.blendInMs(120).blendOutMs(200).locksMovement();
 
         this.animator().register(idle, walk, run, sitEnter, sitLoop, sitExit);
 
-        // --- Actividades (prioridad 6) ---
         registerChain("drink", () -> CivetAnims.DRINK_STARTING, 0.25F,
                 () -> CivetAnims.DRINK_IDLE, 1.0F,
                 () -> CivetAnims.DRINK_ENDING, 0.25F, P_ACTIVITY)
@@ -275,10 +235,6 @@ public class CivetEntity extends DiverseCritter
                 () -> CivetAnims.GROOMING_ENDING, 0.5F, P_ACTIVITY)
                 .setPlayCondition(a -> this.isCleaning());
 
-        // Cavar y aranar son lo propio de la civeta. Los dirigen CritterDigDirtChainGoal y
-        // CritterScratchLogChainGoal, que llegan al flag por IDiggingCritter / IScratchingCritter en
-        // vez de por un instanceof, asi que cualquier especie que implemente esas interfaces los
-        // hereda tal cual. dig_* lo comparte ademas FindDigBoxGoal (la caja de arena).
         registerChain("dig", () -> CivetAnims.DIGGING_STARTING, 0.5F,
                 () -> CivetAnims.DIGGING_IDLE, 0.5F,
                 () -> CivetAnims.DIGGING_ENDING, 0.5F, P_ACTIVITY)
@@ -289,14 +245,6 @@ public class CivetEntity extends DiverseCritter
                 () -> CivetAnims.SCRATCHING_ENDING, 0.5F, P_ACTIVITY)
                 .setPlayCondition(a -> this.isScratching());
 
-        // --- Variantes de reposo (prioridad 7) ---
-        // Las de un solo clip no tienen entrada ni salida: al terminar, el bucle se para por su
-        // condicion e idle entra con su propio crossfade.
-        //
-        // El export de Blockbench trae cruzados dos nombres, igual que el de la ardilla: lo que
-        // llama "Stand up" es en realidad estirarse (clip suelto, variante STRETCH) y la cadena
-        // "Lay" es tumbarse, que el mod dispara con la variante llamada STAND_UP. La traduccion
-        // esta en tools/swap_civet_anims.py.
         registerSingle("stretch", () -> CivetAnims.STAND_UP, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
                 .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STRETCH);
         registerSingle("sniff_left", () -> CivetAnims.SNIFF_LEFT, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
@@ -309,16 +257,11 @@ public class CivetEntity extends DiverseCritter
                 () -> CivetAnims.SIT_ENDING, 1.0F, P_IDLE_VARIANT)
                 .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SIT);
 
-        // CritterIdleVariantGoal.chooseChain() nombra esta cadena "idle_stand_up_*" aunque los clips
-        // sean los de tumbarse: el nombre viene del IdleVariant, no del clip.
         registerChain("idle_stand_up", () -> CivetAnims.LAY_STARTING, 1.0F,
                 () -> CivetAnims.LAY_IDLE, 4.0F,
                 () -> CivetAnims.LAY_ENDING, 1.0F, P_IDLE_VARIANT)
                 .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STAND_UP);
 
-        // --- Estados continuos: no los dirige ningun goal, solo su condicion ---
-        // Prioridades 1-4, o sea por encima de las actividades: si la civeta trepa, nada, duerme o
-        // esta atacando, eso manda sobre cualquier actividad o locomocion.
         StandardAnimation climbUp = new StandardAnimation("climb_up",
                 new AnimSource(() -> CivetAnims.CLIMBING_UP), Loop.REPEATING, 0, P_CLIMB, 1.0F);
         StandardAnimation climbDown = new StandardAnimation("climb_down",
@@ -327,9 +270,7 @@ public class CivetEntity extends DiverseCritter
                 new AnimSource(() -> CivetAnims.CLIMB_IDLE), Loop.REPEATING, 0, P_CLIMB, 4.0F);
         StandardAnimation swim = new StandardAnimation("swim",
                 new AnimSource(() -> CivetAnims.SWIM), Loop.REPEATING, 0, P_SWIM, 2.0F);
-        // PLAY_ONCE y sin playCondition: un golpe no es un estado. Lo lanza AnimatableMeleeAttackGoal
-        // con play() en el frame del impacto; una PLAY_ONCE nunca auto-arranca, asi que no hace falta
-        // condicion que la contenga.
+
         StandardAnimation attack = new StandardAnimation("attack",
                 new AnimSource(() -> CivetAnims.ATTACK), Loop.PLAY_ONCE, 0, P_ATTACK, 0.5F);
         StandardAnimation sleepEnter = new StandardAnimation("sleep_enter",
@@ -339,25 +280,14 @@ public class CivetEntity extends DiverseCritter
         StandardAnimation sleepExit = new StandardAnimation("sleep_exit",
                 new AnimSource(() -> CivetAnims.AWAKENING), Loop.REPEATING, 0, P_SLEEP, 2.0F);
 
-        // Fundidos cortos en trepada: renderToBuffer gira el modelo -90 grados de golpe al entrar,
-        // asi que un crossfade largo mezclaria poses con orientaciones distintas.
+
         climbUp.blendInMs(100).blendOutMs(100);
         climbDown.blendInMs(100).blendOutMs(100);
-        // climb_hang NO lleva locksMovement(), aunque el spec §5 lo pida: contradice la regla del
-        // §4.1 —"no se marcan los clips de actividades con dueño"— y aqui hay dueño,
-        // CivetClimbGoal, que retiene MOVE y hace setDeltaMovement(0,0,0) cada tick.
-        //
-        // Marcarlo montaba este bucle: AnimationLockGoal es prioridad 0, asi que en la misma pasada
-        // del GoalSelector le robaba MOVE/LOOK al climb goal (prioridad 16) y lo desalojaba. Al
-        // desalojarlo corria su stop(), que ademas de soltar el CLIMB_HANG regala
-        // setEnrichment(maxEnrichment()). Resultado: la civeta colgaba UN tick, cobraba el
-        // enriquecimiento entero, y a partir de ahi isEnrichmentNeeded() era false y ni cavaba ni
-        // se aranaba. La ardilla nunca lo llevo; esto la iguala.
+
         climbHang.blendInMs(150).blendOutMs(150);
-        // El modelo variaba la velocidad de nado con limbSwingAmount; la libreria solo admite un
-        // multiplicador fijo, asi que se toma un valor medio. Si se nota lento o rapido, es aqui.
+
         swim.blendInMs(200).blendOutMs(200).playbackSpeed(1.5F);
-        // Fundidos cortos: es un golpe, no una transicion.
+
         attack.blendInMs(80).blendOutMs(120);
         sleepEnter.blendInMs(200).blendOutMs(200);
         sleepLoop.blendInMs(300).blendOutMs(300);
@@ -377,12 +307,7 @@ public class CivetEntity extends DiverseCritter
         this.registerBabyAnimations();
     }
 
-    /**
-     * Las del recien nacido, en la {@link #LAYER_BABY capa 1}. {@code CivetBabyModel} tiene su propia
-     * jerarquia de huesos (la raiz se llama {@code Bandedpalmcivetkit}), asi que sus clips no pueden
-     * convivir con los del adulto en la capa 0; cada modelo lee solo su capa. Las prioridades son
-     * independientes por capa, asi que se reutiliza la misma escala.
-     */
+
     private void registerBabyAnimations() {
         StandardAnimation babyIdle = registerSingle("baby_idle",
                 () -> CivetBabyAnims.idle, 4.0F, Loop.REPEATING, P_IDLE, LAYER_BABY);
@@ -392,9 +317,6 @@ public class CivetEntity extends DiverseCritter
         babyIdle.setPlayCondition(a -> this.isNewborn() && !this.isMoving());
         babyCrawl.setPlayCondition(a -> this.isNewborn() && this.isMoving());
 
-        // Dormir no es una cadena dirigida por un goal, sino tres estados sincronizados: tres
-        // REPEATING con condicion sobre SleepState, igual que en el adulto. Una cadena no valdria,
-        // porque su entrada es PLAY_ONCE y nadie la lanzaria.
         registerSingle("baby_sleep_enter", () -> CivetBabyAnims.preparing_sleep,
                 1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
                 .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.PREPARING);
@@ -405,9 +327,6 @@ public class CivetEntity extends DiverseCritter
                 1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
                 .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.AWAKENING);
 
-        // El llanto si es una cadena con dueno: la dirige CritterCryChainGoal. La condicion del bucle
-        // esta ademas porque el flag lo apaga tambien FindCryingBabyGoal cuando la madre lo atiende,
-        // y asi se para lo apague quien lo apague.
         registerChain("cry",
                 () -> CivetBabyAnims.preparing_cry, 0.5F,
                 () -> CivetBabyAnims.cry, 4.0F,
@@ -415,11 +334,6 @@ public class CivetEntity extends DiverseCritter
                 .setPlayCondition(a -> this.isNewborn() && this.isCrying());
     }
 
-    /**
-     * Reimplementado sobre el animator: la version de {@link DiverseCritter} lee contadores que solo
-     * existian en el cliente, asi que en servidor devolvia siempre false. Ahora es correcta en ambos
-     * lados y cubre tambien la fase de salida.
-     */
     @Override
     public boolean isOrderedSitPlaying() {
         return this.animator().isPlaying("ordered_sit_enter")
@@ -662,12 +576,17 @@ public class CivetEntity extends DiverseCritter
     }
 
     // --- HELPERS & CONFIG ---
+    /**
+     * La civeta es la primera especie con clips de alerta, asi que es la unica que enciende el
+     * sistema de wariness. La ardilla y la sifaka lo heredan cableado y apagado hasta que tengan
+     * los suyos: entonces es esta linea mas registrar alert_enter / alert_loop.
+     */
+    @Override public boolean isWary() { return true; }
+
     @Override public int maxHunger() { return 4000; }
     @Override public int maxThirst() { return 4000; }
     @Override public int maxEnrichment() { return 4000; }
     @Override public int maxHygiene() { return 4000; }
-    // Ticks de juego, y exactamente la longitud del clip: 2.0 s = 40 en el adulto, 1.0 s = 20 en
-    // el recién nacido. Ver la nota en SleepBehaviorGoal#phaseUntilTick.
     @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 40;}
     @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 40;}
     @Override protected boolean getDefaultDiurnal() { return false; }
@@ -836,21 +755,12 @@ public class CivetEntity extends DiverseCritter
         this.setYHeadRot(wallYaw);
     }
 
-    /**
-     * Cavar y aranar cuentan como actividad especial por el mismo motivo que trepar en la ardilla:
-     * CritterCleanChainGoal (prioridad 8) y CritterMotherCleanBabyGoal (9) le ganan MOVE a los goals
-     * de aranar (15) y cavar (16), y sin este gate el acicalado arrancaba encima con la civeta
-     * metida en el hoyo.
-     */
+
     @Override
     public boolean isDoingSpecialActivity() {
         return isClimbing() || isDigging() || isScratching();
     }
 
-    /**
-     * Reservas de bloque, solo servidor. No se sincronizan ni se guardan: solo las leen busquedas de
-     * servidor, y si la civeta se descarga la reserva se va con ella. Ver {@link CritterClaims}.
-     */
     private @Nullable BlockPos digTarget;
     private @Nullable BlockPos scratchTarget;
 
