@@ -157,7 +157,18 @@ public class SquirrelEntity extends DiverseCritter {
         this.goalSelector.addGoal(4, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(5, new NaturalMateGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SQUIRREL_FOOD), false));
+        // Solo domesticados: en un salvaje pelearia con la alerta por el flag MOVE, tirando del bicho
+        // HACIA la amenaza de la que el otro sistema lo aparta, y dos goals con intenciones opuestas
+        // dan tembleque, no comportamiento. Gateado por isTame() no llegan a coexistir nunca: el
+        // sistema de wariness se apaga entero al domesticar.
+        //
+        // Sigue valiendo para llamar con comida a una mascota en modo wandering, donde FollowOwnerGoal
+        // no corre. Y deja el sigilo como canal para domesticar: agachado se congela el temporizador
+        // de alerta y el critter se queda vigilandote mientras te acercas.
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SQUIRREL_FOOD), false) {
+            @Override public boolean canUse() { return isTame() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isTame() && super.canContinueToUse(); }
+        });
 
         this.goalSelector.addGoal(7, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }

@@ -199,6 +199,19 @@ public class SleepBehaviorGoal extends Goal {
         if (this.entity.tickCount < this.noSleepUntilTick) {
             return false;
         }
+        // Cooldown de re-dormirse tras una amenaza, sin re-armar nada: mientras haya alguien cerca el
+        // sensor devuelve 0 y esta puerta no se abre; cuando el ultimo se va, la cuenta arranca sola.
+        //
+        // Va separado del noSleepUntilTick de arriba a proposito. Aquel cubre despertar por dano o
+        // por agua con 600 ticks; subirlo a cinco minutos haria que salpicar con agua bloqueara el
+        // sueno cinco minutos. Dos causas distintas, dos plazos distintos.
+        //
+        // Gateado por isEnabled() para que a un critter recien domesticado —donde el sistema se apaga
+        // entero— no le quede una espera heredada de cuando era salvaje.
+        if (this.entity.sensor().isEnabled()
+                && this.entity.sensor().ticksSinceThreat() < this.entity.reSleepCooldownTicks()) {
+            return false;
+        }
         if (entity.isInWater() || entity.isVehicle() || entity.isAttacking()
                 || entity.isCleaning() || entity.isOrderedToSit()) {
             return false;
@@ -215,7 +228,11 @@ public class SleepBehaviorGoal extends Goal {
             return this.entity.tickCount < this.phaseUntilTick;
         }
 
-        if (entity.hurtTime > 0 || entity.isInWater()) {
+        // La amenaza despierta igual que el dano o el agua, y por el mismo camino: AWAKENING retiene
+        // al bicho hasta que el clip termina, y solo entonces stop() suelta MOVE y CritterFleeGoal
+        // (prioridad 2) se lo lleva. La huida "encadenada despues del despertar" sale del reparto de
+        // prioridades; no hay que construirla.
+        if (entity.hurtTime > 0 || entity.isInWater() || entity.sensor().hasThreat()) {
             this.startWaking(true);
             return true;
         }

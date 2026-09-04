@@ -33,6 +33,21 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
     private boolean isClimbingRender = false;
     private boolean isClimbingDownRender = false;
 
+    /**
+     * El {@code ModelPart} que envuelve al hueso raiz, y lo que devuelve {@link #root()}.
+     *
+     * <p>No es cosmetico. {@code KeyframeBlender} resuelve cada canal con
+     * {@code HierarchicalModel.getAnyDescendantWithName(nombre)}, que busca <b>una parte que tenga un
+     * hijo con ese nombre</b>. Si {@code root()} devuelve directamente el hueso animado, ese hueso no
+     * es hijo de nadie dentro del arbol que se recorre: la busqueda falla, el {@code ifPresent} no
+     * entra y el canal <b>se descarta en silencio</b> — sin excepcion, sin log, sin nada visible
+     * salvo una animacion que no se mueve del sitio.
+     *
+     * <p>Devolviendo el envoltorio, el hueso pasa a ser hijo suyo y resuelve. Es el mismo patron que
+     * ya usaba {@code SifakaModel}.
+     */
+    private final ModelPart meshRoot;
+
     private final ModelPart BandedPlamCivet;
     private final ModelPart Body;
     private final ModelPart Head;
@@ -60,6 +75,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
     private final ModelPart Leg3;
 
     public CivetModel(ModelPart root) {
+        this.meshRoot        = root;
         this.BandedPlamCivet = root.getChild("BandedPlamCivet");
         this.Body            = this.BandedPlamCivet.getChild("Body");
         this.Head            = this.Body.getChild("Head");
@@ -303,6 +319,6 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 
     @Override
     public ModelPart root() {
-        return BandedPlamCivet;
+        return meshRoot;
     }
 }
