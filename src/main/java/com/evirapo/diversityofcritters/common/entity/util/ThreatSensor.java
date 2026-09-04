@@ -38,6 +38,20 @@ public final class ThreatSensor {
      */
     private static final int SCAN_INTERVAL = 5;
 
+    /**
+     * Cuántos ticks sigue contando una amenaza tras dejar de verla.
+     *
+     * <p>Sin esto, la opinión del sensor parpadea: un jugador parado justo en el borde del radio
+     * entra y sale de la zona por centímetros, y cada parpadeo devolvía el estado a CALM y
+     * reiniciaba el temporizador de alerta a su valor completo. Se veía en el debug como
+     * {@code dwell left} subiendo de 1 a 37. En juego significaba que quedándote en el borde el
+     * critter <b>no huía nunca</b>, porque la cuenta no llegaba a cero.
+     *
+     * <p>Cubre además el parpadeo de línea de visión —una brizna de hierba entre medias— y el
+     * aliasing del intervalo de escaneo.
+     */
+    private static final int THREAT_MEMORY = 20;
+
     /** Número de partículas por circunferencia de debug. */
     private static final int RING_POINTS = 48;
 
@@ -55,7 +69,13 @@ public final class ThreatSensor {
     private int lastThreatTick = -1_000_000;
     private boolean loggedRadiusWarning;
 
-    // --- resultado del ultimo escaneo ---
+    // --- borrador del escaneo en curso; solo se publica si encuentra algo ---
+    private @Nullable LivingEntity scanNearest;
+    private double scanNearestDistSq = Double.MAX_VALUE;
+    private boolean scanInner;
+    private boolean scanSprinting;
+
+    // --- ultimo escaneo con amenaza, vigente mientras dure THREAT_MEMORY ---
     private @Nullable LivingEntity nearest;
     private double nearestDistSq = Double.MAX_VALUE;
     private boolean anyInner;
@@ -79,6 +99,12 @@ public final class ThreatSensor {
         if (this.mob.tickCount % SCAN_INTERVAL == 0) {
             this.scan();
         }
+        // Fuera de la ventana de memoria se olvida el ultimo escaneo; dentro, se conserva tal cual.
+        // Es lo que evita que la opinion del sensor parpadee. Ver THREAT_MEMORY.
+        if (this.mob.tickCount - this.lastThreatTick > THREAT_MEMORY) {
+            this.forgetThreats();
+        }
+
         this.advance();
         this.mob.setAlert(this.state == State.ALERT);
         this.mob.setFleeing(this.state == State.FLEE);
@@ -103,12 +129,8 @@ public final class ThreatSensor {
             this.mob.setAlert(false);
             this.mob.setFleeing(false);
         }
-        this.nearest = null;
-        this.nearestDistSq = Double.MAX_VALUE;
-        this.anyInner = false;
-        this.anyOuter = false;
-        this.anySprinting = false;
-        this.allCrouching = false;
+        this.forgetThreats();
+        this.dwellTicksLeft = 0;
         this.fleeTicks = 0;
     }
 
@@ -116,12 +138,17 @@ public final class ThreatSensor {
     //  ESCANEO
     // ─────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Escanea y <b>sólo publica el resultado si encontró algo</b>. Si no, deja intacto el último
+     * escaneo con amenaza: {@link #tick()} decide si sigue dentro de la ventana de memoria o si toca
+     * olvidarlo. Así una pérdida momentánea —un paso atrás en el borde del radio, una brizna de
+     * hierba tapando la línea de visión— no vuelca el estado a CALM.
+     */
     private void scan() {
-        this.nearest = null;
-        this.nearestDistSq = Double.MAX_VALUE;
-        this.anyInner = false;
-        this.anyOuter = false;
-        this.anySprinting = false;
+        this.scanInner = false;
+        this.scanSprinting = false;
+        this.scanNearest = null;
+        this.scanNearestDistSq = Double.MAX_VALUE;
 
         boolean sawAny = false;
         boolean everyoneCrouching = true;
@@ -136,7 +163,8 @@ public final class ThreatSensor {
             // funcione. getSensing() cachea por tick, asi que esto es barato.
             if (!this.mob.getSensing().hasLineOfSight(player)) continue;
 
-            this.consider(player, false);
+            // consider() devuelve false si esta dentro de la CAJA del escaneo pero fuera del radio.
+            if (!this.consider(player, false)) continue;
             sawAny = true;
             if (!player.isCrouching()) everyoneCrouching = false;
         }
@@ -152,28 +180,60 @@ public final class ThreatSensor {
             everyoneCrouching = false;
         }
 
-        this.anyOuter = sawAny;
+        if (!sawAny) {
+            return;   // se conserva el escaneo anterior mientras dure la memoria
+        }
+
+        this.nearest = this.scanNearest;
+        this.nearestDistSq = this.scanNearestDistSq;
+        this.anyInner = this.scanInner;
+        this.anySprinting = this.scanSprinting;
+        this.anyOuter = true;
         // Solo se congela el temporizador si TODAS estan agachadas. Si bastara con una, dos
         // jugadores romperian el sistema: uno se agacha y el otro entra corriendo con impunidad.
-        this.allCrouching = sawAny && everyoneCrouching;
-        if (sawAny) {
-            this.lastThreatTick = this.mob.tickCount;
-        }
+        this.allCrouching = everyoneCrouching;
+        this.lastThreatTick = this.mob.tickCount;
     }
 
-    private void consider(LivingEntity threat, boolean forceInner) {
+    /** Se acabó la memoria: el sensor deja de creer que hay alguien. */
+    private void forgetThreats() {
+        this.nearest = null;
+        this.nearestDistSq = Double.MAX_VALUE;
+        this.anyInner = false;
+        this.anyOuter = false;
+        this.anySprinting = false;
+        this.allCrouching = false;
+    }
+
+    /**
+     * @param ignoreRadius para quien nos ha pegado, que cuenta este donde este
+     * @return false si esta fuera del radio exterior y por tanto no es amenaza
+     *
+     * <p><b>El filtro por distancia es obligatorio.</b> {@code getBoundingBox().inflate(r)} da una
+     * CAJA, no una esfera, asi que el escaneo devuelve entidades hasta a {@code r*sqrt(3)} en
+     * diagonal. Sin esta comprobacion la zona amarilla era un cubo de lado 2r: con r=10 detectaba a
+     * 14.1 en horizontal y 17.3 contando altura. Se veia en el debug como
+     * {@code threat: Dev at 10.6 [OUTER]} con el radio puesto a 10.
+     */
+    private boolean consider(LivingEntity threat, boolean ignoreRadius) {
         double distSq = this.mob.distanceToSqr(threat);
-        if (distSq < this.nearestDistSq) {
-            this.nearestDistSq = distSq;
-            this.nearest = threat;
+        double outer = this.mob.outerThreatRadius();
+        if (!ignoreRadius && distSq > outer * outer) {
+            return false;
+        }
+
+        if (distSq < this.scanNearestDistSq) {
+            this.scanNearestDistSq = distSq;
+            this.scanNearest = threat;
         }
         double inner = this.mob.innerThreatRadius();
-        if (forceInner || distSq <= inner * inner) {
-            this.anyInner = true;
+        if (ignoreRadius || distSq <= inner * inner) {
+            this.scanInner = true;
         }
         if (threat.isSprinting()) {
-            this.anySprinting = true;
+            this.scanSprinting = true;
         }
+        return true;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -183,12 +243,18 @@ public final class ThreatSensor {
     private void advance() {
         switch (this.state) {
             case CALM -> {
-                if (this.anyInner) this.enterFlee();
+                // El sprint dispara la huida tambien desde CALM, no solo desde ALERT. Estando solo
+                // en ALERT, entrar corriendo daba CALM -> ALERT (un tick) -> FLEE, y ese unico tick
+                // bastaba para que CritterAlertGoal arrancara y lanzara alert_enter: se veia como un
+                // parpadeo de la pose de alerta justo antes de salir corriendo.
+                if (this.anyInner || this.anySprinting) this.enterFlee();
                 else if (this.anyOuter) this.enterAlert();
             }
             case ALERT -> {
                 if (!this.anyOuter) {
                     this.state = State.CALM;
+                    // Si no, el debug muestra "CALM  dwell left: 21t" con el resto de la alerta.
+                    this.dwellTicksLeft = 0;
                 } else if (this.anyInner || this.anySprinting) {
                     this.enterFlee();
                 } else if (!this.allCrouching && --this.dwellTicksLeft <= 0) {
@@ -216,6 +282,9 @@ public final class ThreatSensor {
     private void enterFlee() {
         this.state = State.FLEE;
         this.fleeTicks = 0;
+        // Si no, el debug muestra "state: FLEE  dwell left: 6t" con el resto de la alerta que se
+        // corto al entrar en la zona roja, y parece que el temporizador sigue vivo.
+        this.dwellTicksLeft = 0;
     }
 
     /**
@@ -254,8 +323,24 @@ public final class ThreatSensor {
     /** Hay alguna amenaza detectada ahora mismo. Lo usa el despertar forzado del sueño. */
     public boolean hasThreat() { return this.isEnabled() && this.anyOuter; }
 
-    /** Tick absoluto del último escaneo con amenaza; el sueño resta contra este valor. */
+    /** Tick absoluto del último escaneo con amenaza; sólo para introspección. */
     public int lastThreatTick() { return this.lastThreatTick; }
+
+    /**
+     * Ticks desde la última amenaza <i>creída</i>, que es contra lo que resta el cooldown de
+     * re-dormirse.
+     *
+     * <p>No es {@code tickCount - lastThreatTick}: ese sello sólo se pone en los ticks de escaneo, 1
+     * de cada {@link #SCAN_INTERVAL}, así que la resta cruda oscila entre 0 y 4 y en el debug se veía
+     * el contador temblando entre 5996 y 6000 con un jugador parado delante. Y no se puede sellar
+     * cada tick, porque la ventana de {@link #THREAT_MEMORY} se mide contra ese mismo campo y nunca
+     * expiraría.
+     *
+     * <p>Mientras el sensor cree que hay alguien la respuesta es 0 por definición.
+     */
+    public int ticksSinceThreat() {
+        return this.anyOuter ? 0 : this.mob.tickCount - this.lastThreatTick;
+    }
 
     public @Nullable LivingEntity nearestThreat() { return this.nearest; }
 

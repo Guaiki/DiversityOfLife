@@ -137,6 +137,12 @@ public class CivetEntity extends DiverseCritter
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
 
+        // Antes de los goals de llanto aunque comparta prioridad: el GoalSelector recorre la lista en
+        // orden de insercion para repartir flags libres, asi que quien va primero gana el empate. La
+        // prioridad igual solo significa que ninguno DESALOJA al otro ya arrancado.
+        this.goalSelector.addGoal(2, new CritterAlertGoal(this));
+        this.goalSelector.addGoal(2, new CritterFleeGoal(this));
+
         this.goalSelector.addGoal(2, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
         this.goalSelector.addGoal(3, new CritterOrderedSitGoal(this));
@@ -280,6 +286,13 @@ public class CivetEntity extends DiverseCritter
         StandardAnimation sleepExit = new StandardAnimation("sleep_exit",
                 new AnimSource(() -> CivetAnims.AWAKENING), Loop.REPEATING, 0, P_SLEEP, 2.0F);
 
+        // Alerta: entrada de un disparo mas bucle, sin salida. No hace falta: al caer isAlert() el
+        // bucle se para e idle entra por su blendOutMs, igual que nadar o trepar.
+        StandardAnimation alertEnter = new StandardAnimation("alert_enter",
+                new AnimSource(() -> CivetAnims.ALERT_STARTING), Loop.PLAY_ONCE, 0, P_ALERT, 0.5F);
+        StandardAnimation alertLoop = new StandardAnimation("alert_loop",
+                new AnimSource(() -> CivetAnims.ALERT), Loop.REPEATING, 0, P_ALERT, 0.5F);
+
 
         climbUp.blendInMs(100).blendOutMs(100);
         climbDown.blendInMs(100).blendOutMs(100);
@@ -293,6 +306,9 @@ public class CivetEntity extends DiverseCritter
         sleepLoop.blendInMs(300).blendOutMs(300);
         sleepExit.blendInMs(200).blendOutMs(200);
 
+        alertEnter.blendInMs(120).blendOutMs(150).setNextAnimation("alert_loop");
+        alertLoop.blendInMs(120).blendOutMs(200);
+
         climbUp.setPlayCondition(a -> this.isClimbingUp());
         climbDown.setPlayCondition(a -> this.isClimbingDown());
         climbHang.setPlayCondition(a -> this.isHanging());
@@ -300,9 +316,12 @@ public class CivetEntity extends DiverseCritter
         sleepEnter.setPlayCondition(a -> this.getSleepState() == SleepState.PREPARING);
         sleepLoop.setPlayCondition(a -> this.getSleepState() == SleepState.SLEEPING);
         sleepExit.setPlayCondition(a -> this.getSleepState() == SleepState.AWAKENING);
+        // Solo el bucle lleva condicion: la entrada la lanza CritterAlertGoal a mano, porque el
+        // animator tickea antes que aiStep() y en el tick en que se alerta aun no veria el flag.
+        alertLoop.setPlayCondition(a -> this.isAlert());
 
         this.animator().register(climbUp, climbDown, climbHang, swim, attack,
-                sleepEnter, sleepLoop, sleepExit);
+                sleepEnter, sleepLoop, sleepExit, alertEnter, alertLoop);
 
         this.registerBabyAnimations();
     }

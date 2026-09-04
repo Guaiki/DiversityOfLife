@@ -7,6 +7,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -77,11 +78,37 @@ public class WarinessDebugCommand {
                     + (innerZone ? " §c[INNER]" : " §e[OUTER]"));
         }
 
-        int since = critter.tickCount - sensor.lastThreatTick();
+        int since = sensor.ticksSinceThreat();
         send(source, "  §bre-sleep in: " + Math.max(0, critter.reSleepCooldownTicks() - since)
                 + "t  (needs " + critter.reSleepCooldownTicks() + "t threat-free)");
 
+        movement(source, critter);
         sensor.spawnDebugRings(source.getLevel());
+    }
+
+    /**
+     * Quien retiene el flag MOVE y que clip esta sonando.
+     *
+     * <p>Desde fuera del juego, "el goal de huida corre pero no encuentra ruta" y "un goal de idle le
+     * ha robado el flag" se ven <b>exactamente igual</b>: el critter parado con una pose de idle.
+     * Esta seccion es lo unico que los distingue.
+     */
+    private static void movement(CommandSourceStack source, DiverseCritter critter) {
+        send(source, "  §6sprinting=" + critter.isSprinting()
+                + " moving=" + critter.isMoving()
+                + " navDone=" + critter.getNavigation().isDone()
+                + " animLocked=" + critter.animator().isMovementLocked());
+
+        String anim = critter.animator().getCurrent(0).getName();
+        send(source, "  §6anim: " + (anim.isEmpty() ? "(none)" : anim));
+
+        StringBuilder holders = new StringBuilder();
+        critter.goalSelector.getRunningGoals().forEach(wrapped -> {
+            if (!wrapped.getFlags().contains(Goal.Flag.MOVE)) return;
+            if (holders.length() > 0) holders.append(", ");
+            holders.append(wrapped.getGoal().getClass().getSimpleName());
+        });
+        send(source, "  §6MOVE held by: " + (holders.length() == 0 ? "nobody" : holders));
     }
 
     /** Por que esta apagado, o que esta haciendo si no lo esta. */
