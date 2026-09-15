@@ -45,6 +45,7 @@ import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.Arrays;
 import java.util.function.Supplier;
 
@@ -122,6 +123,44 @@ public abstract class DiverseCritter extends TamableAnimal
     public int pregnancyTimer = 0;
     public int breedCooldown = 0;
     public static final int PREGNANCY_TIME_TICKS = 48000;
+
+    /**
+     * Cada cuantos ticks se regenera medio corazon. Un corazon son 2 HP, asi que medio corazon es
+     * {@code heal(1.0F)} y no {@code 0.5F}.
+     */
+    private static final int HEAL_INTERVAL_TICKS = 1200;
+
+    /**
+     * A partir de que distancia una cuidadora deja de contar como presente.
+     *
+     * <p><b>Este mismo radio se usa en los dos lados</b> —la cria buscando a su cuidadora y la
+     * cuidadora comprobando si ya tiene cria— y tiene que seguir siendo asi. Si se separan aparece una
+     * banda de distancias en la que la madre se cree libre mientras la cria la sigue considerando
+     * suya, y acaba con dos crias. No da error de compilacion: desde fuera solo se ve una hembra con
+     * dos bebes y ninguna explicacion.
+     */
+    public static final double CAREGIVER_RANGE = 32.0D;
+
+    /** Cuanto aguanta una cria sin ver a su cuidadora antes de declararse huerfana. 1200 = 60 s. */
+    public static final int ORPHAN_TIMEOUT_TICKS = 1200;
+
+    /** Cada cuantos ticks la cria comprueba si su cuidadora sigue cerca. */
+    private static final int CAREGIVER_CHECK_INTERVAL = 20;
+
+    /**
+     * Quien cuida de esta cria. Solo significativo en recien nacidos; en un adulto es siempre null.
+     *
+     * <p>Solo servidor y persistido en NBT. No se sincroniza al cliente porque nada se dibuja a partir
+     * de el.
+     *
+     * <p>El vinculo vive SOLO aqui, y no tambien en la cuidadora, a proposito: dos copias del mismo
+     * hecho se desincronizan en cuanto una de las dos entidades se descarga, muere o se serializa a
+     * medias.
+     */
+    private @Nullable UUID caregiverUUID;
+
+    /** Tick en que se vio por ultima vez a la cuidadora. Ver {@link #readAdditionalSaveData}. */
+    private int lastCaregiverSeenTick;
 
     public final AnimationState preparingSleepState = new AnimationState();
     public final AnimationState sleepState = new AnimationState();
@@ -358,6 +397,9 @@ public abstract class DiverseCritter extends TamableAnimal
         pCompound.putInt("Enrichment", this.getEnrichment());
         pCompound.putInt("Hygiene", this.getHygiene());
         pCompound.putBoolean("Cleaning", this.isCleaning());
+        if (this.caregiverUUID != null) {
+            pCompound.putUUID("Caregiver", this.caregiverUUID);
+        }
         pCompound.putInt("SleepState", this.getSleepState().getId());
         pCompound.putBoolean("Diurnal", this.isDiurnal());
         pCompound.putBoolean("Wandering", this.isWandering());
@@ -404,6 +446,14 @@ public abstract class DiverseCritter extends TamableAnimal
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
         if (pCompound.contains("TempComfort")) this.setTemperatureComfort(pCompound.getInt("TempComfort"));
         if (pCompound.contains("HumidityComfort")) this.setHumidityComfort(pCompound.getInt("HumidityComfort"));
+
+        // El contador NO se persiste a proposito. tickCount vuelve a 0 al cargar del disco, asi que
+        // guardar el valor viejo daria una resta negativa enorme y la cria no se declararia huerfana
+        // jamas. Arrancando a cero vuelve del disco con sus 60 s completos para reencontrar a su
+        // madre: recargar un mundo no huerfana a nadie, ni perpetua un vinculo con una madre que ya no
+        // existe.
+        this.lastCaregiverSeenTick = this.tickCount;
+        this.caregiverUUID = pCompound.hasUUID("Caregiver") ? pCompound.getUUID("Caregiver") : null;
     }
 
     public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
@@ -683,6 +733,9 @@ public abstract class DiverseCritter extends TamableAnimal
 
             if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){ this.starve(); }
 
+            this.tickPassiveHealing();
+            this.tickCaregiverPresence();
+
             if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
         }
 
@@ -705,6 +758,13 @@ public abstract class DiverseCritter extends TamableAnimal
         if (baby != null) {
             baby.setBaby(true);
             baby.moveTo(this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F);
+
+            // giveBirth() corre sobre la madre, asi que this es ella. Una cria invocada con /summon o
+            // con huevo no pasa por aqui: nace sin cuidadora, huerfana y adoptable, que es el
+            // comportamiento correcto por defecto.
+            if (baby instanceof DiverseCritter cria) {
+                cria.setCaregiver(this.getUUID());
+            }
 
             serverLevel.addFreshEntityWithPassengers(baby);
 
@@ -1089,8 +1149,12 @@ public abstract class DiverseCritter extends TamableAnimal
     public boolean isWary() { return false; }
 
     /**
-     * Que cuenta como amenaza. Por defecto cualquier jugador que no sea espectador; los de creativo
-     * SI cuentan, para poder probar el sistema volando.
+     * Que cuenta como amenaza. Por defecto cualquier jugador en supervivencia o aventura.
+     *
+     * <p><b>Creativo y espectador quedan fuera.</b> En creativo estas construyendo el recinto, y que
+     * los animales salgan corriendo cada vez que te acercas hace el modo inservible para eso. El
+     * precio es que el sistema de wariness no se puede probar volando: hay que estar en
+     * supervivencia.
      *
      * <p><b>Deuda declarada:</b> anadir depredadores exige tocar dos sitios — sobrescribir esto y
      * ampliar la consulta de {@code ThreatSensor.scan()}, que hoy pide solo {@code Player.class}
@@ -1098,7 +1162,7 @@ public abstract class DiverseCritter extends TamableAnimal
      * asi que esa rama seria codigo sin nada que la dispare.
      */
     public boolean isThreat(LivingEntity other) {
-        return other instanceof Player player && !player.isSpectator();
+        return other instanceof Player player && !player.isSpectator() && !player.isCreative();
     }
 
     /** Zona roja: huida inmediata. */
@@ -1127,4 +1191,116 @@ public abstract class DiverseCritter extends TamableAnimal
 
     /** Espera sin amenazas antes de volver a dormirse. 6000 ticks = 5 min. */
     public int reSleepCooldownTicks() { return 6000; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  CURADO PASIVO
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Medio corazon por minuto, solo si esta bien alimentado.
+     *
+     * <p>Los umbrales son relativos porque cada especie tiene su escala: la civeta tiene 4000 de
+     * hambre maxima y las demas otra cosa.
+     *
+     * <p>El intervalo se escalona con {@code getId()} para que veinte critters no se curen todos en el
+     * mismo tick.
+     *
+     * <p>No trata distinto a los recien nacidos, no se apaga durmiendo y no consulta el sistema de
+     * wariness. Cada condicion extra seria un sitio mas donde el curado se queda mudo sin que se
+     * entienda por que; el vinculo con la comida y el agua ya cumple el objetivo de diseno.
+     */
+    private void tickPassiveHealing() {
+        if ((this.tickCount + this.getId()) % HEAL_INTERVAL_TICKS != 0) return;
+        if (this.getHealth() >= this.getMaxHealth()) return;
+        if (this.getHunger() <= this.maxHunger() / 2) return;
+        if (this.getThirst() <= this.maxThirst() / 2) return;
+
+        this.heal(1.0F);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  VINCULO MADRE-CRIA
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public @Nullable UUID getCaregiver() { return this.caregiverUUID; }
+
+    /** Vincula esta cria a una cuidadora y reinicia el contador de ausencia. */
+    public void setCaregiver(@Nullable UUID uuid) {
+        this.caregiverUUID = uuid;
+        this.lastCaregiverSeenTick = this.tickCount;
+    }
+
+    public void clearCaregiver() {
+        this.caregiverUUID = null;
+    }
+
+    /**
+     * Una cria sin cuidadora, y por tanto adoptable. Un adulto nunca lo es: el vinculo solo significa
+     * algo mientras es recien nacido, y devolver true para todos los adultos haria que el goal los
+     * tratara como candidatos a adopcion.
+     */
+    public boolean isOrphan() {
+        return this.isNewborn() && this.caregiverUUID == null;
+    }
+
+    public int ticksSinceCaregiverSeen() {
+        return this.tickCount - this.lastCaregiverSeenTick;
+    }
+
+    /**
+     * Mantiene vivo el vinculo mientras la cuidadora este cerca, y lo corta cuando lleva demasiado
+     * tiempo sin aparecer.
+     *
+     * <p>Usa {@code ServerLevel.getEntity(UUID)}, que es una busqueda en mapa y no un escaneo por
+     * area. Si la madre esta en un chunk descargado devuelve null y cuenta como ausencia — correcto,
+     * porque desde el punto de vista de la cria lo es.
+     *
+     * <p>Esta es la regla que cubre los dos casos del encargo con un solo mecanismo: para la cria,
+     * "mi madre murio" y "se la llevaron" son el mismo hecho.
+     */
+    private void tickCaregiverPresence() {
+        if (this.caregiverUUID == null) return;
+        if (!this.isNewborn()) {
+            // Ha crecido: el vinculo deja de significar nada y se suelta para no arrastrarlo en NBT ni
+            // ensuciar el comando de depuracion.
+            this.clearCaregiver();
+            return;
+        }
+        if (this.tickCount % CAREGIVER_CHECK_INTERVAL != 0) return;
+
+        Entity caregiver = ((ServerLevel) this.level()).getEntity(this.caregiverUUID);
+        if (caregiver instanceof DiverseCritter mother
+                && mother.isAlive()
+                && this.distanceTo(mother) <= CAREGIVER_RANGE) {
+            this.lastCaregiverSeenTick = this.tickCount;
+        }
+
+        if (this.ticksSinceCaregiverSeen() > ORPHAN_TIMEOUT_TICKS) {
+            this.clearCaregiver();
+        }
+    }
+
+    /**
+     * Al morir, corta el vinculo con su cria para que quede adoptable <b>en el acto</b> y no dentro de
+     * 60 s.
+     *
+     * <p>Hace falta este camino porque al morir la entidad desaparece del mundo, y desde la cria eso
+     * es indistinguible de "chunk descargado": el temporizador no puede saber que la madre no va a
+     * volver. Se resuelve desde el otro lado, que si lo sabe.
+     *
+     * <p>El temporizador sigue siendo la red para todo lo demas: que se la lleven, que muera lejos de
+     * la cria, o que cambie de dimension.
+     */
+    @Override
+    public void die(DamageSource pDamageSource) {
+        if (!this.level().isClientSide) {
+            for (DiverseCritter ward : this.level().getEntitiesOfClass(
+                    DiverseCritter.class,
+                    this.getBoundingBox().inflate(CAREGIVER_RANGE),
+                    other -> other.isNewborn() && this.getUUID().equals(other.getCaregiver()))) {
+                ward.clearCaregiver();
+            }
+        }
+        super.die(pDamageSource);
+    }
 }

@@ -8,6 +8,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 
 public class FindCryingBabyGoal extends Goal {
     private final DiverseCritter parent;
@@ -27,26 +28,53 @@ public class FindCryingBabyGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (parent.isBaby() || parent.isSleeping() || parent.isOrderedToSit() || parent.isPassenger() || parent.getIsMale()) {
+        if (parent.isBaby() || parent.isSleeping() || parent.isOrderedToSit()
+                || parent.isPassenger() || parent.getIsMale()) {
             return false;
         }
 
-        AABB searchBox = parent.getBoundingBox().inflate(searchRange, 4.0D, searchRange);
-        List<DiverseCritter> list = parent.level().getEntitiesOfClass(DiverseCritter.class, searchBox, (entity) -> {
-            return entity.getType() == parent.getType() && entity.isNewborn() && entity.isCrying();
-        });
+        // Una sola consulta, con el radio del VINCULO y no el de busqueda del goal, y sin filtrar por
+        // isCrying: mi propia cria puede estar bien alimentada y en ese caso no llora, pero sigue
+        // ocupando mi plaza. Que los dos lados usen CAREGIVER_RANGE es lo que evita la banda de
+        // distancias en la que la madre se cree libre y acaba con dos crias.
+        List<DiverseCritter> newborns = parent.level().getEntitiesOfClass(
+                DiverseCritter.class,
+                parent.getBoundingBox().inflate(DiverseCritter.CAREGIVER_RANGE),
+                entity -> entity.getType() == parent.getType() && entity.isNewborn());
 
-        if (list.isEmpty()) {
-            return false;
+        boolean hasWard = false;
+        DiverseCritter ownCryingChild = null;
+        DiverseCritter cryingOrphan = null;
+
+        for (DiverseCritter baby : newborns) {
+            if (parent.getUUID().equals(baby.getCaregiver())) {
+                hasWard = true;
+                if (baby.isCrying() && ownCryingChild == null) ownCryingChild = baby;
+            } else if (baby.isOrphan() && baby.isCrying() && cryingOrphan == null
+                    && parent.distanceTo(baby) <= this.searchRange) {
+                cryingOrphan = baby;
+            }
         }
 
-        this.targetBaby = list.get(0);
-        return true;
+        // La propia cria manda sobre cualquier huerfano: relevar a otra es un extra, alimentar a la
+        // tuya es la obligacion. Y un huerfano solo se considera dentro de searchRange, para que el
+        // goal no camine mas lejos de lo que caminaba antes: el radio grande sirve para contar la
+        // plaza, no para elegir destino.
+        this.targetBaby = ownCryingChild != null ? ownCryingChild
+                : (hasWard ? null : cryingOrphan);
+        return this.targetBaby != null;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return targetBaby != null && targetBaby.isAlive() && targetBaby.isCrying() && this.feedTimer < (FEEDING_DURATION + 10);
+        if (targetBaby == null || !targetBaby.isAlive() || !targetBaby.isCrying()) return false;
+        if (this.feedTimer >= FEEDING_DURATION + 10) return false;
+
+        // Si otra hembra lo adopto mientras yo iba de camino, dejo de ir. No hay reserva sobre el
+        // huerfano a proposito: la primera que lo amamanta lo vincula y esta comprobacion hace que la
+        // segunda lo suelte. Sin ella acabarian las dos plantadas encima del mismo bebe.
+        UUID caregiver = targetBaby.getCaregiver();
+        return caregiver == null || parent.getUUID().equals(caregiver);
     }
 
     @Override
@@ -86,6 +114,10 @@ public class FindCryingBabyGoal extends Goal {
     }
 
     private void performNursing() {
+        // Si era huerfano, amamantarlo lo adopta: el vinculo es permanente y sustituye al anterior. No
+        // hace falta comprobar si ya era mio, porque reasignar el mismo UUID no cambia nada y ademas
+        // refresca el contador de ausencia, que es justo lo que toca al haber estado pegados.
+        targetBaby.setCaregiver(parent.getUUID());
 
         targetBaby.setHunger(targetBaby.maxHunger());
         targetBaby.setThirst(targetBaby.maxThirst());

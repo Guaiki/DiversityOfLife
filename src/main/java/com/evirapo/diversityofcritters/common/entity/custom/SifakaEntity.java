@@ -614,6 +614,19 @@ public class SifakaEntity extends DiverseCritter {
                         itemstack.shrink(1);
                     }
                 }
+                // Alimentar es alimentar, aunque sea una toma de domesticacion. Sin esto, el biberon
+                // gastaba durabilidad y no tocaba el hambre: la barra solo se rellenaba una vez el
+                // bicho ya era tuyo, porque ese codigo vive en DiverseCritter.mobInteract y esta rama
+                // devuelve antes de llegar. Efecto practico: dar el biberon a un huerfano salvaje NO
+                // lo salvaba de morir de hambre, que es justo para lo que existe.
+                //
+                // La domesticacion sigue costando las 3-5 tomas de siempre; lo que cambia es que cada
+                // una llena la barra.
+                if (isNurserBottle) {
+                    this.setHunger(this.maxHunger());
+                    this.setThirst(this.maxThirst());
+                }
+
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
