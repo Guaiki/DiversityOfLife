@@ -7,6 +7,8 @@ import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.client.animations.SquirrelAnims;
 import com.evirapo.diversityofcritters.client.animations.SquirrelBabyAnims;
+import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
+import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.darkblade.deluxelib.anim.AnimSource;
 import net.darkblade.deluxelib.anim.Loop;
@@ -1004,7 +1006,7 @@ public class SquirrelEntity extends DiverseCritter {
     }
 
     public static boolean checkSquirrelSpawnRules(EntityType<SquirrelEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
-        return true;
+        return SpawnRuleEngine.evaluate(DOCSpecies.SQUIRREL, lvl, type, pos, rnd).allowed();
     }
 
     @Nullable

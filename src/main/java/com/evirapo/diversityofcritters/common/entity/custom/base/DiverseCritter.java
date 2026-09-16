@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
+import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
 import com.evirapo.diversityofcritters.common.humidity.HumiditySystem;
@@ -410,13 +411,48 @@ public abstract class DiverseCritter extends TamableAnimal
         pCompound.putInt("BreedCooldown", this.breedCooldown);
         pCompound.putInt("TempComfort", this.getTemperatureComfort());
         pCompound.putInt("HumidityComfort", this.getHumidityComfort());
+        pCompound.putBoolean("DOCWasReleased", this.wasReleased);
     }
 
     private Integer loadedNbtAge = null;
 
+    /**
+     * Whether this animal has ever been returned to the wild.
+     *
+     * It serves two purposes: it stops the same individual from counting twice towards the global
+     * counter (anti-farming), and it marks the animal as wild fauna for despawn purposes.
+     * See {@link #removeWhenFarAway(double)}.
+     */
+    private boolean wasReleased = false;
+
+    public boolean wasReleased() {
+        return this.wasReleased;
+    }
+
+    public void setWasReleased(boolean wasReleased) {
+        this.wasReleased = wasReleased;
+    }
+
+    /**
+     * Gives released animals the despawn behaviour of wild fauna.
+     *
+     * Animal.removeWhenFarAway() returns false, so vanilla passive mobs (and these critters by
+     * inheritance) never despawn. Without this override every released animal would stay loaded in
+     * the world forever, and mass releasing would end up dragging the save down.
+     *
+     * The override is deliberately narrow: it only affects released, ownerless animals. Naturally
+     * spawned and tamed ones keep vanilla behaviour.
+     */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        if (!DOCServerConfig.releasedCanDespawn()) return false;
+        return this.wasReleased && !this.isTame();
+    }
+
     @Override
     public void readAdditionalSaveData(CompoundTag pCompound) {
         super.readAdditionalSaveData(pCompound);
+        this.wasReleased = pCompound.getBoolean("DOCWasReleased");
         if (pCompound.contains("DiverseAge")) {
             this.loadedNbtAge = pCompound.getInt("DiverseAge");
             if (this.loadedNbtAge != null) {

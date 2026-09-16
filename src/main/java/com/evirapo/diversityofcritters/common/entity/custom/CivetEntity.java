@@ -16,6 +16,8 @@ import net.darkblade.deluxelib.anim.AnimSource;
 import net.darkblade.deluxelib.entity.ai.goal.AnimatableMeleeAttackGoal;
 import net.darkblade.deluxelib.anim.Loop;
 import net.darkblade.deluxelib.anim.StandardAnimation;
+import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
+import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
@@ -820,7 +822,7 @@ public class CivetEntity extends DiverseCritter
     @Override public void setScratching(boolean isScratching) { this.entityData.set(IS_SCRATCHING, isScratching); }
 
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
-        return true;
+        return SpawnRuleEngine.evaluate(DOCSpecies.CIVET, lvl, type, pos, rnd).allowed();
     }
 
     @Nullable
