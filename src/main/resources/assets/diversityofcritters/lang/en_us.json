@@ -53,5 +53,9 @@
   "gui.diversityofcritters.humidifier.humidity": "Humidity",
   "gui.diversityofcritters.humidifier.size": "Size (Blocks)",
 
-  "item.diversityofcritters.worm": "Worm"
+  "item.diversityofcritters.worm": "Worm",
+
+  "message.diversityofcritters.release.counted": "%1$s returned to the wild. %2$s population: %3$s/%4$s (+%5$s%% spawn rate)",
+  "message.diversityofcritters.release.duplicate": "%1$s was already released before — population unchanged.",
+  "message.diversityofcritters.release.capped": "%1$s returned to the wild. The %2$s population is already at its peak."
 }

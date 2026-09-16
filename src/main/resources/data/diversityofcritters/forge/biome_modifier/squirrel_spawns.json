@@ -1,0 +1,12 @@
+{
+  "type": "forge:add_spawns",
+  "biomes": "#diversityofcritters:is_squirrel_biome",
+  "spawners": [
+    {
+      "type": "diversityofcritters:squirrel",
+      "weight": 60,
+      "minCount": 2,
+      "maxCount": 4
+    }
+  ]
+}

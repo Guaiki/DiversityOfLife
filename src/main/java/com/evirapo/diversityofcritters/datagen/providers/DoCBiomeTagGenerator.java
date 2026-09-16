@@ -23,6 +23,13 @@ public class DoCBiomeTagGenerator extends BiomeTagsProvider {
     }
 
     protected void addTags() {
+        // Banded palm civet: jungle.
         this.tag(DoCTags.Biomes.CIVET_BIOMES).addTags(BiomeTags.IS_JUNGLE);
+
+        // Verreaux's sifaka: savanna.
+        this.tag(DoCTags.Biomes.SIFAKA_BIOMES).addTags(BiomeTags.IS_SAVANNA);
+
+        // Red and white giant flying squirrel: temperate forest and taiga.
+        this.tag(DoCTags.Biomes.SQUIRREL_BIOMES).addTags(BiomeTags.IS_FOREST, BiomeTags.IS_TAIGA);
     }
 }

@@ -27,6 +27,14 @@ public class DoCTags {
 
         public static final TagKey<Block> CIVET_CLIMBABLE = create("civet_climbable");
 
+        /**
+         * Ground blocks the mod's animals are allowed to spawn on.
+         *
+         * It exists because the vanilla tag {@code #minecraft:animals_spawnable_on} only contains
+         * grass_block, which would keep the squirrel from spawning in podzol taigas.
+         */
+        public static final TagKey<Block> CRITTERS_SPAWNABLE_ON = create("critters_spawnable_on");
+
         private static TagKey<Block> create(String pName) {
             return TagKey.create(Registries.BLOCK, new ResourceLocation(DiversityOfCritters.MODID, pName));
         }
@@ -35,6 +43,10 @@ public class DoCTags {
     public static class Biomes {
 
         public static final TagKey<Biome> CIVET_BIOMES = create("is_civet_biome");
+
+        public static final TagKey<Biome> SIFAKA_BIOMES = create("is_sifaka_biome");
+
+        public static final TagKey<Biome> SQUIRREL_BIOMES = create("is_squirrel_biome");
 
         private static TagKey<Biome> create(String pName) {
             return TagKey.create(Registries.BIOME, new ResourceLocation(DiversityOfCritters.MODID, pName));

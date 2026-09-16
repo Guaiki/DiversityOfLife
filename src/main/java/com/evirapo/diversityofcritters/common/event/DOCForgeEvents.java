@@ -4,6 +4,9 @@ import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.command.CivetDebugCommand;
 import com.evirapo.diversityofcritters.common.command.SetNeedsCommand;
 import com.evirapo.diversityofcritters.common.command.SetPregnancyCommand;
+import com.evirapo.diversityofcritters.common.command.SpawnDebugCommand;
+import com.evirapo.diversityofcritters.common.spawn.ReleaseRegistry;
+import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -38,10 +41,15 @@ public class DOCForgeEvents {
         SetPregnancyCommand.register(event.getDispatcher());
         SetNeedsCommand.register(event.getDispatcher());
         CivetDebugCommand.register(event.getDispatcher());
+        SpawnDebugCommand.register(event.getDispatcher());
     }
 
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
+        // Load the release registry at startup so its counter cache is populated before the first
+        // spawn cycle.
+        ReleaseRegistry.get(event.getServer());
+
         // Capture the server thread reference
         serverThread = Thread.currentThread();
 
@@ -82,6 +90,10 @@ public class DOCForgeEvents {
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
+        // Stops one world's counters from leaking into the next within the same session.
+        ReleaseRegistry.resetCache();
+        SpawnRuleEngine.clearChanceOverrides();
+
         if (watchdogTask != null) watchdogTask.cancel(false);
         if (watchdogExecutor != null) watchdogExecutor.shutdownNow();
     }

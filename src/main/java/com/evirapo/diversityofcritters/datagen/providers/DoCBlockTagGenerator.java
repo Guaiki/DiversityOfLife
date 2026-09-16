@@ -23,6 +23,16 @@ public class DoCBlockTagGenerator extends BlockTagsProvider {
     @Override
     protected void addTags(HolderLookup.Provider provider) {
         this.tag(DoCTags.Blocks.CIVET_CLIMBABLE)
-                .addTag(BlockTags.LOGS);           // troncos de árbol — superficie natural de escalada
+                .addTag(BlockTags.LOGS);           // tree logs, the natural climbing surface
+
+        // Spawn ground. Vanilla only allows grass_block for animals, which would leave out the
+        // podzol of taigas and the coarse dirt of savannas.
+        this.tag(DoCTags.Blocks.CRITTERS_SPAWNABLE_ON)
+                .add(Blocks.GRASS_BLOCK,
+                     Blocks.PODZOL,
+                     Blocks.COARSE_DIRT,
+                     Blocks.DIRT,
+                     Blocks.ROOTED_DIRT,
+                     Blocks.MOSS_BLOCK);
     }
 }

@@ -1,6 +1,6 @@
 {
   "type": "forge:add_spawns",
-  "biomes": "#minecraft:is_savanna",
+  "biomes": "#diversityofcritters:is_sifaka_biome",
   "spawners": [
     {
       "type": "diversityofcritters:sifaka",

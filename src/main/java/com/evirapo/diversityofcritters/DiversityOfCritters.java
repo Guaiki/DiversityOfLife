@@ -6,10 +6,12 @@ import com.evirapo.diversityofcritters.client.screen.BowlScreen;
 import com.evirapo.diversityofcritters.client.screen.DigBoxScreen;
 import com.evirapo.diversityofcritters.client.screen.HumidifierScreen;
 import com.evirapo.diversityofcritters.common.block.DOCBlockEntities;
+import com.evirapo.diversityofcritters.common.config.DOCConfig;
 import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.creative.DOCEntitiesCreativeTab;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
@@ -35,6 +37,8 @@ public class DiversityOfCritters {
     public DiversityOfCritters() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
+        DOCConfig.register(modEventBus);
+
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::clientSetup);
 
@@ -54,6 +58,7 @@ public class DiversityOfCritters {
 
         SpawnPlacements.register(DOCEntities.CIVET.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, CivetEntity::checkCivetSpawnRules);
         SpawnPlacements.register(DOCEntities.SIFAKA.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, SifakaEntity::checkSifakaSpawnRules);
+        SpawnPlacements.register(DOCEntities.SQUIRREL.get(), SpawnPlacements.Type.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, SquirrelEntity::checkSquirrelSpawnRules);
 
     }
 

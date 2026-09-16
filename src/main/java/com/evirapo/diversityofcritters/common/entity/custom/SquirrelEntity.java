@@ -5,6 +5,8 @@ import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
+import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
@@ -979,7 +981,7 @@ public class SquirrelEntity extends DiverseCritter {
     }
 
     public static boolean checkSquirrelSpawnRules(EntityType<SquirrelEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
-        return true;
+        return SpawnRuleEngine.evaluate(DOCSpecies.SQUIRREL, lvl, type, pos, rnd).allowed();
     }
 
     @Nullable
