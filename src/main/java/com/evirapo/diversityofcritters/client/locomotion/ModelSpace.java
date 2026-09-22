@@ -71,6 +71,16 @@ public final class ModelSpace {
     }
 
     /**
+     * Model units per world block at the model root, for the entity passed to the last
+     * {@link #begin}: 32 for the adult civet (drawn at half size), more for smaller growth stages.
+     */
+    public float modelUnitsPerBlock() {
+        final Matrix4f m = this.base.last().pose();
+        final float blocksPerRootUnit = (float) Math.sqrt(m.m00() * m.m00() + m.m01() * m.m01() + m.m02() * m.m02());
+        return ModelParts.UNITS_PER_BLOCK / blocksPerRootUnit;
+    }
+
+    /**
      * World position of a point given in the frame of the last part of {@code chain}, in model
      * units. The chain must start at the model's {@code root()}.
      */

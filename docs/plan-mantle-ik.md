@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.3, 0.5 y 0.9 hechas (61 tests en verde). Siguiente: 0.4 |
+| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.5 y 0.9 hechas (81 tests en verde). Siguiente: 0.8 (montar en el civet) |
 | 1 — `LedgeSampler` | ⬜ Pendiente |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
@@ -172,6 +172,19 @@ haga mantle. Es el primer hito visible y tiene valor por sí mismo.
 - `ModelSpaceTest` fija la suela del civet contra valores calculados a mano (yaw 0 y 90, adulto y juvenil, pata
   encogida) y comprueba que `applyPart` coincide con `ModelPart.translateAndRotate`. Eso cubre la 0.9; queda
   verla con una entidad real en juego cuando exista el overlay (0.7).
+
+**Notas de lo hecho en 0.4**
+- Dividido en `QuadrupedSolver` (decisiones, sin tipos de Minecraft) y `QuadrupedRig` (mide la pose y el suelo,
+  escribe en los huesos). La escritura (`writePose`) está separada de la medición para poder probarla sin entidad.
+- La inclinación se aplica en la pelvis y se compensa el desplazamiento de las caderas que apoyan, así el cuerpo gira
+  alrededor de ellas y no del pivote de `BandedPlamCivet` (a ras de suelo), que lo haría deslizarse.
+- La altura del cuerpo es la media recortada de lo que piden las patas, medida desde la suela de referencia: una pata
+  dibujada a media zancada no inclina el cuerpo, y una pata en un escalón no lo levanta.
+- La pelvis se nombra `"root"` en el builder cuando es la raíz del modelo (convención de `getAnyDescendantWithName`).
+- `QuadrupedRigSceneTest` hornea la malla real del civet y comprueba que, tras escribir la pose, cada suela queda
+  sobre su suelo (±0.15 u) y no se desliza (< 0.5 u): frente alto, trasera alta, pendiente lateral, losa bajo todo el
+  cuerpo, una pata sobre un guijarro. Invertir el signo del pitch hace fallar 3 de esos casos: el test detecta
+  errores de convención.
 
 **Aceptación**
 - `gradlew test` y `gradlew compileJava` en verde.
