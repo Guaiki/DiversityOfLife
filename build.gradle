@@ -153,6 +153,11 @@ dependencies {
     implementation "io.github.llamalad7:mixinextras-forge:0.3.6"
     annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.6"
 
+    // Unit tests for the locomotion pipeline. Its math uses no Minecraft types,
+    // so it runs under the plain `test` task.
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-common-api:${jei_version}")
@@ -167,6 +172,10 @@ dependencies {
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
+}
+
+test {
+    useJUnitPlatform()
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
