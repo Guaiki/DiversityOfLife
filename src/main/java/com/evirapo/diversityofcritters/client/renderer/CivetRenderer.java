@@ -42,14 +42,17 @@ public class CivetRenderer<T extends CivetEntity> extends MobRenderer<T, Hierarc
 
     @Override
     protected void scale(@NotNull T entity, PoseStack poseStack, float partialTickTime) {
-        if (entity.isNewborn()) {
-            poseStack.scale(0.45F, 0.45F, 0.45F);
-        } else if (entity.isJuvenile()) {
-            poseStack.scale(0.65F, 0.65F, 0.65F);
-        } else {
-            poseStack.scale(1.0F, 1.0F, 1.0F);
-        }
+        final float scale = scaleFor(entity);
+        poseStack.scale(scale, scale, scale);
         super.scale(entity, poseStack, partialTickTime);
+    }
+
+    /** Growth-stage scale; also read by the locomotion rig to place bones in the world. */
+    public static float scaleFor(CivetEntity entity) {
+        if (entity.isNewborn()) {
+            return 0.45F;
+        }
+        return entity.isJuvenile() ? 0.65F : 1.0F;
     }
 
     @Override

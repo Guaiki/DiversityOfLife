@@ -1,6 +1,8 @@
 package com.evirapo.diversityofcritters.client.models;
 
 import com.evirapo.diversityofcritters.client.animations.CivetAnims;
+import com.evirapo.diversityofcritters.client.locomotion.ILocomotionModel;
+import com.evirapo.diversityofcritters.client.renderer.CivetRenderer;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -15,8 +17,10 @@ import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.world.entity.AnimationState;
 import org.joml.Vector3f;
 
-public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
+public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> implements ILocomotionModel<T> {
 	private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
+	/** The model is authored at twice its in-game size. */
+	public static final float MODEL_SCALE = 0.5F;
 
 	private final ModelPart BandedPlamCivet;
 	private final ModelPart Body;
@@ -224,9 +228,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, float red, float green, float blue, float alpha) {
 		poseStack.pushPose();
 
-		float baseScale = 0.5f;
-		poseStack.scale(baseScale, baseScale, baseScale);
-		poseStack.translate(0, 1.5F, 0);
+		this.applyRootTransform(poseStack);
 
 		if (this.climbing) {
 			if (this.climbingDown) {
@@ -247,6 +249,18 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> {
 	@Override
 	public ModelPart root() {
 		return BandedPlamCivet;
+	}
+
+	/** Shared with the locomotion rig, so bones are placed in the world exactly where they are drawn. */
+	@Override
+	public void applyRootTransform(PoseStack poseStack) {
+		poseStack.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+		poseStack.translate(0.0F, 1.5F, 0.0F);
+	}
+
+	@Override
+	public float rendererScale(T entity) {
+		return CivetRenderer.scaleFor(entity);
 	}
 
 	private void animateWithWeight(AnimationState state, AnimationDefinition definition,

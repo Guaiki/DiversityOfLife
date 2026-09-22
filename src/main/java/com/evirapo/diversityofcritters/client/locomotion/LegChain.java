@@ -1,6 +1,5 @@
 package com.evirapo.diversityofcritters.client.locomotion;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraftforge.api.distmarker.Dist;
@@ -107,25 +106,23 @@ public final class LegChain {
 
     /**
      * Model-space Y of the sole as currently posed, in model units (+Y down), measured from the
-     * model root. Allocates nothing: {@code scratch} is pushed and popped.
+     * model root. {@code scratch} is overwritten.
      */
-    public float soleModelY(PoseStack scratch) {
+    public float soleModelY(Matrix4f scratch) {
         return modelY(scratch, this.fromRoot, this.soleOffset);
     }
 
     /**
      * Model-space Y, in model units, of the point {@code localY} units down the last part of
-     * {@code chain}, with every part in its current pose.
+     * {@code chain}, with every part in its current pose. {@code scratch} is overwritten.
      */
-    public static float modelY(PoseStack scratch, List<ModelPart> chain, float localY) {
-        scratch.pushPose();
+    public static float modelY(Matrix4f scratch, List<ModelPart> chain, float localY) {
+        scratch.identity();
         for (int i = 0; i < chain.size(); i++) {
-            chain.get(i).translateAndRotate(scratch);
+            ModelSpace.applyPart(scratch, chain.get(i));
         }
-        final Matrix4f pose = scratch.last().pose();
         // Transform (0, localY, 0) and keep only Y: column 1 times localY, plus the translation.
-        final float y = pose.m11() * (localY / ModelParts.UNITS_PER_BLOCK) + pose.m31();
-        scratch.popPose();
+        final float y = scratch.m11() * (localY / ModelParts.UNITS_PER_BLOCK) + scratch.m31();
         return y * ModelParts.UNITS_PER_BLOCK;
     }
 }

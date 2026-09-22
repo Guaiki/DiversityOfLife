@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.3 hechas (55 tests en verde). Siguiente: 0.5, luego 0.4 |
+| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.3, 0.5 y 0.9 hechas (61 tests en verde). Siguiente: 0.4 |
 | 1 — `LedgeSampler` | ⬜ Pendiente |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
@@ -163,6 +163,15 @@ haga mantle. Es el primer hito visible y tiene valor por sí mismo.
   tramos sintéticos; la lectura de `VoxelShape` (orden de coordenadas `(z, x)` en el eje Y) se verifica en juego.
 - `LocomotionRig.isActive` ignora copias que no están en el nivel (civet cargado con CarryOn, previews).
 - `DiverseCritter` implementa `ILocomotionSubject`; `CivetEntity` añade excavar y rascar.
+
+**Notas de lo hecho en 0.5 / 0.9**
+- `ModelSpace` trabaja relativo a la entidad y suma la posición en `double` al final (sin pérdida de precisión
+  lejos del origen); no aloca por frame. `LegChain.modelY` también pasó a matriz de trabajo en vez de `PoseStack`.
+- `CivetModel.renderToBuffer` llama a `applyRootTransform`, la misma que usa el rig: ya no hay dos copias del
+  `scale(0.5)` + `translate(0,1.5,0)`. `CivetRenderer.scaleFor` es la única fuente de la escala por edad.
+- `ModelSpaceTest` fija la suela del civet contra valores calculados a mano (yaw 0 y 90, adulto y juvenil, pata
+  encogida) y comprueba que `applyPart` coincide con `ModelPart.translateAndRotate`. Eso cubre la 0.9; queda
+  verla con una entidad real en juego cuando exista el overlay (0.7).
 
 **Aceptación**
 - `gradlew test` y `gradlew compileJava` en verde.
