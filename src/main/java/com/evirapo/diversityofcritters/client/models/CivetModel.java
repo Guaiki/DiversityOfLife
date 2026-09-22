@@ -2,12 +2,15 @@ package com.evirapo.diversityofcritters.client.models;
 
 import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.client.locomotion.ILocomotionModel;
+import com.evirapo.diversityofcritters.client.locomotion.LocomotionRig;
+import com.evirapo.diversityofcritters.client.locomotion.QuadrupedRig;
 import com.evirapo.diversityofcritters.client.renderer.CivetRenderer;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.animation.AnimationDefinition;
 import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
@@ -44,6 +47,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 	public boolean climbing = false;
 	public boolean climbingDown = false;
 
+	/** Keeps the feet on uneven ground. Built once; per-entity state lives in the rig's cache. */
+	private final LocomotionRig<T> locomotionRig;
+
 	public CivetModel(ModelPart root) {
 		this.BandedPlamCivet = root.getChild("BandedPlamCivet");
 		this.Body = this.BandedPlamCivet.getChild("Body");
@@ -63,6 +69,12 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 		this.Leg = this.BandedPlamCivet.getChild("Leg");
 		this.Leg2 = this.BandedPlamCivet.getChild("Leg2");
 		this.Leg3 = this.BandedPlamCivet.getChild("Leg3");
+
+		// The legs hang straight from the root, which is also what the body tilts on.
+		this.locomotionRig = QuadrupedRig.<T, CivetModel<T>>builder(this)
+				.pelvis("root")
+				.legs("Leg4", "Leg3", "Leg", "Leg2")
+				.build();
 	}
 
 	public static LayerDefinition createBodyLayer() {
@@ -113,8 +125,15 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 	}
 
 	@Override
-	public void setupAnim(CivetEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+	public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
+		this.animatePose(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+		// Last, so it corrects the finished pose. Runs even when the animation stood the rig down
+		// (sleeping, sitting, climbing): that is what lets it fade out instead of snapping off.
+		this.locomotionRig.apply(entity, Minecraft.getInstance().getPartialTick());
+	}
+
+	private void animatePose(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 
 		boolean sleepingLike = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
 		boolean orderedSitPlaying = entity.isOrderedSitPlaying();

@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.5 y 0.9 hechas (81 tests en verde). Siguiente: 0.8 (montar en el civet) |
+| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 Todo menos 0.6 hecho (81 tests en verde). **Pendiente: prueba en juego** (§4, lista de abajo) y 0.6 (cabeza/cola) |
 | 1 — `LedgeSampler` | ⬜ Pendiente |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
@@ -185,6 +185,25 @@ haga mantle. Es el primer hito visible y tiene valor por sí mismo.
   sobre su suelo (±0.15 u) y no se desliza (< 0.5 u): frente alto, trasera alta, pendiente lateral, losa bajo todo el
   cuerpo, una pata sobre un guijarro. Invertir el signo del pitch hace fallar 3 de esos casos: el test detecta
   errores de convención.
+
+**Notas de lo hecho en 0.7 / 0.8**
+- Teclas (categoría "Diversity of Life: Locomotion Debug"): F6 overlay, F7 dump al log, F9 bypass. Sólo vienen
+  asignadas en desarrollo; en un build de release existen en Controles sin tecla.
+- Overlay en el mundo, por pata: cubo amarillo = suela animada, placa = suelo leído (verde si la pata carga peso,
+  roja si no), cubo cian = suela corregida. En pantalla: gate, autoridad, pitch/roll/drop y una fila por pata para el
+  civet bajo la mira (o el más cercano).
+- Con el gate cerrado (bypass, sentado, dormido…) el rig sigue midiendo pero no escribe: el overlay sigue vivo.
+- `CivetModel` construye el `QuadrupedRig` (pelvis `root`, patas `Leg4`, `Leg3`, `Leg`, `Leg2`) y lo aplica al
+  final de `setupAnim`, también cuando la animación sale antes (dormido), para que el gate se apague suave.
+
+**Prueba en juego pendiente** (`gradlew runClient`, mundo creativo, civet adulto y juvenil)
+1. Suelo plano, civet quieto, F6: los cubos cian sobre las placas; pitch/roll ≈ 0.
+2. Escalera de losas y de bloques, caminos (`dirt_path`), nieve en capas: patas apoyadas, sin temblor.
+3. Borde de un bloque con dos patas colgando: las placas de esas patas en rojo, el cuerpo no se hunde hacia ellas.
+4. F9 alterna con la pose original sin salto brusco (fundido de ~0.2 s).
+5. Trepar un tronco, dormir, sentarse, excavar, rascar, nadar: rig apagado (gate 0.00 en el panel), pose como hoy.
+6. Civet cargado con CarryOn: sin correcciones raras.
+7. Cualquier `[Locomotion] ... disabled` o `non-finite` en el log es un fallo.
 
 **Aceptación**
 - `gradlew test` y `gradlew compileJava` en verde.
