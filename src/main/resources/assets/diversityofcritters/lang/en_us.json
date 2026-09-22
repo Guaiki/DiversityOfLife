@@ -57,5 +57,10 @@
 
   "message.diversityofcritters.release.counted": "%1$s returned to the wild. %2$s population: %3$s/%4$s (+%5$s%% spawn rate)",
   "message.diversityofcritters.release.duplicate": "%1$s was already released before — population unchanged.",
-  "message.diversityofcritters.release.capped": "%1$s returned to the wild. The %2$s population is already at its peak."
+  "message.diversityofcritters.release.capped": "%1$s returned to the wild. The %2$s population is already at its peak.",
+
+  "key.categories.diversityofcritters.locomotion": "Diversity of Life: Locomotion Debug",
+  "key.diversityofcritters.locomotion.overlay": "Toggle leg IK overlay",
+  "key.diversityofcritters.locomotion.dump": "Dump leg IK state to log",
+  "key.diversityofcritters.locomotion.bypass": "Toggle leg IK bypass"
 }

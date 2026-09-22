@@ -43,6 +43,7 @@ public abstract class LocomotionRig<T extends LivingEntity & ILocomotionSubject>
         }
 
         final LocomotionState state = LocomotionStateCache.of(entity);
+        state.rigName = this.getClass().getSimpleName();
         this.prepareState(state);
 
         final boolean firstPass = state.beginFrame(LocomotionClock.frame(), LocomotionClock.frameNanos());
@@ -85,7 +86,9 @@ public abstract class LocomotionRig<T extends LivingEntity & ILocomotionSubject>
      * read and are left alone.
      */
     protected boolean isActive(T entity) {
-        return !entity.isLocomotionSuspended() && entity.level().getEntity(entity.getId()) == entity;
+        return !LocomotionDebugFlags.bypass()
+                && !entity.isLocomotionSuspended()
+                && entity.level().getEntity(entity.getId()) == entity;
     }
 
     /** Turns the rig off for good, logging why once. */

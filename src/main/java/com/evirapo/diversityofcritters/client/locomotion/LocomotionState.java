@@ -37,6 +37,11 @@ public final class LocomotionState {
 
     private LegState[] legs = new LegState[0];
 
+    // Debug, written by the rig.
+    public String rigName = "?";
+    public float debugAuthority;
+    public float debugUnitsPerBlock;
+
     public LegState[] ensureLegs(int count) {
         if (this.legs.length != count) {
             this.legs = new LegState[count];
@@ -122,7 +127,9 @@ public final class LocomotionState {
         public float debugLift;
         public float debugResidual;
         public float debugStretch;
+        public double debugCorrectedSoleX;
         public double debugCorrectedSoleY;
+        public double debugCorrectedSoleZ;
 
         public void reset() {
             this.plantWeight = 0.0f;

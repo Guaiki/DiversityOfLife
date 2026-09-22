@@ -78,9 +78,6 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     @Override
     protected void solve(T entity, LocomotionState state, float partialTick, float dt) {
         final float gate = state.gate.value();
-        if (gate <= GATE_EPSILON && state.initialised) {
-            return;
-        }
         final int count = this.legs.size();
         final LocomotionState.LegState[] legStates = state.legs();
         final QuadrupedSolver solver = this.solver;
@@ -117,7 +114,28 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         }
 
         solver.solve(state, gate, dt);
-        this.writePose(state, gate);
+        state.debugAuthority = solver.authority;
+        state.debugUnitsPerBlock = unitsPerBlock;
+
+        // Keep measuring while closed, so stance tracking and the overlay stay current, but leave
+        // the animated pose exactly as it is.
+        if (gate > GATE_EPSILON) {
+            this.writePose(state, gate);
+        }
+        if (LocomotionDebugFlags.capturing()) {
+            this.captureCorrected(legStates);
+        }
+    }
+
+    /** Where each sole ended up after the correction, for the debug overlay. */
+    private void captureCorrected(LocomotionState.LegState[] legStates) {
+        for (int i = 0; i < this.legs.size(); i++) {
+            final LegChain chain = this.legs.get(i);
+            this.space.toWorld(chain.fromRoot(), 0.0f, chain.soleOffset(), 0.0f, this.world);
+            legStates[i].debugCorrectedSoleX = this.world.x;
+            legStates[i].debugCorrectedSoleY = this.world.y;
+            legStates[i].debugCorrectedSoleZ = this.world.z;
+        }
     }
 
     /**
