@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| 0 — Pipeline de locomoción base + rig de terreno en el civet | ⬜ Pendiente |
+| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 0.1 – 0.3 hechas (55 tests en verde). Siguiente: 0.5, luego 0.4 |
 | 1 — `LedgeSampler` | ⬜ Pendiente |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
@@ -152,6 +152,17 @@ haga mantle. Es el primer hito visible y tiene valor por sí mismo.
 | 0.7 | `LocomotionDebug` | Overlay (F6), dump a log (F7), bypass (F9), categoría de teclas propia del mod. Registro en `client/event/DOCClientEvents.java`. |
 | 0.8 | Rig en `CivetModel` | Construido una vez en el constructor: pelvis `BandedPlamCivet`, patas `Leg`, `Leg2`, `Leg3`, `Leg4`, escala de render 0.5. `apply(...)` al final de `setupAnim`, tras todos los `animate`. |
 | 0.9 | Tests de conversión | Posición de la suela en el mundo con el civet en `(0,64,0)`, yaw 0 y 90, adulto y juvenil. Es el test que caza el problema de §2.2. |
+
+**Orden real:** 0.5 va antes que 0.4, porque `QuadrupedRig` necesita la posición de cada suela en el mundo.
+
+**Notas de lo hecho en 0.3**
+- `GroundProbe` lee el suelo a través de `SurfaceQuery`; `BlockSurfaceQuery` lo implementa con las formas de
+  colisión reales y **salta los salientes** (una forma cuyo fondo está > 0.25 por encima del pie es techo, no suelo).
+- El recorrido de huesos usa sólo API pública (`ModelPart.visit` + `getChild`); no hace falta access transformer.
+- Los tests no pueden arrancar `Bootstrap` de Minecraft fuera de FML, así que el escaneo de columnas se prueba con
+  tramos sintéticos; la lectura de `VoxelShape` (orden de coordenadas `(z, x)` en el eje Y) se verifica en juego.
+- `LocomotionRig.isActive` ignora copias que no están en el nivel (civet cargado con CarryOn, previews).
+- `DiverseCritter` implementa `ILocomotionSubject`; `CivetEntity` añade excavar y rascar.
 
 **Aceptación**
 - `gradlew test` y `gradlew compileJava` en verde.

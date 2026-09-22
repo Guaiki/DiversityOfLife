@@ -869,6 +869,11 @@ public class CivetEntity extends DiverseCritter {
     public boolean isScratching() { return this.entityData.get(IS_SCRATCHING); }
     public void setScratching(boolean isScratching) { this.entityData.set(IS_SCRATCHING, isScratching); }
 
+    @Override
+    public boolean isLocomotionSuspended() {
+        return super.isLocomotionSuspended() || this.isDigging() || this.isScratching();
+    }
+
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
         return SpawnRuleEngine.evaluate(DOCSpecies.CIVET, lvl, type, pos, rnd).allowed();
     }

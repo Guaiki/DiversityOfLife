@@ -8,6 +8,7 @@ import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
 import net.minecraft.core.BlockPos;
@@ -40,7 +41,7 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.Arrays;
 
-public abstract class DiverseCritter extends TamableAnimal implements ContainerListener, IAnimatedAttacker {
+public abstract class DiverseCritter extends TamableAnimal implements ContainerListener, IAnimatedAttacker, ILocomotionSubject {
 
     public enum SleepState {
         AWAKE(0), PREPARING(1), SLEEPING(2), AWAKENING(3);
@@ -448,6 +449,24 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     public boolean isClimbing() { return false; }
+
+    /**
+     * Poses where the legs are placed by the animation for reasons other than the ground under
+     * them: resting, grooming, drinking, rearing, climbing, riding, swimming, dying. Species add
+     * their own busy states on top.
+     */
+    @Override
+    public boolean isLocomotionSuspended() {
+        final IdleVariant idle = this.getIdleVariant();
+        return this.getSleepState() != SleepState.AWAKE
+                || this.isOrderedToSit() || this.isOrderedSitPlaying()
+                || idle == IdleVariant.SIT || idle == IdleVariant.LAY || idle == IdleVariant.STAND_UP
+                || this.isCleaning() || this.IsDrinking()
+                || this.isClimbing()
+                || this.isInWaterOrBubble()
+                || this.isPassenger()
+                || this.isDeadOrDying();
+    }
 
     public void onStartEatingItem(ItemStack stack) {}
     public void onStopEatingItem() {}
