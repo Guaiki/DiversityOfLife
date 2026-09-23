@@ -196,7 +196,8 @@ public final class LocomotionDebug {
 
     private static String[] describe(Entity entity, LocomotionState state) {
         final LocomotionState.LegState[] legs = state.legs();
-        final String[] lines = new String[3 + legs.length];
+        final LocomotionState.SpineState[] spine = state.spine();
+        final String[] lines = new String[3 + legs.length + (spine.length > 0 ? 1 : 0)];
         lines[0] = String.format(Locale.ROOT, "[Locomotion] %s #%d  %s  gate %.2f  authority %.2f%s",
                 entity.getType().getDescriptionId().replace("entity." + DiversityOfCritters.MODID + ".", ""),
                 entity.getId(), state.rigName, state.gate.value(), state.debugAuthority,
@@ -210,6 +211,13 @@ public final class LocomotionDebug {
             lines[3 + i] = String.format(Locale.ROOT, "%-7s  %4.2f  %4.2f  %4.2f  %+6.2f %+6.2f  %+5.2f  %7.3f  %7.3f->%7.3f",
                     leg.name, leg.plantWeight, leg.contactWeight, leg.support, leg.debugLift, leg.debugResidual,
                     leg.debugStretch, leg.groundY, leg.soleY, leg.debugCorrectedSoleY);
+        }
+        if (spine.length > 0) {
+            final StringBuilder trails = new StringBuilder("spine trail yaw:");
+            for (LocomotionState.SpineState s : spine) {
+                trails.append(String.format(Locale.ROOT, " %+.1f°", Math.toDegrees(s.debugTrailYaw)));
+            }
+            lines[lines.length - 1] = trails.toString();
         }
         return lines;
     }

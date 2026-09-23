@@ -1,5 +1,6 @@
 package com.evirapo.diversityofcritters.client.locomotion;
 
+import com.evirapo.diversityofcritters.client.locomotion.math.DampedFollower;
 import com.evirapo.diversityofcritters.client.locomotion.math.Spring;
 
 /**
@@ -57,6 +58,32 @@ public final class LocomotionState {
         return this.legs;
     }
 
+    private SpineState[] spine = new SpineState[0];
+
+    public SpineState[] ensureSpine(int count) {
+        if (this.spine.length != count) {
+            this.spine = new SpineState[count];
+            for (int i = 0; i < count; i++) {
+                this.spine[i] = new SpineState();
+            }
+        }
+        return this.spine;
+    }
+
+    public SpineState[] spine() {
+        return this.spine;
+    }
+
+    /** Memory of one spine rule: where a lagging bone would like to be. */
+    public static final class SpineState {
+        public final DampedFollower pitch = new DampedFollower(0.1f, 0.5f);
+        public final DampedFollower roll = new DampedFollower(0.1f, 0.5f);
+        /** Degrees, continuous (not wrapped). */
+        public final DampedFollower yaw = new DampedFollower(0.1f, 0.5f);
+        public boolean seeded;
+        public float debugTrailYaw;
+    }
+
     /**
      * Marks the start of a render pass.
      *
@@ -85,6 +112,9 @@ public final class LocomotionState {
         this.airborneSeconds = 0.0f;
         for (LegState leg : this.legs) {
             leg.reset();
+        }
+        for (SpineState s : this.spine) {
+            s.seeded = false;
         }
     }
 

@@ -8,7 +8,7 @@
 
 | Fase | Estado |
 |---|---|
-| 0 — Pipeline de locomoción base + rig de terreno en el civet | 🟡 Todo menos 0.6 hecho (81 tests en verde). **Pendiente: prueba en juego** (§4, lista de abajo) y 0.6 (cabeza/cola) |
+| 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
 | 1 — `LedgeSampler` | ⬜ Pendiente |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
@@ -196,7 +196,18 @@ haga mantle. Es el primer hito visible y tiene valor por sí mismo.
 - `CivetModel` construye el `QuadrupedRig` (pelvis `root`, patas `Leg4`, `Leg3`, `Leg`, `Leg2`) y lo aplica al
   final de `setupAnim`, también cuando la animación sale antes (dormido), para que el gate se apague suave.
 
-**Prueba en juego pendiente** (`gradlew runClient`, mundo creativo, civet adulto y juvenil)
+**Notas de lo hecho en 0.6**
+- `SpineRules`, declaradas en el builder del rig:
+  - `stabilise(hueso, fracción)`: el hueso devuelve esa fracción de la inclinación de terreno que hereda. Si un
+    ancestro también está estabilizado, sólo se aplica la diferencia (la ascendencia se detecta con
+    `getAllParts()`, que no depende de que el hueso tenga geometría).
+  - `lag(hueso, semivida, amortiguación, máx°)`: el hueso sigue con retraso la inclinación y el giro del cuerpo,
+    con algo de rebote. El giro se sigue por el camino corto, sin saltar al cruzar ±180°.
+  - Los seguidores se actualizan cada frame aunque el rig esté cerrado; lo escrito se multiplica por el gate.
+- Civet: `stabilise("Head", 0.6)`, `lag("Tail", 0.12 s, 0.35, 30°)`. Valores de partida: ajustar a ojo con F6/F9
+  (el panel muestra el retraso actual de la cola).
+
+**Prueba en juego** — hecha y correcta para 0.1–0.8 (`gradlew runClient`, mundo creativo, civet adulto y juvenil)
 1. Suelo plano, civet quieto, F6: los cubos cian sobre las placas; pitch/roll ≈ 0.
 2. Escalera de losas y de bloques, caminos (`dirt_path`), nieve en capas: patas apoyadas, sin temblor.
 3. Borde de un bloque con dos patas colgando: las placas de esas patas en rojo, el cuerpo no se hunde hacia ellas.

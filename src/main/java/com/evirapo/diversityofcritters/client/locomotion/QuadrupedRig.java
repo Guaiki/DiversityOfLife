@@ -41,6 +41,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final List<ModelPart> pelvisChain;
     private final List<LegChain> legs;
     private final QuadrupedSolver solver;
+    private final SpineRules spine;
     private final String[] legNames;
 
     private final ModelSpace space = new ModelSpace();
@@ -53,8 +54,10 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final float[] shiftY;
     private final float[] shiftZ;
 
-    private QuadrupedRig(Builder<T> builder, ModelPart pelvis, List<ModelPart> pelvisChain, List<LegChain> legs) {
+    private QuadrupedRig(Builder<T> builder, ModelPart pelvis, List<ModelPart> pelvisChain, List<LegChain> legs,
+                         SpineRules spine) {
         this.locomotionModel = builder.locomotionModel;
+        this.spine = spine;
         this.pelvis = pelvis;
         this.pelvisChain = pelvisChain;
         this.legs = legs;
@@ -114,6 +117,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         }
 
         solver.solve(state, gate, dt);
+        this.spine.track(state, state.pelvisPitch.value(), state.pelvisRoll.value(), state.bodyYaw, dt);
         state.debugAuthority = solver.authority;
         state.debugUnitsPerBlock = unitsPerBlock;
 
@@ -205,6 +209,9 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             leg.debugResidual = applied;
             leg.debugStretch = stretch;
         }
+
+        // --- Head and tail answer what was done to the body.
+        this.spine.write(state, pitch, roll, state.bodyYaw, gate);
     }
 
     QuadrupedSolver solver() {
@@ -229,6 +236,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         private float maxRollDeg = 20.0f;
         private float stretchLimit = 0.15f;
         private float maxDropFraction = 0.5f;
+        private final SpineRules.Declarations spine = new SpineRules.Declarations();
 
         private <M extends HierarchicalModel<T> & ILocomotionModel<T>> Builder(M model) {
             this.model = model;
@@ -270,6 +278,27 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         }
 
         /**
+         * The bone gives back {@code fraction} of the terrain tilt it inherits, in the world: 0.6
+         * keeps a head 60% nearer its animated orientation while the body climbs.
+         */
+        public Builder<T> stabilise(String boneName, float fraction) {
+            this.spine.stabilise(boneName, fraction);
+            return this;
+        }
+
+        /**
+         * The bone trails the body's tilt and turning, settling with a little overshoot.
+         *
+         * @param halfLifeSeconds how quickly it catches up
+         * @param damping         0.05 (whippy) to 0.95 (sluggish, no overshoot)
+         * @param maxDegrees      the most it may trail by
+         */
+        public Builder<T> lag(String boneName, float halfLifeSeconds, float damping, float maxDegrees) {
+            this.spine.lag(boneName, halfLifeSeconds, damping, maxDegrees);
+            return this;
+        }
+
+        /**
          * Resolves the bones. Never throws: a model that does not match gets a rig that disables
          * itself on first use and says why once.
          */
@@ -295,7 +324,13 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
                 }
                 legs.add(leg);
             }
-            return new QuadrupedRig<>(this, pelvis.get(), pelvisChain, legs);
+            final SpineRules spineRules;
+            try {
+                spineRules = this.spine.bind(name -> this.model.getAnyDescendantWithName(name).orElse(null));
+            } catch (IllegalArgumentException e) {
+                return disabled(e.getMessage());
+            }
+            return new QuadrupedRig<>(this, pelvis.get(), pelvisChain, legs, spineRules);
         }
 
         private LocomotionRig<T> disabled(String reason) {

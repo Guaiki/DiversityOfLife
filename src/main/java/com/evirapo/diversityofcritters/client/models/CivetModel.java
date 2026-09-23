@@ -74,6 +74,9 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 		this.locomotionRig = QuadrupedRig.<T, CivetModel<T>>builder(this)
 				.pelvis("root")
 				.legs("Leg4", "Leg3", "Leg", "Leg2")
+				// Starting values, to be tuned by eye with the overlay (F6) and bypass (F9).
+				.stabilise("Head", 0.6F)
+				.lag("Tail", 0.12F, 0.35F, 30.0F)
 				.build();
 	}
 
