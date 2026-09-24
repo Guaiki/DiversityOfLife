@@ -9,7 +9,7 @@
 | Fase | Estado |
 |---|---|
 | 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
-| 1 — `LedgeSampler` | ⬜ Pendiente |
+| 1 — `LedgeSampler` | ✅ Código y tests (109 en verde). Falta la prueba en juego del overlay |
 | 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
 | 4 — Lado servidor: controlador de mantle | ⬜ Pendiente |
@@ -262,6 +262,32 @@ labio a 30° y a 45° (confianza decreciente), pared sin cima alcanzable, tronco
 
 **Aceptación:** tests en verde; en juego, el overlay dibuja plano de pared + línea de labio al acercarse a
 cualquier bloque de la lista y nada ante losas/escaleras.
+
+**Notas de lo hecho** (cambios respecto a lo de arriba)
+- `wallAxis` se llama `facing`: la dirección en la que el cuerpo mira a la pared (la cara apunta al revés).
+- La sonda marcha por el **eje dominante**, no por el heading exacto: así el plano de pared siempre es
+  perpendicular a lo que se marcha. La cara se afina por bisección (8 pasos, < 0.001 bloques).
+- Confianza: no es `|cos|` a secas (valdría 0.71 a 45°, justo donde el eje salta de X a Z), sino
+  `(|cos| − cos 45°) / (1 − cos 45°)`: 1 de frente, 0.54 a 30°, 0 a 45°. Además se multiplica por la fracción de
+  carriles (centro + dos laterales al 60 % del medio ancho, donde caen las manos) cuyo tope coincide con el
+  labio: una esquina de pilar da 2/3. El umbral de 0.6 de la Fase 4 se revisa con esto.
+- Qué es pared: el primer sólido que se solapa con la franja `[pies, pies + bodyHeight]`, más lo que tenga
+  apilado sin hueco. Una losa superior a ras de los pies es pared para un cuerpo de 0.6 y no lo es para el
+  civet (0.4 de alto pasa por debajo, como en vanilla).
+- `headroom` se mide en 6 puntos (labio y zona de aterrizaje × 3 carriles), sobre el suelo local; rechazo si
+  es menor que `bodyHeight`. `HAZARD`: fluido o `#fire` en el bloque sobre el labio.
+- `continuesUp`: el bloque de la pared justo por encima de lo que se puede escalar es `CIVET_CLIMBABLE`. En un
+  tronco de 3 va con `TOO_HIGH`; en uno de 1, `found` y `continuesUp = false`.
+- Una escalera cuya mitad alta cae fuera del alcance da `STEPPED` sin pared: correcto, el cuerpo sube el
+  escalón y vuelve a muestrear.
+- `MantleProfile` se adelantó de la 3.1 con los campos de la sonda (`CIVET`: 0.6 / 1.0625 / 0.5).
+- La lectura de `VoxelShape` pasó a `common/locomotion/BlockSpans`, compartida con `BlockSurfaceQuery`.
+- Overlay (F6): cara de la pared a lo ancho del cuerpo (verde = mantle, naranja = rechazado), línea del labio
+  en blanco, y una fila `ledge:` en el panel y en el dump. Muestrea con el perfil del civet en el hilo de render.
+
+**Prueba en juego pendiente** — acercar un civet a: bloque, tronco de 1 (verde); losa, escalera (nada o
+`STEPPED`); valla, muro de 2, tronco de 3 (naranja `TOO_HIGH`, el tronco con `climbs on`); bloque con losa
+superior encima (verde, headroom 0.50); agua o fuego encima (naranja `HAZARD`).
 
 ---
 

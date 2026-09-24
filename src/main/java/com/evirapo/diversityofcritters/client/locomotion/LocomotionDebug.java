@@ -1,6 +1,9 @@
 package com.evirapo.diversityofcritters.client.locomotion;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.locomotion.LedgeSample;
+import com.evirapo.diversityofcritters.common.locomotion.LedgeSampler;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -14,6 +17,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -57,6 +61,8 @@ public final class LocomotionDebug {
     public static final KeyMapping OVERLAY = key("overlay", GLFW.GLFW_KEY_F6);
     public static final KeyMapping DUMP = key("dump", GLFW.GLFW_KEY_F7);
     public static final KeyMapping BYPASS = key("bypass", GLFW.GLFW_KEY_F9);
+
+    private static final LedgeSample LEDGE = new LedgeSample();
 
     private LocomotionDebug() {
     }
@@ -138,6 +144,7 @@ public final class LocomotionDebug {
                     mark(poseStack, lines, leg.debugCorrectedSoleX, leg.debugCorrectedSoleY, leg.debugCorrectedSoleZ,
                             MARK * 0.7, 0.2f, 1.0f, 1.0f);
                 }
+                drawLedge(poseStack, lines, entity);
             });
             poseStack.popPose();
             buffers.endBatch(RenderType.lines());
@@ -171,6 +178,58 @@ public final class LocomotionDebug {
                 new AABB(x - size, y - size, z - size, x + size, y + size, z + size), r, g, b, 1.0f);
     }
 
+    /**
+     * Probes for a ledge ahead of the critter. Uses the civet's profile until each rig carries its
+     * own. Render thread only: the result is shared.
+     */
+    private static LedgeSample ledge(Entity entity) {
+        final float yaw = entity instanceof LivingEntity living ? living.yBodyRot : entity.getYRot();
+        LedgeSampler.sample(entity.level(), entity.position(), yaw, entity.getBbWidth() * 0.5f,
+                entity.getBbHeight(), MantleProfile.CIVET, LEDGE);
+        return LEDGE;
+    }
+
+    /** The wall's face across the body's width, and its lip: green if it can be mantled, orange if not. */
+    private static void drawLedge(PoseStack poseStack, VertexConsumer lines, Entity entity) {
+        final LedgeSample s = ledge(entity);
+        if (!s.hasWall()) {
+            return;
+        }
+        final float r = s.found ? 0.2f : 1.0f;
+        final float g = s.found ? 1.0f : 0.5f;
+        final double half = entity.getBbWidth() * 0.5;
+        final double feetY = s.lipY - s.lipHeight;
+        final int stepX = s.facing.getStepX();
+        final int stepZ = s.facing.getStepZ();
+        final double thin = 0.003;
+        final double onTop = 0.1;
+        if (stepX != 0) {
+            final double z = entity.getZ();
+            LevelRenderer.renderLineBox(poseStack, lines,
+                    new AABB(s.wallCoord - thin, feetY, z - half, s.wallCoord + thin, s.lipY, z + half), r, g, 0.1f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines,
+                    new AABB(s.wallCoord, s.lipY - thin, z - half, s.wallCoord + stepX * onTop, s.lipY + thin, z + half),
+                    1.0f, 1.0f, 1.0f, 1.0f);
+        } else {
+            final double x = entity.getX();
+            LevelRenderer.renderLineBox(poseStack, lines,
+                    new AABB(x - half, feetY, s.wallCoord - thin, x + half, s.lipY, s.wallCoord + thin), r, g, 0.1f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines,
+                    new AABB(x - half, s.lipY - thin, s.wallCoord, x + half, s.lipY + thin, s.wallCoord + stepZ * onTop),
+                    1.0f, 1.0f, 1.0f, 1.0f);
+        }
+    }
+
+    private static String describeLedge(Entity entity) {
+        final LedgeSample s = ledge(entity);
+        if (!s.hasWall()) {
+            return "ledge: " + s.reason;
+        }
+        return String.format(Locale.ROOT, "ledge: %s  %s  lip %+.2f  top %.2f  headroom %.2f  conf %.2f%s",
+                s.found ? "MANTLE" : s.reason, s.facing.getName(), s.lipHeight, s.topY, s.headroom, s.confidence,
+                s.continuesUp ? "  climbs on" : "");
+    }
+
     /** The critter under the crosshair, or else the nearest rigged one. */
     private static @Nullable Entity target() {
         final Minecraft minecraft = Minecraft.getInstance();
@@ -197,7 +256,7 @@ public final class LocomotionDebug {
     private static String[] describe(Entity entity, LocomotionState state) {
         final LocomotionState.LegState[] legs = state.legs();
         final LocomotionState.SpineState[] spine = state.spine();
-        final String[] lines = new String[3 + legs.length + (spine.length > 0 ? 1 : 0)];
+        final String[] lines = new String[4 + legs.length + (spine.length > 0 ? 1 : 0)];
         lines[0] = String.format(Locale.ROOT, "[Locomotion] %s #%d  %s  gate %.2f  authority %.2f%s",
                 entity.getType().getDescriptionId().replace("entity." + DiversityOfCritters.MODID + ".", ""),
                 entity.getId(), state.rigName, state.gate.value(), state.debugAuthority,
@@ -217,8 +276,9 @@ public final class LocomotionDebug {
             for (LocomotionState.SpineState s : spine) {
                 trails.append(String.format(Locale.ROOT, " %+.1f°", Math.toDegrees(s.debugTrailYaw)));
             }
-            lines[lines.length - 1] = trails.toString();
+            lines[lines.length - 2] = trails.toString();
         }
+        lines[lines.length - 1] = describeLedge(entity);
         return lines;
     }
 

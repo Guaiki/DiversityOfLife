@@ -1,11 +1,9 @@
 package com.evirapo.diversityofcritters.client.locomotion;
 
+import com.evirapo.diversityofcritters.common.locomotion.BlockSpans;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * {@link SurfaceQuery} over real block collision shapes, so slabs, stairs, paths, farmland and
@@ -69,23 +67,6 @@ public final class BlockSurfaceQuery implements SurfaceQuery {
     }
 
     private boolean readBlock(int x, int y, int z, double inX, double inZ, double[] span) {
-        this.cursor.set(x, y, z);
-        final BlockState state = this.level.getBlockState(this.cursor);
-        if (state.isAir()) {
-            return false;
-        }
-        final VoxelShape shape = state.getCollisionShape(this.level, this.cursor);
-        if (shape.isEmpty()) {
-            return false;
-        }
-        // For the Y axis, VoxelShape takes the position within the block as (z, x).
-        final double bottom = shape.min(Direction.Axis.Y, inZ, inX);
-        final double top = shape.max(Direction.Axis.Y, inZ, inX);
-        if (!Double.isFinite(bottom) || !Double.isFinite(top)) {
-            return false;
-        }
-        span[0] = bottom;
-        span[1] = top;
-        return true;
+        return BlockSpans.read(this.level, this.cursor, x, y, z, inX, inZ, span);
     }
 }
