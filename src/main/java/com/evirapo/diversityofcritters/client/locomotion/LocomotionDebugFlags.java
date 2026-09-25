@@ -13,7 +13,14 @@ public final class LocomotionDebugFlags {
     /** One frame of capture requested for a dump, even with the overlay off. */
     static volatile boolean captureOnce;
 
+    /** Pin on: each rig anchors its first leg where that sole was when the pin went on. */
+    static volatile boolean pin;
+
     private LocomotionDebugFlags() {
+    }
+
+    public static boolean pin() {
+        return pin;
     }
 
     public static boolean overlay() {

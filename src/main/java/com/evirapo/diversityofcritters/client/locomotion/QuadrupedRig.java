@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.client.locomotion;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -29,6 +30,11 @@ import java.util.Optional;
  *   <li>per leg: undo the tilt so the leg stays upright, then stretch or shrink it within a small
  *       limit for whatever is left between sole and ground.</li>
  * </ol>
+ *
+ * <p>A leg with an anchor ({@link LocomotionState.LegState#anchorWeight}) instead aims at a point
+ * in the world and stretches toward it, within a looser limit. What the anchored legs cannot reach
+ * moves the pelvis first; the legs then take up the rest, and report what is still missing in
+ * {@link LocomotionState.LegState#anchorShortfall}.
  */
 @OnlyIn(Dist.CLIENT)
 public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> extends LocomotionRig<T> {
@@ -50,6 +56,10 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final Matrix3f rotation = new Matrix3f();
     private final Vector3d world = new Vector3d();
     private final Vector3f shift = new Vector3f();
+    private final Matrix4f worldToPelvis = new Matrix4f();
+    private final Vector3f target = new Vector3f();
+    private final float anchorStretchLimit;
+    private final float maxAnchorShift;
     private final float[] shiftX;
     private final float[] shiftY;
     private final float[] shiftZ;
@@ -65,6 +75,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.solver = new QuadrupedSolver(legs.size(),
                 (float) Math.toRadians(builder.maxPitchDeg), (float) Math.toRadians(builder.maxRollDeg),
                 builder.stretchLimit, builder.maxDropFraction, legs.get(0).soleOffset());
+        this.anchorStretchLimit = builder.anchorStretchLimit;
+        this.maxAnchorShift = builder.maxAnchorShiftFraction * legs.get(0).soleOffset();
         this.shiftX = new float[legs.size()];
         this.shiftY = new float[legs.size()];
         this.shiftZ = new float[legs.size()];
@@ -115,6 +127,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             solver.soleUp[i] = (float) (leg.soleY - originY) * unitsPerBlock;
             solver.groundUp[i] = (float) (leg.groundY - originY) * unitsPerBlock;
         }
+
+        updateDebugPin(legStates[0]);
 
         solver.solve(state, gate, dt);
         this.spine.track(state, state.pelvisPitch.value(), state.pelvisRoll.value(), state.bodyYaw, dt);
@@ -188,6 +202,9 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.pelvis.y += drop - meanY;
         this.pelvis.z -= meanZ;
 
+        // --- Anchored legs: the pelvis goes first, by what they cannot reach.
+        final float anchorDown = this.anchorPelvis(legStates, gate);
+
         // --- Legs: stay upright, then take up what is left.
         for (int i = 0; i < count; i++) {
             final LegChain chain = this.legs.get(i);
@@ -198,7 +215,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             hip.zRot -= roll;
 
             // How far the hip ended up moving down (model +Y), which the sole has to make up.
-            final float hipDown = this.shiftY[i] - meanY + drop;
+            final float hipDown = this.shiftY[i] - meanY + drop + anchorDown;
             final float residual = leg.footLift.value() + hipDown;
             final float applied = QuadrupedSolver.appliedResidual(
                     residual, Math.max(leg.plantWeight, leg.contactWeight), gate);
@@ -208,10 +225,141 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             }
             leg.debugResidual = applied;
             leg.debugStretch = stretch;
+
+            final float anchor = anchorWeight(leg, gate);
+            if (anchor > GATE_EPSILON) {
+                this.aim(chain, leg, anchor);
+            } else {
+                leg.anchorShortfall = 0.0f;
+            }
         }
 
         // --- Head and tail answer what was done to the body.
         this.spine.write(state, pitch, roll, state.bodyYaw, gate);
+    }
+
+    /**
+     * Moves the pelvis by the weighted mean of what the anchored legs cannot reach, capped, and
+     * leaves {@link #worldToPelvis} current for {@link #aim}.
+     *
+     * @return how far that moved the pelvis down (model +Y), for the ground legs to make up
+     */
+    private float anchorPelvis(LocomotionState.LegState[] legStates, float gate) {
+        boolean anchored = false;
+        for (LocomotionState.LegState leg : legStates) {
+            anchored |= anchorWeight(leg, gate) > GATE_EPSILON;
+        }
+        if (!anchored) {
+            return 0.0f;
+        }
+        this.updateWorldToPelvis();
+
+        float missX = 0.0f;
+        float missY = 0.0f;
+        float missZ = 0.0f;
+        float total = 0.0f;
+        for (int i = 0; i < legStates.length; i++) {
+            final LocomotionState.LegState leg = legStates[i];
+            final float w = anchorWeight(leg, gate);
+            if (w <= GATE_EPSILON) {
+                continue;
+            }
+            final LegChain chain = this.legs.get(i);
+            final float distance = this.hipToAnchor(chain.hip(), leg);
+            if (distance < 1.0e-4f) {
+                continue;
+            }
+            final float miss = distance - this.reachable(distance, chain.soleOffset());
+            final float k = w * miss / distance;
+            missX += this.target.x * k;
+            missY += this.target.y * k;
+            missZ += this.target.z * k;
+            total += w;
+        }
+        // A half-weighted anchor moves the pelvis half as far.
+        final float share = 1.0f / Math.max(total, 1.0f);
+
+        // Pelvis frame to its parent's, where the pelvis position lives.
+        this.rotation.rotationZYX(this.pelvis.zRot, this.pelvis.yRot, this.pelvis.xRot)
+                .transform(missX * share, missY * share, missZ * share, this.shift);
+        final float length = this.shift.length();
+        if (length > this.maxAnchorShift) {
+            this.shift.mul(this.maxAnchorShift / length);
+        }
+        if (!this.finite(this.shift.x + this.shift.y + this.shift.z, "anchor shift")) {
+            return 0.0f;
+        }
+        this.pelvis.x += this.shift.x;
+        this.pelvis.y += this.shift.y;
+        this.pelvis.z += this.shift.z;
+        this.updateWorldToPelvis();
+        return this.shift.y;
+    }
+
+    /** Points the leg at its anchor and stretches it there, blended over the ground result by {@code w}. */
+    private void aim(LegChain chain, LocomotionState.LegState leg, float w) {
+        final ModelPart hip = chain.hip();
+        final float distance = this.hipToAnchor(hip, leg);
+        final float length = chain.soleOffset();
+        if (distance < 1.0e-4f || length <= 0.0f) {
+            leg.anchorShortfall = 0.0f;
+            return;
+        }
+        // The sole hangs down the bone's +Y. With no yaw, rotateZYX(z, 0, x) takes it to
+        // (-sin z cos x, cos z cos x, sin x).
+        final float pitch = (float) Math.asin(Mth.clamp(this.target.z / distance, -1.0f, 1.0f));
+        final float roll = (float) Math.atan2(-this.target.x, this.target.y);
+        final float reach = this.reachable(distance, length);
+        leg.anchorShortfall = distance - reach;
+
+        hip.xRot = Mth.lerp(w, hip.xRot, pitch);
+        hip.yRot = Mth.lerp(w, hip.yRot, 0.0f);
+        hip.zRot = Mth.lerp(w, hip.zRot, roll);
+        hip.yScale = Mth.lerp(w, hip.yScale, reach / length);
+    }
+
+    /** Hip to anchor in the pelvis frame, left in {@link #target}; returns its length. */
+    private float hipToAnchor(ModelPart hip, LocomotionState.LegState leg) {
+        this.space.worldToFrame(this.worldToPelvis, leg.anchorX, leg.anchorY, leg.anchorZ, this.target);
+        this.target.sub(hip.x, hip.y, hip.z);
+        return this.target.length();
+    }
+
+    /** The nearest length to {@code distance} a leg of {@code length} can take. */
+    private float reachable(float distance, float length) {
+        return Mth.clamp(distance, length * (1.0f - this.anchorStretchLimit),
+                length * (1.0f + this.anchorStretchLimit));
+    }
+
+    private void updateWorldToPelvis() {
+        this.space.frameToWorld(this.pelvisChain, this.worldToPelvis).invert();
+    }
+
+    private static float anchorWeight(LocomotionState.LegState leg, float gate) {
+        final float w = leg.anchorWeight;
+        return w > 0.0f ? Math.min(w, 1.0f) * gate : 0.0f;
+    }
+
+    /** The debug pin holds the first leg where its sole was when the pin went on. */
+    private static void updateDebugPin(LocomotionState.LegState leg) {
+        final boolean pin = LocomotionDebugFlags.pin();
+        if (pin == leg.debugPinned) {
+            return;
+        }
+        leg.debugPinned = pin;
+        if (pin) {
+            leg.anchorX = leg.soleX;
+            leg.anchorY = leg.soleY;
+            leg.anchorZ = leg.soleZ;
+            leg.anchorWeight = 1.0f;
+        } else {
+            leg.anchorWeight = 0.0f;
+        }
+    }
+
+    /** The space the next {@link #writePose} measures anchors in; tests begin it by hand. */
+    ModelSpace space() {
+        return this.space;
     }
 
     QuadrupedSolver solver() {
@@ -236,6 +384,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         private float maxRollDeg = 20.0f;
         private float stretchLimit = 0.15f;
         private float maxDropFraction = 0.5f;
+        private float anchorStretchLimit = 0.25f;
+        private float maxAnchorShiftFraction = 0.5f;
         private final SpineRules.Declarations spine = new SpineRules.Declarations();
 
         private <M extends HierarchicalModel<T> & ILocomotionModel<T>> Builder(M model) {
@@ -274,6 +424,18 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         /** How far the pelvis may rise or sink, as a fraction of leg length. */
         public Builder<T> maxDrop(float fraction) {
             this.maxDropFraction = fraction;
+            return this;
+        }
+
+        /** How far an anchored leg may lengthen or shorten, as a fraction of its length. */
+        public Builder<T> anchorStretchLimit(float fraction) {
+            this.anchorStretchLimit = fraction;
+            return this;
+        }
+
+        /** How far anchored legs may pull the pelvis, as a fraction of leg length. */
+        public Builder<T> maxAnchorShift(float fraction) {
+            this.maxAnchorShiftFraction = fraction;
             return this;
         }
 
