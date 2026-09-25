@@ -45,6 +45,8 @@ import java.util.Locale;
  *       (cyan). On screen, the numbers for the critter under the crosshair or the nearest one.</li>
  *   <li><b>Dump</b> (F7): writes the same numbers for every rigged critter nearby to the log.</li>
  *   <li><b>Bypass</b> (F9): fades every rig out, to compare against the pose as animated.</li>
+ *   <li><b>Pin</b> (F10): anchors each rig's first leg where its sole is, to check that an
+ *       anchored foot stays put in the world (magenta cross) while the body moves.</li>
  * </ul>
  *
  * <p>The keys are bound by default only in a development environment; in a release build they
@@ -61,6 +63,7 @@ public final class LocomotionDebug {
     public static final KeyMapping OVERLAY = key("overlay", GLFW.GLFW_KEY_F6);
     public static final KeyMapping DUMP = key("dump", GLFW.GLFW_KEY_F7);
     public static final KeyMapping BYPASS = key("bypass", GLFW.GLFW_KEY_F9);
+    public static final KeyMapping PIN = key("pin", GLFW.GLFW_KEY_F10);
 
     private static final LedgeSample LEDGE = new LedgeSample();
 
@@ -83,6 +86,7 @@ public final class LocomotionDebug {
             event.register(OVERLAY);
             event.register(DUMP);
             event.register(BYPASS);
+            event.register(PIN);
         }
     }
 
@@ -105,6 +109,10 @@ public final class LocomotionDebug {
             while (BYPASS.consumeClick()) {
                 LocomotionDebugFlags.bypass = !LocomotionDebugFlags.bypass;
                 say("Locomotion bypass " + (LocomotionDebugFlags.bypass ? "on: poses as animated" : "off"));
+            }
+            while (PIN.consumeClick()) {
+                LocomotionDebugFlags.pin = !LocomotionDebugFlags.pin;
+                say("Locomotion pin " + (LocomotionDebugFlags.pin ? "on: first leg anchored where it stands" : "off"));
             }
             if (dumpNextFrame) {
                 // The capture requested last tick has had a frame to fill in.
@@ -143,6 +151,9 @@ public final class LocomotionDebug {
                             1.0f - carried, carried, 0.2f, 1.0f);
                     mark(poseStack, lines, leg.debugCorrectedSoleX, leg.debugCorrectedSoleY, leg.debugCorrectedSoleZ,
                             MARK * 0.7, 0.2f, 1.0f, 1.0f);
+                    if (leg.anchorWeight > 0.0f) {
+                        cross(poseStack, lines, leg.anchorX, leg.anchorY, leg.anchorZ, MARK * 3.0, 1.0f, 0.2f, 1.0f);
+                    }
                 }
                 drawLedge(poseStack, lines, entity);
             });
@@ -176,6 +187,15 @@ public final class LocomotionDebug {
                              float r, float g, float b) {
         LevelRenderer.renderLineBox(poseStack, lines,
                 new AABB(x - size, y - size, z - size, x + size, y + size, z + size), r, g, b, 1.0f);
+    }
+
+    /** Three thin bars through a point, one per axis. */
+    private static void cross(PoseStack poseStack, VertexConsumer lines, double x, double y, double z, double size,
+                              float r, float g, float b) {
+        final double thin = size * 0.05;
+        LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - size, y - thin, z - thin, x + size, y + thin, z + thin), r, g, b, 1.0f);
+        LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - thin, y - size, z - thin, x + thin, y + size, z + thin), r, g, b, 1.0f);
+        LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - thin, y - thin, z - size, x + thin, y + thin, z + size), r, g, b, 1.0f);
     }
 
     /**
@@ -260,7 +280,7 @@ public final class LocomotionDebug {
         lines[0] = String.format(Locale.ROOT, "[Locomotion] %s #%d  %s  gate %.2f  authority %.2f%s",
                 entity.getType().getDescriptionId().replace("entity." + DiversityOfCritters.MODID + ".", ""),
                 entity.getId(), state.rigName, state.gate.value(), state.debugAuthority,
-                LocomotionDebugFlags.bypass ? "  BYPASS" : "");
+                (LocomotionDebugFlags.bypass ? "  BYPASS" : "") + (LocomotionDebugFlags.pin ? "  PIN" : ""));
         lines[1] = String.format(Locale.ROOT, "pitch %+.1f°  roll %+.1f°  drop %+.2fu  air %.2fs  %.1f u/block",
                 Math.toDegrees(state.pelvisPitch.value()), Math.toDegrees(state.pelvisRoll.value()),
                 state.pelvisDrop.value(), state.airborneSeconds, state.debugUnitsPerBlock);
@@ -269,7 +289,10 @@ public final class LocomotionDebug {
             final LocomotionState.LegState leg = legs[i];
             lines[3 + i] = String.format(Locale.ROOT, "%-7s  %4.2f  %4.2f  %4.2f  %+6.2f %+6.2f  %+5.2f  %7.3f  %7.3f->%7.3f",
                     leg.name, leg.plantWeight, leg.contactWeight, leg.support, leg.debugLift, leg.debugResidual,
-                    leg.debugStretch, leg.groundY, leg.soleY, leg.debugCorrectedSoleY);
+                    leg.debugStretch, leg.groundY, leg.soleY, leg.debugCorrectedSoleY)
+                    + (leg.anchorWeight > 0.0f
+                    ? String.format(Locale.ROOT, "  anchor %.2f short %+.2f", leg.anchorWeight, leg.anchorShortfall)
+                    : "");
         }
         if (spine.length > 0) {
             final StringBuilder trails = new StringBuilder("spine trail yaw:");

@@ -9,8 +9,8 @@
 | Fase | Estado |
 |---|---|
 | 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
-| 1 — `LedgeSampler` | ✅ Código y tests (109 en verde). Falta la prueba en juego del overlay |
-| 2 — Objetivos de pata anclados al mundo | ⬜ Pendiente |
+| 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
+| 2 — Objetivos de pata anclados al mundo | ✅ Código y tests (117 en verde). Falta la prueba en juego con F10 |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
 | 4 — Lado servidor: controlador de mantle | ⬜ Pendiente |
 | 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
@@ -285,9 +285,9 @@ cualquier bloque de la lista y nada ante losas/escaleras.
 - Overlay (F6): cara de la pared a lo ancho del cuerpo (verde = mantle, naranja = rechazado), línea del labio
   en blanco, y una fila `ledge:` en el panel y en el dump. Muestrea con el perfil del civet en el hilo de render.
 
-**Prueba en juego pendiente** — acercar un civet a: bloque, tronco de 1 (verde); losa, escalera (nada o
-`STEPPED`); valla, muro de 2, tronco de 3 (naranja `TOO_HIGH`, el tronco con `climbs on`); bloque con losa
-superior encima (verde, headroom 0.50); agua o fuego encima (naranja `HAZARD`).
+**Prueba en juego** — hecha y correcta: bloque, tronco de 1 (verde); losa, escalera (nada o `STEPPED`); valla,
+muro de 2, tronco de 3 (naranja `TOO_HIGH`, el tronco con `climbs on`); losa superior sobre el bloque (verde,
+headroom 0.50); agua o fuego encima (naranja `HAZARD`).
 
 ---
 
@@ -306,6 +306,30 @@ superior encima (verde, headroom 0.50); agua o fuego encima (naranja `HAZARD`).
 
 **Aceptación:** con la tecla 2.5, la suela fijada se queda quieta en el mundo mientras el civet gira y anda
 en el sitio (overlay: cruz del target y suela coincidentes).
+
+**Notas de lo hecho**
+- Commits: 2.1–2.2 juntas (campos + `ModelSpace.frameToWorld`/`worldToFrame`), 2.3–2.4 juntas (van en el
+  mismo paso de `writePose`), 2.5 aparte.
+- Orden en `writePose`: inclinación y altura de terreno en la pelvis → **desplazamiento de pelvis por las
+  anclas** → patas (ruta de suelo, y encima la rama anclada). La matriz mundo → pelvis se invierte una vez antes
+  del desplazamiento y otra después; sólo si hay alguna pata anclada.
+- Apuntar la pata: con `yRot = 0`, `rotateZYX(z, 0, x)` lleva el eje +Y del hueso a
+  `(−sin z·cos x, cos z·cos x, sin x)` → `xRot = asin(d.z)`, `zRot = atan2(−d.x, d.y)`. Se mezcla con el
+  resultado de suelo por `anchorWeight × gate`, también `yRot → 0` y `yScale`.
+- Límite de estiramiento anclado: ±25 % (`anchorStretchLimit`). Desplazamiento de pelvis: media de los
+  faltantes ponderada por peso, dividida por `max(Σpeso, 1)` (un ancla a medio peso mueve la pelvis la mitad),
+  y acotada a media pata (`maxAnchorShift`). Las patas de suelo compensan la altura que se movió.
+- `anchorShortfall` con signo: positivo = el ancla queda lejos; negativo = demasiado cerca para plegarse.
+  Un objetivo demasiado cerca **sube** la pelvis (el cuerpo se aparta), no la baja.
+- Las patas ancladas siguen contando en el plano de apoyo del solver; el driver de la Fase 3 decide su
+  contacto con `contactOverride`.
+- F10 fija la **primera pata declarada** de cada rig (en el civet, `Leg4`, delantera izquierda). Cruz magenta
+  en el ancla; el panel añade `anchor/short` a la fila de la pata y `PIN` a la cabecera.
+
+**Prueba en juego pendiente** — F6 + F10 con un civet quieto: la cruz magenta y el cubo cian de `Leg4`
+coinciden. Girarlo o dejar que dé unos pasos: la suela se queda en la cruz mientras llega (short ≈ 0) y el
+cuerpo se inclina hacia ella cuando no llega; `short` crece al alejarse. F10 otra vez: la pata vuelve a la
+ruta de suelo sin salto raro.
 
 ---
 

@@ -62,5 +62,6 @@
   "key.categories.diversityofcritters.locomotion": "Diversity of Life: Locomotion Debug",
   "key.diversityofcritters.locomotion.overlay": "Toggle leg IK overlay",
   "key.diversityofcritters.locomotion.dump": "Dump leg IK state to log",
-  "key.diversityofcritters.locomotion.bypass": "Toggle leg IK bypass"
+  "key.diversityofcritters.locomotion.bypass": "Toggle leg IK bypass",
+  "key.diversityofcritters.locomotion.pin": "Toggle leg IK pin (first leg)"
 }
