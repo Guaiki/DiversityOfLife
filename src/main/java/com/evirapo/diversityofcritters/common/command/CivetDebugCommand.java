@@ -1,11 +1,14 @@
 package com.evirapo.diversityofcritters.common.command;
 
 import com.evirapo.diversityofcritters.common.entity.ai.FindFoodBowlGoal;
+import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
+import com.evirapo.diversityofcritters.common.locomotion.LedgeSample;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
@@ -13,17 +16,26 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Locale;
 
 public class CivetDebugCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        var mantle = Commands.literal("mantle")
+                .executes(context -> mantle(context.getSource(), null));
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            mantle.then(Commands.literal(direction.getName())
+                    .executes(context -> mantle(context.getSource(), direction)));
+        }
         dispatcher.register(Commands.literal("civet_debug")
                 .requires(source -> source.hasPermission(2))
                 .executes(context -> run(context.getSource()))
+                .then(mantle)
         );
     }
 
-    private static int run(CommandSourceStack source) {
+    /** The civet nearest the command's source, within 10 blocks, or null (after saying so). */
+    private static CivetEntity nearest(CommandSourceStack source) {
         Vec3 pos = source.getPosition();
 
         List<CivetEntity> civets = source.getLevel().getEntitiesOfClass(
@@ -34,13 +46,66 @@ public class CivetDebugCommand {
 
         if (civets.isEmpty()) {
             source.sendFailure(Component.literal("[CivetDebug] No CivetEntity within 10 blocks."));
-            return 0;
+            return null;
         }
 
-        CivetEntity civet = civets.stream()
+        return civets.stream()
                 .min((a, b) -> Double.compare(a.distanceToSqr(pos.x, pos.y, pos.z),
                                               b.distanceToSqr(pos.x, pos.y, pos.z)))
                 .orElse(civets.get(0));
+    }
+
+    /**
+     * Makes the nearest civet mantle the ledge in front of it, turning it to {@code direction}
+     * first if given. Repeatable captures for tuning.
+     */
+    private static int mantle(CommandSourceStack source, Direction direction) {
+        CivetEntity civet = nearest(source);
+        if (civet == null) return 0;
+        MantleController mantle = civet.mantle();
+        if (mantle == null) {
+            source.sendFailure(Component.literal("[CivetDebug] This critter cannot mantle."));
+            return 0;
+        }
+        if (mantle.isActive()) {
+            source.sendFailure(Component.literal("[CivetDebug] Already mantling."));
+            return 0;
+        }
+
+        float yaw = direction != null ? direction.toYRot() : civet.getYRot();
+        if (direction != null) {
+            civet.setYRot(yaw);
+            civet.setYBodyRot(yaw);
+            civet.setYHeadRot(yaw);
+        }
+        civet.getNavigation().stop();
+
+        if (mantle.tryStart(yaw, false)) {
+            LedgeSample s = mantle.lastSample();
+            send(source, String.format(Locale.ROOT, "§a[CivetDebug] Mantling %s: lip +%.2f, confidence %.2f",
+                    s.facing.getName(), s.lipHeight, s.confidence));
+            return 1;
+        }
+
+        LedgeSample s = mantle.lastSample();
+        String why;
+        if (!civet.onGround() || civet.hurtTime > 0 || civet.isInWaterOrBubble() || civet.isLocomotionSuspended()) {
+            why = "not standing free (onGround=" + civet.onGround() + ", busy=" + civet.isLocomotionSuspended() + ")";
+        } else if (!s.found) {
+            why = "no ledge: " + s.reason + (s.hasWall() ? String.format(Locale.ROOT, " (lip +%.2f)", s.lipHeight) : "");
+        } else if (s.continuesUp) {
+            why = "the wall carries on up: that is a climb";
+        } else {
+            why = String.format(Locale.ROOT, "confidence %.2f below %.2f", s.confidence, mantle.profile().minConfidence);
+        }
+        source.sendFailure(Component.literal("[CivetDebug] No mantle: " + why));
+        return 0;
+    }
+
+    private static int run(CommandSourceStack source) {
+        CivetEntity civet = nearest(source);
+        if (civet == null) return 0;
+        Vec3 pos = source.getPosition();
 
         send(source, "§e=== CIVET DEBUG [" + civet.getId() + "] ===");
 
@@ -62,7 +127,8 @@ public class CivetDebugCommand {
                 + "  isClimbing=" + civet.isClimbing()
                 + "  isClimbingDown=" + civet.isClimbingDown()
                 + "  isHanging=" + civet.isHanging());
-        send(source, "§dhasAdjacentClimbable=" + civet.hasAdjacentClimbableBlock());
+        send(source, "§dhasAdjacentClimbable=" + civet.hasAdjacentClimbableBlock()
+                + "  mantling=" + civet.isMantling());
 
         // Check each probe direction manually for detail
         AABB box = civet.getBoundingBox();

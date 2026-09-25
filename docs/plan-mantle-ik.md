@@ -12,7 +12,7 @@
 | 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
 | 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | 🟨 Recorte MVP hecho (3.1, 3.3–3.6; 133 tests). Sin probar en juego hasta la Fase 4. Pendientes 3.2, 3.7, 3.8, 3.9 |
-| 4 — Lado servidor: controlador de mantle | ⬜ Pendiente |
+| 4 — Lado servidor: controlador de mantle | 🟨 Código y tests (138 en verde). Falta la prueba en juego (`/civet_debug mantle`) |
 | 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
 | 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
 
@@ -407,6 +407,42 @@ Los umbrales viven en `MantleProfile`, no en el código. REACH es la única fase
 
 Sonidos/partículas por agarre: en cliente, disparados por eventos de `GripPlanner`. No hace falta paquete: la
 fase ya es la misma en ambos lados.
+
+**Notas de lo hecho**
+- 4.1: en `DiverseCritter`, además de lo previsto, `MANTLE_LIP_Y` (float): ver notas de la Fase 3. El tick de
+  inicio viaja como los 32 bits bajos del game time y `readMantle` lo reconstruye sin problemas de desborde. El
+  labio se escribe el último: es el interruptor que ve el cliente.
+- 4.2: **el disparo no puede colgar de la rama `dy > maxUpStep`**: con `maxUpStep = 1` un adulto nunca entra
+  (vanilla lo sube de golpe). `CivetMoveControl.tryMantleFromPath` dispara cuando el siguiente nodo está un
+  bloque más arriba y a < 1.5 bloques, con el heading hacia el nodo; la sonda ve la pared a 0.875 por delante,
+  antes de que vanilla la toque. Umbral de confianza en el perfil: `minConfidence` 0.5 (no 0.6: ver Fase 1).
+- 4.3: `tryMantleFromPath` va **antes** de `updateClimbDirectionFromPath`, así una columna trepable de 1 se
+  mantlea; con `continuesUp` el controlador rechaza y sigue la trepada de siempre. `updateClimbState` no pasa a
+  `CLIMB_UP` con mantle activo. El controlador nunca toca `CLIMB_STATE`.
+- 4.5: el movimiento por tick es una función pura, `MantleMotion.plan`: REACH se pega a la cara con gravedad;
+  RISE/CREST suben a ritmo de perfil (`riseTicks` 10, `crestTicks` 6) sin pasar del labio y a `PIN_GAP` 0.01
+  de la cara; RECOVER avanza `recoverDistance` en `recoverTicks` 8. `MantleMotionTest` simula la maniobra
+  entera: termina encima en ~30 ticks (`maxTicks` 40), nunca atraviesa la pared ni pasa del labio.
+- 4.6: salidas por timeout, daño, agua, `isLocomotionSuspended` (sueño, sentado, pasajero, muerte…), path
+  abandonado en REACH (sólo si lo disparó el path), labio cambiado (cada 4 ticks) y entidad retirada. Con
+  `h > 0.8` se completa (a 0.05 sobre la cima); si no, se suelta. Todo pasa por `end()`.
+- 4.7: la gravedad sólo se toca si el mantle la quitó (`holdsGravity`); si alguien más la tenía quitada, se
+  respeta. Sin mantle activo y con la gravedad retenida → se restaura con aviso en log. **Vanilla guarda
+  `NoGravity` en el NBT**: `addAdditionalSaveData` lo quita si lo puso el mantle (guardado a media subida,
+  CarryOn).
+- 4.8: el comando existente es `/civet_debug`; se añadió `/civet_debug mantle [north|south|east|west]`. Gira
+  el civet más cercano, para su path y arranca el mantle, o dice por qué no (motivo de la sonda, confianza,
+  `continuesUp`, no está libre). `/civet_debug` muestra `mantling=`.
+- Pendiente de la 3.8 (micro-salto): el juvenil. No se ha tocado.
+
+**Prueba en juego pendiente** (F6 para ver la fila `mantle:`)
+1. Civet adulto frente a un bloque, `/civet_debug mantle <dirección>`: REACH → RISE → CREST → RECOVER; manos
+   al labio, traseras en el suelo hasta la cresta, termina encima. Nada de `[Mantle] ... gravity` en el log.
+2. Losa, escalera, valla, muro de 2, tronco de 3: el comando dice por qué no.
+3. Tronco de 1 bloque: mantle, no `CLIMB_UP`. Tronco de 3: trepada de siempre.
+4. Dejar que el path lo haga solo: comida o bebedero encima de un bloque.
+5. Pegarle a media subida: baja (h < 0.8) o termina encima (h > 0.8), sin quedarse flotando.
+6. Guardar y salir a media subida, volver a entrar: el civet no flota.
 
 ### 7.4 Fase 5 — Debug del mantle (1 – 2 d, en paralelo con la 3)
 
