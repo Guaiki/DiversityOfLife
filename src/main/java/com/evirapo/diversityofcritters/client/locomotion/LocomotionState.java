@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.client.locomotion;
 
 import com.evirapo.diversityofcritters.client.locomotion.math.DampedFollower;
 import com.evirapo.diversityofcritters.client.locomotion.math.Spring;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
 
 /**
  * Everything the rig remembers about one entity between frames.
@@ -24,6 +25,22 @@ public final class LocomotionState {
     public final Spring pelvisRoll = new Spring(0.18f);
     /** Pelvis rise (negative) or sink (positive), model units, model +Y down. */
     public final Spring pelvisDrop = new Spring(0.12f);
+
+    // Mantle, written by MantleDriver.
+    /** How much a mantle poses the body, in [0, 1]. Fades in and out; never cut. */
+    public final Spring mantleAuthority = new Spring(0.2f);
+    /** Body pitch the mantle asks for, radians, model convention (negative lifts the head end). */
+    public float mantlePitch;
+    /** Share of the body's rise since the start that the pose holds back down, in [0, 1]. */
+    public float mantleLock;
+    /** Pelvis sink the mantle asks for this frame, model units, model +Y down. */
+    public float mantleBodyDrop;
+    public boolean mantleActive;
+    public long mantleStartTick;
+    public double mantleStartY;
+    /** The mantle driver set the leg anchors and has to clear them when it lets go. */
+    public boolean mantleOwnsAnchors;
+    public final MantleProgress mantleProgress = new MantleProgress();
 
     public boolean initialised;
     public double lastEntityY;
@@ -159,6 +176,8 @@ public final class LocomotionState {
          * the anchor is out of reach, negative when too close to fold into.
          */
         public float anchorShortfall;
+        /** Anchor weight the mantle wants for this leg, before its authority. */
+        public float mantleWeight;
         /** The debug pin owns this leg's anchor. */
         public boolean debugPinned;
 
@@ -183,6 +202,7 @@ public final class LocomotionState {
             this.contactOverride = NO_OVERRIDE;
             this.anchorWeight = 0.0f;
             this.anchorShortfall = 0.0f;
+            this.mantleWeight = 0.0f;
             this.debugPinned = false;
             this.stanceSeeded = false;
             this.stillSeconds = 0.0f;

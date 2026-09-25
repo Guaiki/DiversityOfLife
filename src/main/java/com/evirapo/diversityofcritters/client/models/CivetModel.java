@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.client.animations.CivetAnims;
 import com.evirapo.diversityofcritters.client.locomotion.ILocomotionModel;
 import com.evirapo.diversityofcritters.client.locomotion.LocomotionRig;
 import com.evirapo.diversityofcritters.client.locomotion.QuadrupedRig;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.client.renderer.CivetRenderer;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -77,6 +78,7 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 				// Starting values, to be tuned by eye with the overlay (F6) and bypass (F9).
 				.stabilise("Head", 0.6F)
 				.lag("Tail", 0.12F, 0.35F, 30.0F)
+				.mantle(MantleProfile.CIVET)
 				.build();
 	}
 
@@ -196,8 +198,10 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 
 				float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
 				float idleWeight   = busyBodyAnim ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
-				float sprintWeight = entity.sprintProgress;
-				float walkWeight   = 1.0F - sprintWeight;
+				// A mantle poses the legs itself; the walk cycle steps aside for it.
+				float cycleWeight  = 1.0F - this.locomotionRig.mantleAuthority(entity);
+				float sprintWeight = entity.sprintProgress * cycleWeight;
+				float walkWeight   = (1.0F - entity.sprintProgress) * cycleWeight;
 
 				if (idleWeight > 0.01F) {
 					this.animateWithWeight(entity.idleAnimationState, CivetAnims.IDLE, ageInTicks, idleWeight);

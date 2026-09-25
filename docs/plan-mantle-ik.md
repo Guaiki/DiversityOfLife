@@ -10,8 +10,8 @@
 |---|---|
 | 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
 | 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
-| 2 — Objetivos de pata anclados al mundo | ✅ Código y tests (117 en verde). Falta la prueba en juego con F10 |
-| 3 — `MantleDriver` + `GripPlanner` + arqueo | ⬜ Pendiente |
+| 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
+| 3 — `MantleDriver` + `GripPlanner` + arqueo | 🟨 Recorte MVP hecho (3.1, 3.3–3.6; 133 tests). Sin probar en juego hasta la Fase 4. Pendientes 3.2, 3.7, 3.8, 3.9 |
 | 4 — Lado servidor: controlador de mantle | ⬜ Pendiente |
 | 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
 | 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
@@ -326,10 +326,8 @@ en el sitio (overlay: cruz del target y suela coincidentes).
 - F10 fija la **primera pata declarada** de cada rig (en el civet, `Leg4`, delantera izquierda). Cruz magenta
   en el ancla; el panel añade `anchor/short` a la fila de la pata y `PIN` a la cabecera.
 
-**Prueba en juego pendiente** — F6 + F10 con un civet quieto: la cruz magenta y el cubo cian de `Leg4`
-coinciden. Girarlo o dejar que dé unos pasos: la suela se queda en la cruz mientras llega (short ≈ 0) y el
-cuerpo se inclina hacia ella cuando no llega; `short` crece al alejarse. F10 otra vez: la pata vuelve a la
-ruta de suelo sin salto raro.
+**Prueba en juego** — hecha y correcta: con F6 + F10 la suela se queda en la cruz magenta mientras llega, el
+cuerpo se inclina hacia ella cuando no, y F10 otra vez la devuelve a la ruta de suelo sin salto.
 
 ---
 
@@ -364,6 +362,35 @@ Los umbrales viven en `MantleProfile`, no en el código. REACH es la única fase
 | 3.9 | Hack de 90° | No aplica al mantle: `renderToBuffer` sólo rota para `CLIMB_UP/DOWN/HANG`, y el mantle nunca pone esos estados (§7.3). Verificar que no se cruzan. |
 
 **Recorte para el MVP:** 3.1 + 3.3 sin agarres (manos directas al labio) + 3.4 + 3.5 + 3.6. Sin 3.2 ni 3.7.
+
+**Notas de lo hecho (recorte MVP)**
+- 3.1: `MantleProfile` pasó a builder (valores del civet por defecto): alturas y sonda, `reachTicks` 6,
+  `crestStart` 0.55, `recoverDistance` 0.75, pitch 35/80/20°, `lipInset` 0.06, `plantDepth` 0.25.
+  `MantleProgress.pitchDegrees` da el pitch por fase con smoothstep, continuo en los bordes. RECOVER mide
+  `(pastFace + medioAncho) / recoverDistance`: 0 con el centro contra la cara, 1 con el cuerpo encima.
+- La entidad expone el mantle con `ILocomotionSubject.readMantle(MantleState)` (por defecto `false`).
+  `MantleState` = bloque del labio, `lipY`, `facing`, `startY`, `startTick`; la cara sale del lado cercano del
+  bloque. **Cambio para la 4.1:** se sincroniza también `lipY` (float); el cliente no puede re-muestrear el
+  labio a media subida porque desde la Y elevada ya no hay pared.
+- **Hueco del plan resuelto — hundimiento del cuerpo:** el servidor sube la Y durante RISE/CREST, pero las
+  traseras siguen en el suelo hasta la cresta; ninguna pata estira 0.55 bloques. El driver pide a la pelvis
+  bajar `(y − startY) × lock` (lock 1 en REACH/RISE, 1 → 0 en CREST, 0 en RECOVER). Así la subida de la Y se
+  lee como encabritarse sobre las traseras y la cresta como el cuerpo que sube al perder el apoyo.
+- 3.3 `MantleDriver` (`client/locomotion/mantle`), módulo del rig vía `builder.mantle(profile)`. Delanteras:
+  peso de ancla 0 → 1 en REACH, ancla en `(cara + lipInset, lipY)` frente a la suela; en CREST avanzan hasta
+  `plantDepth`; en RECOVER el peso vuelve a 0. Traseras: capturan `(suela, suelo)` al empezar y quedan
+  ancladas hasta la cresta, que las suelta. `contactOverride` por fase; al terminar, todo a `NO_OVERRIDE`.
+- 3.4: autoridad = muelle de 0.2 s en `LocomotionState`; los pesos de ancla son `mantleWeight × autoridad`.
+  `CivetModel` multiplica walk y run por `1 − autoridad` (valor del frame anterior, vía `rig.mantleAuthority`).
+- 3.5: en `QuadrupedSolver`, `pitch = lerp(plano·autoridadTerreno, pitchMantle·gate, autoridadMantle)`, sin
+  límite; roll y altura de terreno se escalan por `1 − autoridadMantle`. Con autoridad 0 la pose es bit a bit
+  la de antes (test).
+- 3.6: no hizo falta código aparte: `writePose` ya gira la pelvis sobre las caderas ponderadas; bajo mantle
+  esos pesos se llevan a las traseras (`hip.z > 0`).
+- `QuadrupedMantleSceneTest` (malla real, frame a frame): en REACH y RISE las traseras quedan en su ancla
+  (< 10⁻⁶ u); a media subida (h 0.3, pitch ≈ 61°) las manos quedan a 1.6 u del labio y lo reportan en
+  `anchorShortfall`; en CREST las traseras sueltan y las manos avanzan; al terminar se devuelve todo.
+- Panel F6: fila `mantle:` con fase, t, h, autoridad, pitch, lock y hundimiento.
 
 ### 7.3 Fase 4 — Servidor: `MantleController` (2 – 3 d)
 

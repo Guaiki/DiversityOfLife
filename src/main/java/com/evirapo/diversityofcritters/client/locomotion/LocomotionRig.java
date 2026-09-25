@@ -91,6 +91,15 @@ public abstract class LocomotionRig<T extends LivingEntity & ILocomotionSubject>
                 && entity.level().getEntity(entity.getId()) == entity;
     }
 
+    /**
+     * How much a mantle is posing this entity, in [0, 1], as of its last frame. Models scale their
+     * walk cycle down by it so the legs are not animated and anchored at once.
+     */
+    public final float mantleAuthority(T entity) {
+        final LocomotionState state = LocomotionStateCache.peek(entity);
+        return state == null ? 0.0f : Mth.clamp(state.mantleAuthority.value(), 0.0f, 1.0f);
+    }
+
     /** Turns the rig off for good, logging why once. */
     protected final void disable(String reason) {
         if (!this.disabled) {

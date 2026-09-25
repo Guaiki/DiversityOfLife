@@ -59,6 +59,10 @@ public final class QuadrupedSolver {
     private final int[] order;
     private final PlaneFit.Plane plane = new PlaneFit.Plane();
 
+    /** Mantle input, set before {@link #solve}: its authority in [0, 1] and the pitch it asks for. */
+    float mantleAuthority;
+    float mantlePitch;
+
     /** Unsmoothed targets this frame, for debug. */
     float pitchTarget;
     float rollTarget;
@@ -154,9 +158,20 @@ public final class QuadrupedSolver {
         this.authority = gate * smoothstep(standing / STANDING_WEIGHT);
         final float grounded = 1.0f - smoothstep(state.airborneSeconds / DROP_RELEASE_SECONDS);
 
-        updateOrSnap(state.pelvisPitch, this.pitchTarget * this.authority, dt, smooth);
-        updateOrSnap(state.pelvisRoll, this.rollTarget * this.authority, dt, smooth);
-        updateOrSnap(state.pelvisDrop, this.dropTarget * this.authority * grounded, dt, smooth);
+        float pitch = this.pitchTarget * this.authority;
+        float roll = this.rollTarget * this.authority;
+        float drop = this.dropTarget * this.authority * grounded;
+        // A mantle takes the pitch over, past the terrain limit, and lets roll and height go:
+        // the body is rearing against a wall, not standing on the ground under its feet.
+        final float mantle = clamp01(this.mantleAuthority);
+        if (mantle > 0.0f) {
+            pitch += (this.mantlePitch * gate - pitch) * mantle;
+            roll *= 1.0f - mantle;
+            drop *= 1.0f - mantle;
+        }
+        updateOrSnap(state.pelvisPitch, pitch, dt, smooth);
+        updateOrSnap(state.pelvisRoll, roll, dt, smooth);
+        updateOrSnap(state.pelvisDrop, drop, dt, smooth);
     }
 
     private float[] footLifts(LocomotionState.LegState[] legs) {

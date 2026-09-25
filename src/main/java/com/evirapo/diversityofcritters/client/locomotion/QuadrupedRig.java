@@ -1,6 +1,9 @@
 package com.evirapo.diversityofcritters.client.locomotion;
 
+import com.evirapo.diversityofcritters.client.locomotion.mantle.MantleDriver;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
+import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.util.Mth;
@@ -35,6 +38,10 @@ import java.util.Optional;
  * in the world and stretches toward it, within a looser limit. What the anchored legs cannot reach
  * moves the pelvis first; the legs then take up the rest, and report what is still missing in
  * {@link LocomotionState.LegState#anchorShortfall}.
+ *
+ * <p>With a {@link MantleProfile}, a {@link MantleDriver} poses the body while the entity climbs a
+ * ledge: the pitch comes from the manoeuvre, the body turns about its hind hips, and the legs are
+ * anchored to the lip and to the ground they stood on.
  */
 @OnlyIn(Dist.CLIENT)
 public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> extends LocomotionRig<T> {
@@ -60,6 +67,10 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final Vector3f target = new Vector3f();
     private final float anchorStretchLimit;
     private final float maxAnchorShift;
+    /** Legs behind the body's middle (model +Z): the ones a mantle pivots on. */
+    private final boolean[] rear;
+    private final @org.jetbrains.annotations.Nullable MantleDriver mantle;
+    private final MantleState mantleState = new MantleState();
     private final float[] shiftX;
     private final float[] shiftY;
     private final float[] shiftZ;
@@ -77,6 +88,11 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
                 builder.stretchLimit, builder.maxDropFraction, legs.get(0).soleOffset());
         this.anchorStretchLimit = builder.anchorStretchLimit;
         this.maxAnchorShift = builder.maxAnchorShiftFraction * legs.get(0).soleOffset();
+        this.rear = new boolean[legs.size()];
+        for (int i = 0; i < legs.size(); i++) {
+            this.rear[i] = legs.get(i).hip().z > 0.0f;
+        }
+        this.mantle = builder.mantleProfile == null ? null : new MantleDriver(builder.mantleProfile, this.rear);
         this.shiftX = new float[legs.size()];
         this.shiftY = new float[legs.size()];
         this.shiftZ = new float[legs.size()];
@@ -130,6 +146,17 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
 
         updateDebugPin(legStates[0]);
 
+        if (this.mantle != null) {
+            final MantleState mantle = entity.readMantle(this.mantleState) ? this.mantleState : null;
+            this.mantle.update(state, mantle,
+                    Mth.lerp(partialTick, entity.xOld, entity.getX()),
+                    Mth.lerp(partialTick, entity.yOld, entity.getY()),
+                    Mth.lerp(partialTick, entity.zOld, entity.getZ()),
+                    entity.level().getGameTime() + partialTick, entity.getBbWidth() * 0.5f, unitsPerBlock, dt);
+        }
+        solver.mantleAuthority = state.mantleAuthority.value();
+        solver.mantlePitch = state.mantlePitch;
+
         solver.solve(state, gate, dt);
         this.spine.track(state, state.pelvisPitch.value(), state.pelvisRoll.value(), state.bodyYaw, dt);
         state.debugAuthority = solver.authority;
@@ -168,6 +195,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         final float pitch = state.pelvisPitch.value();
         final float roll = state.pelvisRoll.value();
         final float drop = state.pelvisDrop.value();
+        final float mantle = state.mantleAuthority.value();
+        final float bodyDrop = state.mantleBodyDrop * gate;
         if (!this.finite(pitch, "pelvis pitch") || !this.finite(roll, "pelvis roll")
                 || !this.finite(drop, "pelvis drop")) {
             return;
@@ -185,8 +214,12 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             this.shiftX[i] = this.shift.x;
             this.shiftY[i] = this.shift.y;
             this.shiftZ[i] = this.shift.z;
-            // A trace of weight on every hip keeps the pivot defined in the air.
-            final float w = solver.weight[i] + 1.0e-3f;
+            // A trace of weight on every hip keeps the pivot defined in the air. A mantle turns
+            // the body about its hind hips, whatever the feet say.
+            float w = solver.weight[i] + 1.0e-3f;
+            if (mantle > 0.0f) {
+                w += ((this.rear[i] ? 1.0f : 1.0e-3f) - w) * mantle;
+            }
             meanX += this.shiftX[i] * w;
             meanY += this.shiftY[i] * w;
             meanZ += this.shiftZ[i] * w;
@@ -199,7 +232,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.pelvis.xRot += pitch;
         this.pelvis.zRot += roll;
         this.pelvis.x -= meanX;
-        this.pelvis.y += drop - meanY;
+        this.pelvis.y += drop - meanY + bodyDrop;
         this.pelvis.z -= meanZ;
 
         // --- Anchored legs: the pelvis goes first, by what they cannot reach.
@@ -215,7 +248,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             hip.zRot -= roll;
 
             // How far the hip ended up moving down (model +Y), which the sole has to make up.
-            final float hipDown = this.shiftY[i] - meanY + drop + anchorDown;
+            final float hipDown = this.shiftY[i] - meanY + drop + bodyDrop + anchorDown;
             final float residual = leg.footLift.value() + hipDown;
             final float applied = QuadrupedSolver.appliedResidual(
                     residual, Math.max(leg.plantWeight, leg.contactWeight), gate);
@@ -357,6 +390,11 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         }
     }
 
+    @org.jetbrains.annotations.Nullable
+    MantleDriver mantleDriver() {
+        return this.mantle;
+    }
+
     /** The space the next {@link #writePose} measures anchors in; tests begin it by hand. */
     ModelSpace space() {
         return this.space;
@@ -386,6 +424,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         private float maxDropFraction = 0.5f;
         private float anchorStretchLimit = 0.25f;
         private float maxAnchorShiftFraction = 0.5f;
+        private MantleProfile mantleProfile;
         private final SpineRules.Declarations spine = new SpineRules.Declarations();
 
         private <M extends HierarchicalModel<T> & ILocomotionModel<T>> Builder(M model) {
@@ -430,6 +469,12 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         /** How far an anchored leg may lengthen or shorten, as a fraction of its length. */
         public Builder<T> anchorStretchLimit(float fraction) {
             this.anchorStretchLimit = fraction;
+            return this;
+        }
+
+        /** Lets the rig pose the body climbing a ledge, with the species' numbers. */
+        public Builder<T> mantle(MantleProfile profile) {
+            this.mantleProfile = profile;
             return this;
         }
 

@@ -276,7 +276,7 @@ public final class LocomotionDebug {
     private static String[] describe(Entity entity, LocomotionState state) {
         final LocomotionState.LegState[] legs = state.legs();
         final LocomotionState.SpineState[] spine = state.spine();
-        final String[] lines = new String[4 + legs.length + (spine.length > 0 ? 1 : 0)];
+        final String[] lines = new String[5 + legs.length + (spine.length > 0 ? 1 : 0)];
         lines[0] = String.format(Locale.ROOT, "[Locomotion] %s #%d  %s  gate %.2f  authority %.2f%s",
                 entity.getType().getDescriptionId().replace("entity." + DiversityOfCritters.MODID + ".", ""),
                 entity.getId(), state.rigName, state.gate.value(), state.debugAuthority,
@@ -299,9 +299,14 @@ public final class LocomotionDebug {
             for (LocomotionState.SpineState s : spine) {
                 trails.append(String.format(Locale.ROOT, " %+.1f°", Math.toDegrees(s.debugTrailYaw)));
             }
-            lines[lines.length - 2] = trails.toString();
+            lines[lines.length - 3] = trails.toString();
         }
-        lines[lines.length - 1] = describeLedge(entity);
+        lines[lines.length - 2] = describeLedge(entity);
+        lines[lines.length - 1] = String.format(Locale.ROOT,
+                "mantle: %s  t %.2f  h %.2f  authority %.2f  pitch %+.1f°  lock %.2f  sink %+.2fu",
+                state.mantleProgress.phase, state.mantleProgress.t, state.mantleProgress.h,
+                state.mantleAuthority.value(), Math.toDegrees(state.mantlePitch), state.mantleLock,
+                state.mantleBodyDrop);
         return lines;
     }
 
