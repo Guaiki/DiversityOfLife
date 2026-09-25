@@ -94,6 +94,29 @@ public final class ModelSpace {
         return out.set(this.originX + this.point.x, this.originY + this.point.y, this.originZ + this.point.z);
     }
 
+    /**
+     * The transform from the frame of the last part of {@code chain} to the world, relative to the
+     * entity, as posed right now. Invert it to bring world points into that part's frame with
+     * {@link #worldToFrame}. The chain must start at the model's {@code root()}.
+     */
+    public Matrix4f frameToWorld(List<ModelPart> chain, Matrix4f out) {
+        out.set(this.base.last().pose());
+        for (int i = 0; i < chain.size(); i++) {
+            applyPart(out, chain.get(i));
+        }
+        return out;
+    }
+
+    /**
+     * A world point in a part's frame, in model units. {@code worldToFrame} is the inverse of a
+     * {@link #frameToWorld} matrix taken since the last {@link #begin}.
+     */
+    public Vector3f worldToFrame(Matrix4f worldToFrame, double x, double y, double z, Vector3f out) {
+        out.set((float) (x - this.originX), (float) (y - this.originY), (float) (z - this.originZ));
+        worldToFrame.transformPosition(out);
+        return out.mul(ModelParts.UNITS_PER_BLOCK);
+    }
+
     /** The same as {@link ModelPart#translateAndRotate}, applied to a bare matrix. */
     public static void applyPart(Matrix4f matrix, ModelPart part) {
         matrix.translate(part.x / ModelParts.UNITS_PER_BLOCK, part.y / ModelParts.UNITS_PER_BLOCK,

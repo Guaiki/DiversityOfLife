@@ -115,4 +115,20 @@ class ModelSpaceTest {
         // 24 down to the root, 11 up to the hip, 11 down to the sole.
         assertEquals(24.0f, LegChain.modelY(new Matrix4f(), this.chain, 11.0f), 1.0e-4f);
     }
+
+    @Test
+    void worldPointsComeBackIntoTheLegFrame() {
+        // Tilted leg, turned and shrunk body: the round trip must still land on the sole point.
+        this.leg.xRot = 0.4f;
+        this.leg.zRot = -0.3f;
+        this.leg.yScale = 1.1f;
+        this.space.begin(100.0, 64.0, -30.0, 37.0f, 0.65f, CIVET_LIKE);
+        final Vector3d at = this.space.toWorld(this.chain, 1.5f, 11.0f, -2.0f, this.out);
+
+        final Matrix4f toFrame = this.space.frameToWorld(this.chain, new Matrix4f()).invert();
+        final Vector3f local = this.space.worldToFrame(toFrame, at.x, at.y, at.z, new Vector3f());
+        assertEquals(1.5f, local.x, 1.0e-3f);
+        assertEquals(11.0f, local.y, 1.0e-3f);
+        assertEquals(-2.0f, local.z, 1.0e-3f);
+    }
 }

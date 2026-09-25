@@ -147,6 +147,21 @@ public final class LocomotionState {
         public double groundY;
         public final GroundProbe.Reading ground = new GroundProbe.Reading();
 
+        // World-anchored target, written by whatever drives the leg (a manoeuvre, the debug pin).
+        /** World position the sole should reach. Only read while {@link #anchorWeight} is above 0. */
+        public double anchorX;
+        public double anchorY;
+        public double anchorZ;
+        /** 0 = the ground path alone, 1 = the leg aims at its anchor. */
+        public float anchorWeight;
+        /**
+         * Output: how far the sole stayed from its anchor, model units along the leg; positive when
+         * the anchor is out of reach, negative when too close to fold into.
+         */
+        public float anchorShortfall;
+        /** The debug pin owns this leg's anchor. */
+        public boolean debugPinned;
+
         /** Smoothed correction the leg itself answers, model units. */
         public final Spring footLift = new Spring(0.08f);
         /** Smoothed correction the body answers, model units. */
@@ -166,6 +181,9 @@ public final class LocomotionState {
             this.contactWeight = 0.0f;
             this.support = 1.0f;
             this.contactOverride = NO_OVERRIDE;
+            this.anchorWeight = 0.0f;
+            this.anchorShortfall = 0.0f;
+            this.debugPinned = false;
             this.stanceSeeded = false;
             this.stillSeconds = 0.0f;
             this.footLift.snap(0.0f);
