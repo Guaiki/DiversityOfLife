@@ -13,4 +13,13 @@ public interface ILocomotionSubject {
      * fades back in afterwards.
      */
     boolean isLocomotionSuspended();
+
+    /**
+     * Fills {@code out} with the mantle in progress.
+     *
+     * @return false when the entity is not mantling (the default: it never does)
+     */
+    default boolean readMantle(MantleState out) {
+        return false;
+    }
 }
