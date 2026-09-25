@@ -1,5 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
+import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -156,6 +158,7 @@ public class CivetEntity extends DiverseCritter {
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
+        this.mantle = new MantleController(this, MantleProfile.CIVET);
         this.moveControl = new CivetMoveControl(this);
         this.idleAnimationState.start(0);
     }
@@ -242,7 +245,8 @@ public class CivetEntity extends DiverseCritter {
 
             boolean isNewborn = this.isNewborn();
             double desiredSpeed = isNewborn ? 0.095D : 0.2D;
-            float desiredStep   = isNewborn ? 0.5F : 1.0F;
+            // A mantle lifts the body itself; vanilla stepping would jump it up the block at once.
+            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : 1.0F);
 
             if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
                 this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);
@@ -833,6 +837,7 @@ public class CivetEntity extends DiverseCritter {
         }
 
         if (this.postDescentCooldown > 0) return;
+        if (this.isMantling()) return;
         if (!this.horizontalCollision || !hasClimbable) return;
         if (this.isScratching() || this.isNewborn() || this.onGround()) return;
         if (this.isInWater() || this.isInWaterOrBubble()) return;

@@ -8,10 +8,13 @@ import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
+import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -81,6 +84,18 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+
+    // Mantle in progress (see MantleController). Empty lip = not mantling. The phase is not synced:
+    // both sides derive it from the body's height.
+    private static final EntityDataAccessor<Optional<BlockPos>> MANTLE_LIP = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    private static final EntityDataAccessor<Byte> MANTLE_FACING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Integer> MANTLE_START = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Float> MANTLE_START_Y = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> MANTLE_LIP_Y = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
+
+    /** Species that can climb a ledge set this in their constructor. Server side only acts on it. */
+    @Nullable
+    protected MantleController mantle;
 
     int prevHunger;
     int prevThirst;
@@ -170,11 +185,62 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(TEMP_COMFORT, 100);
         this.entityData.define(HUMIDITY_TIER, HumidityTier.MODERATE.ordinal());
         this.entityData.define(HUMIDITY_COMFORT, 100);
+        this.entityData.define(MANTLE_LIP, Optional.empty());
+        this.entityData.define(MANTLE_FACING, (byte) Direction.SOUTH.get2DDataValue());
+        this.entityData.define(MANTLE_START, 0);
+        this.entityData.define(MANTLE_START_Y, 0.0F);
+        this.entityData.define(MANTLE_LIP_Y, 0.0F);
+    }
+
+    // --- MANTLE ---
+
+    /** The ledge climb this species can do, or null. */
+    @Nullable
+    public MantleController mantle() {
+        return this.mantle;
+    }
+
+    public boolean isMantling() {
+        return this.entityData.get(MANTLE_LIP).isPresent();
+    }
+
+    /** Publishes a mantle to the clients. Only {@link MantleController} calls this. */
+    public void setMantleData(BlockPos lip, Direction facing, int startTick, float startY, float lipY) {
+        this.entityData.set(MANTLE_FACING, (byte) facing.get2DDataValue());
+        this.entityData.set(MANTLE_START, startTick);
+        this.entityData.set(MANTLE_START_Y, startY);
+        this.entityData.set(MANTLE_LIP_Y, lipY);
+        // Last: clients treat the lip as the switch, so everything else is in place when it flips.
+        this.entityData.set(MANTLE_LIP, Optional.of(lip));
+    }
+
+    public void clearMantleData() {
+        this.entityData.set(MANTLE_LIP, Optional.empty());
+    }
+
+    @Override
+    public boolean readMantle(MantleState out) {
+        final Optional<BlockPos> lip = this.entityData.get(MANTLE_LIP);
+        if (lip.isEmpty()) {
+            return false;
+        }
+        // The start tick travels as the low 32 bits of the game time; rebuild it wrap-safe.
+        final long now = this.level().getGameTime();
+        final long startTick = now - ((int) now - this.entityData.get(MANTLE_START));
+        final BlockPos pos = lip.get();
+        out.set(pos.getX(), pos.getY(), pos.getZ(), this.entityData.get(MANTLE_LIP_Y),
+                Direction.from2DDataValue(this.entityData.get(MANTLE_FACING)),
+                this.entityData.get(MANTLE_START_Y), startTick);
+        return true;
     }
 
     @Override
     public void addAdditionalSaveData(CompoundTag pCompound) {
         super.addAdditionalSaveData(pCompound);
+        // A mantle is never saved: a critter loaded mid-climb must not come back floating.
+        if (this.mantle != null && this.mantle.holdsGravity()) {
+            pCompound.remove("NoGravity");
+        }
         pCompound.putBoolean("IsMale", this.getIsMale());
         pCompound.putInt("Hunger", this.getHunger());
         pCompound.putInt("Thirst", this.getThirst());

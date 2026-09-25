@@ -25,6 +25,18 @@ public final class MantleProfile {
     /** How far the body walks onto the top before the manoeuvre is over. */
     public final double recoverDistance;
 
+    // --- Server movement (see MantleMotion).
+    /** Ticks the rise takes, up to the crest. */
+    public final int riseTicks;
+    /** Ticks the crest takes, up to level with the top. */
+    public final int crestTicks;
+    /** Ticks the walk onto the top takes. */
+    public final int recoverTicks;
+    /** A mantle still going after this many ticks is given up. */
+    public final int maxTicks;
+    /** Ledges probed with less confidence than this are not mantled. */
+    public final float minConfidence;
+
     // --- The pose.
     /** Body pitch at the end of each phase; it starts from the previous phase's. */
     public final float reachPitch;
@@ -40,9 +52,13 @@ public final class MantleProfile {
             throw new IllegalArgumentException("Bad mantle heights: min " + b.minMantleHeight
                     + ", max " + b.maxMantleHeight + ", probe " + b.probeDistance);
         }
-        if (!(b.reachTicks > 0 && b.crestStart > 0.0 && b.crestStart < 1.0 && b.recoverDistance > 0.0)) {
+        if (!(b.reachTicks > 0 && b.crestStart > 0.0 && b.crestStart < 1.0 && b.recoverDistance > 0.0
+                && b.riseTicks > 0 && b.crestTicks > 0 && b.recoverTicks > 0
+                && b.maxTicks > b.reachTicks + b.riseTicks + b.crestTicks + b.recoverTicks)) {
             throw new IllegalArgumentException("Bad mantle phases: reach " + b.reachTicks
-                    + " ticks, crest at " + b.crestStart + ", recover " + b.recoverDistance);
+                    + " ticks, crest at " + b.crestStart + ", recover " + b.recoverDistance
+                    + ", rise/crest/recover " + b.riseTicks + "/" + b.crestTicks + "/" + b.recoverTicks
+                    + " of max " + b.maxTicks);
         }
         this.minMantleHeight = b.minMantleHeight;
         this.maxMantleHeight = b.maxMantleHeight;
@@ -50,6 +66,11 @@ public final class MantleProfile {
         this.reachTicks = b.reachTicks;
         this.crestStart = b.crestStart;
         this.recoverDistance = b.recoverDistance;
+        this.riseTicks = b.riseTicks;
+        this.crestTicks = b.crestTicks;
+        this.recoverTicks = b.recoverTicks;
+        this.maxTicks = b.maxTicks;
+        this.minConfidence = b.minConfidence;
         this.reachPitch = b.reachPitch;
         this.risePitch = b.risePitch;
         this.crestPitch = b.crestPitch;
@@ -69,6 +90,11 @@ public final class MantleProfile {
         private int reachTicks = 6;
         private double crestStart = 0.55;
         private double recoverDistance = 0.75;
+        private int riseTicks = 10;
+        private int crestTicks = 6;
+        private int recoverTicks = 8;
+        private int maxTicks = 40;
+        private float minConfidence = 0.5f;
         private float reachPitch = 35.0f;
         private float risePitch = 80.0f;
         private float crestPitch = 20.0f;
@@ -101,6 +127,24 @@ public final class MantleProfile {
 
         public Builder recoverDistance(double blocks) {
             this.recoverDistance = blocks;
+            return this;
+        }
+
+        /** Ticks for the rise, the crest and the walk onto the top. */
+        public Builder timing(int rise, int crest, int recover) {
+            this.riseTicks = rise;
+            this.crestTicks = crest;
+            this.recoverTicks = recover;
+            return this;
+        }
+
+        public Builder maxTicks(int ticks) {
+            this.maxTicks = ticks;
+            return this;
+        }
+
+        public Builder minConfidence(float confidence) {
+            this.minConfidence = confidence;
             return this;
         }
 
