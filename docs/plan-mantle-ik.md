@@ -11,7 +11,7 @@
 | 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
 | 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
 | 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
-| 3 — `MantleDriver` + `GripPlanner` + arqueo | 🟨 Recorte MVP hecho (3.1, 3.3–3.6; 133 tests). Sin probar en juego hasta la Fase 4. Pendientes 3.2, 3.7, 3.8, 3.9 |
+| 3 — `MantleDriver` + `GripPlanner` + arqueo | ✅ Código y tests completos (150). MVP probado en juego; falta ver 3.2 (agarres), 3.7 (arqueo) y 3.8 (salto del juvenil) |
 | 4 — Lado servidor: controlador de mantle | ✅ Hecho. Probado en juego (H2 validado) |
 | 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
 | 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
@@ -391,6 +391,30 @@ Los umbrales viven en `MantleProfile`, no en el código. REACH es la única fase
   (< 10⁻⁶ u); a media subida (h 0.3, pitch ≈ 61°) las manos quedan a 1.6 u del labio y lo reportan en
   `anchorShortfall`; en CREST las traseras sueltan y las manos avanzan; al terminar se devuelve todo.
 - Panel F6: fila `mantle:` con fase, t, h, autoridad, pitch, lock y hundimiento.
+
+**Notas de lo hecho (resto de la fase)**
+- 3.2 `GripPlanner` (puro, `client/locomotion/mantle`). En REACH las dos manos van a primeros agarres
+  escalonados en la cara (`firstGripHigh` 0.75 y `firstGripLow` 0.5 del labio, a `FACE_GAP` 0.02 delante);
+  en RISE se alternan `2 × gripsPerHand` swings (civet: 1 por mano → izquierda y luego derecha al labio), cada
+  uno un arco que se separa `swingOut` 0.12 de la cara. **El swing al labio sube primero a su altura (70 % del
+  swing) y sólo entonces pasa por encima**: sin eso la mano cortaba la esquina del bloque (lo cazó el test).
+  La primera pata delantera del rig (`Leg4`) lleva la iniciativa. Contacto de la mano = `1 − swing`.
+  Simplificación: los agarres son fracciones del labio en el perfil, no se calculan desde hombro y alcance.
+- 3.7 `SpineRules.arch(hueso, peso)`: `xRot += curvatura × peso`. Curvatura = `archDegrees` (25°) ×
+  `MantleProgress.archShare`: 0 en REACH/RISE, sube en CREST, se deshace en RECOVER. Civet:
+  `.arch("Head", 0.5).arch("Tail", -0.6)` (en xRot, + baja una cabeza y sube una cola). Test: sin arco, las
+  demás reglas escriben lo mismo bit a bit.
+- 3.8 Salto: `MantleMotion.needsHop(lipHeight, growthScale)` = labio > `reach` (1.09) × escala. Adulto nunca
+  con un bloque; juvenil (0.65) sí. El salto multiplica ×`hopBoost` (3) la subida desde `hopFrom` (50 % de
+  RISE), sin pasar del labio. La escala por edad pasó a `DiverseCritter.growthScale()` (común), que
+  `CivetRenderer.scaleFor` lee: el servidor no puede usar el renderer.
+- 3.9 ver la tabla.
+
+**Prueba en juego pendiente (resto de la Fase 3)** — `/civet_debug mantle` con F6:
+1. Adulto: en RISE, primero una mano y luego la otra, cada una con un arco hacia fuera; ninguna atraviesa la
+   esquina del bloque.
+2. Sobre la cresta, cabeza hacia la cima y cola hacia abajo; se enderezan al alejarse.
+3. Juvenil contra un bloque: la segunda mitad de la subida es un salto rápido; nunca flota por encima.
 
 ### 7.3 Fase 4 — Servidor: `MantleController` (2 – 3 d)
 

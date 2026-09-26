@@ -36,6 +36,15 @@ public final class MantleProfile {
     public final int maxTicks;
     /** Ledges probed with less confidence than this are not mantled. */
     public final float minConfidence;
+    /**
+     * Highest lip an adult reaches rearing up on its hind legs, blocks; scaled by growth. Higher
+     * lips get a hop: the second part of the rise goes faster, as if pushed off the hind legs.
+     */
+    public final double reach;
+    /** Share of the rise after which the hop kicks in. */
+    public final double hopFrom;
+    /** How much faster the rise goes during the hop. */
+    public final double hopBoost;
 
     // --- The pose.
     /** Body pitch at the end of each phase; it starts from the previous phase's. */
@@ -61,6 +70,10 @@ public final class MantleProfile {
             throw new IllegalArgumentException("Bad mantle heights: min " + b.minMantleHeight
                     + ", max " + b.maxMantleHeight + ", probe " + b.probeDistance);
         }
+        if (!(b.reach > 0.0 && b.hopFrom >= 0.0 && b.hopFrom < 1.0 && b.hopBoost >= 1.0)) {
+            throw new IllegalArgumentException("Bad mantle hop: reach " + b.reach + ", from " + b.hopFrom
+                    + ", boost " + b.hopBoost);
+        }
         if (!(b.gripsPerHand > 0 && b.firstGripLow >= 0.0 && b.firstGripHigh <= 1.0 && b.swingOut >= 0.0)) {
             throw new IllegalArgumentException("Bad mantle grips: " + b.gripsPerHand + " per paw, first at "
                     + b.firstGripHigh + "/" + b.firstGripLow + ", swing out " + b.swingOut);
@@ -84,6 +97,9 @@ public final class MantleProfile {
         this.recoverTicks = b.recoverTicks;
         this.maxTicks = b.maxTicks;
         this.minConfidence = b.minConfidence;
+        this.reach = b.reach;
+        this.hopFrom = b.hopFrom;
+        this.hopBoost = b.hopBoost;
         this.reachPitch = b.reachPitch;
         this.risePitch = b.risePitch;
         this.crestPitch = b.crestPitch;
@@ -113,6 +129,9 @@ public final class MantleProfile {
         private int recoverTicks = 8;
         private int maxTicks = 40;
         private float minConfidence = 0.5f;
+        private double reach = 1.09;
+        private double hopFrom = 0.5;
+        private double hopBoost = 3.0;
         private float reachPitch = 35.0f;
         private float risePitch = 80.0f;
         private float crestPitch = 20.0f;
@@ -168,6 +187,18 @@ public final class MantleProfile {
 
         public Builder minConfidence(float confidence) {
             this.minConfidence = confidence;
+            return this;
+        }
+
+        /**
+         * @param reach    highest lip an adult reaches without a hop, blocks
+         * @param hopFrom  share of the rise after which a hop speeds it up
+         * @param hopBoost how much faster
+         */
+        public Builder hop(double reach, double hopFrom, double hopBoost) {
+            this.reach = reach;
+            this.hopFrom = hopFrom;
+            this.hopBoost = hopBoost;
             return this;
         }
 

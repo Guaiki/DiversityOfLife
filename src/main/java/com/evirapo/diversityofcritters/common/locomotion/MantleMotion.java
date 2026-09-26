@@ -35,9 +35,11 @@ public final class MantleMotion {
      * @param lipY      the lip's Y
      * @param pastFace  how far the body's centre is past the face, along the facing
      * @param halfWidth half the body's width
+     * @param hop       the lip is past the body's reach: speed up the end of the rise
      */
     public static MantleMotion plan(MantleProgress progress, double y, double startY, double lipY,
-                                    double pastFace, double halfWidth, MantleProfile profile, MantleMotion out) {
+                                    double pastFace, double halfWidth, boolean hop, MantleProfile profile,
+                                    MantleMotion out) {
         final double rise = Math.max(lipY - startY, 0.0);
         final double pinned = -(halfWidth + PIN_GAP);
         final double toPin = clamp(pinned - pastFace, MAX_PIN_SPEED);
@@ -51,8 +53,12 @@ public final class MantleMotion {
                 out.holdsVertical = false;
             }
             case RISE -> {
+                double speed = rise * profile.crestStart / profile.riseTicks;
+                if (hop && progress.t >= profile.hopFrom) {
+                    speed *= profile.hopBoost;
+                }
                 out.along = toPin;
-                out.up = Math.min(rise * profile.crestStart / profile.riseTicks, toLip);
+                out.up = Math.min(speed, toLip);
                 out.holdsVertical = true;
             }
             case CREST -> {
@@ -74,6 +80,11 @@ public final class MantleMotion {
             }
         }
         return out;
+    }
+
+    /** Whether a body drawn at {@code growthScale} needs a hop to reach a lip {@code lipHeight} up. */
+    public static boolean needsHop(double lipHeight, float growthScale, MantleProfile profile) {
+        return lipHeight > profile.reach * growthScale;
     }
 
     /** Past this share of the rise, an interrupted mantle finishes instead of dropping back. */

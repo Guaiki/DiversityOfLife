@@ -194,6 +194,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
     // --- MANTLE ---
 
+    /**
+     * How big this critter is drawn next to an adult, 1 for adults. The hitbox does not change, so
+     * this is what tells the server a young critter's legs are shorter.
+     */
+    public float growthScale() {
+        return 1.0F;
+    }
+
     /** The ledge climb this species can do, or null. */
     @Nullable
     public MantleController mantle() {

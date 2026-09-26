@@ -49,10 +49,7 @@ public class CivetRenderer<T extends CivetEntity> extends MobRenderer<T, Hierarc
 
     /** Growth-stage scale; also read by the locomotion rig to place bones in the world. */
     public static float scaleFor(CivetEntity entity) {
-        if (entity.isNewborn()) {
-            return 0.45F;
-        }
-        return entity.isJuvenile() ? 0.65F : 1.0F;
+        return entity.growthScale();
     }
 
     @Override

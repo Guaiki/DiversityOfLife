@@ -46,6 +46,7 @@ public final class MantleController {
     private boolean active;
     private boolean fromPath;
     private boolean holdsGravity;
+    private boolean hop;
     private long startTick;
     private double startY;
     private double lipY;
@@ -101,14 +102,15 @@ public final class MantleController {
         this.wallCoord = s.wallCoord;
         this.facing = s.facing;
         this.lip.set(s.lipX, s.lipBlockY, s.lipZ);
+        this.hop = MantleMotion.needsHop(s.lipHeight, this.critter.growthScale(), this.profile);
 
         // Vanilla would otherwise step the body straight up the block and leave the pose behind.
         this.critter.setMaxUpStep(0.0f);
         this.critter.setMantleData(this.lip.immutable(), this.facing, (int) this.startTick,
                 (float) this.startY, (float) this.lipY);
         this.lockRotation();
-        LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}", this.critter, this.lip, this.facing,
-                String.format("%.2f", s.lipHeight));
+        LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}{}", this.critter, this.lip, this.facing,
+                String.format("%.2f", s.lipHeight), this.hop ? ", with a hop" : "");
         return true;
     }
 
@@ -134,7 +136,7 @@ public final class MantleController {
         }
 
         MantleMotion.plan(this.progress, this.critter.getY(), this.startY, this.lipY, pastFace,
-                this.critter.getBbWidth() * 0.5, this.profile, this.motion);
+                this.critter.getBbWidth() * 0.5, this.hop, this.profile, this.motion);
         if (this.motion.done) {
             this.end("done");
             return false;

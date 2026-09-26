@@ -879,6 +879,15 @@ public class CivetEntity extends DiverseCritter {
         return super.isLocomotionSuspended() || this.isDigging() || this.isScratching();
     }
 
+    /** Drawn at this size by the renderer; the rig and the mantle measure legs with it. */
+    @Override
+    public float growthScale() {
+        if (this.isNewborn()) {
+            return 0.45F;
+        }
+        return this.isJuvenile() ? 0.65F : 1.0F;
+    }
+
     public static boolean checkCivetSpawnRules(EntityType<CivetEntity> t, LevelAccessor lvl, MobSpawnType type, BlockPos pos, RandomSource rnd) {
         return SpawnRuleEngine.evaluate(DOCSpecies.CIVET, lvl, type, pos, rnd).allowed();
     }

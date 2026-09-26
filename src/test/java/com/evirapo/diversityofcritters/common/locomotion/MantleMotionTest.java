@@ -23,6 +23,10 @@ class MantleMotionTest {
     }
 
     private static Run simulate(double lipY, double startPastFace) {
+        return simulate(lipY, startPastFace, false);
+    }
+
+    private static Run simulate(double lipY, double startPastFace, boolean hop) {
         final MantleProgress progress = new MantleProgress();
         final MantleMotion motion = new MantleMotion();
         double y = START_Y;
@@ -32,7 +36,7 @@ class MantleMotionTest {
         int tick = 0;
         for (; tick <= PROFILE.maxTicks; tick++) {
             MantleProgress.of(y, START_Y, lipY, tick, pastFace, HALF_WIDTH, PROFILE, progress);
-            MantleMotion.plan(progress, y, START_Y, lipY, pastFace, HALF_WIDTH, PROFILE, motion);
+            MantleMotion.plan(progress, y, START_Y, lipY, pastFace, HALF_WIDTH, hop, PROFILE, motion);
             if (motion.done) {
                 break;
             }
@@ -80,10 +84,28 @@ class MantleMotionTest {
         final MantleProgress progress = MantleProgress.of(START_Y, START_Y, 65.0, 0.0, -0.6, HALF_WIDTH,
                 PROFILE, new MantleProgress());
         final MantleMotion motion = MantleMotion.plan(progress, START_Y, START_Y, 65.0, -0.6, HALF_WIDTH,
-                PROFILE, new MantleMotion());
+                false, PROFILE, new MantleMotion());
         assertEquals(MantlePhase.REACH, progress.phase);
         assertFalse(motion.holdsVertical, "gravity stays on while standing");
         assertEquals(MantleMotion.MAX_PIN_SPEED, motion.along, 1.0e-12, "toward the face, capped");
+    }
+
+    @Test
+    void hopIsOnlyForLipsPastTheReach() {
+        assertFalse(MantleMotion.needsHop(1.0, 1.0f, PROFILE), "adult, full block");
+        assertTrue(MantleMotion.needsHop(1.0, 0.65f, PROFILE), "juvenile, full block");
+        assertFalse(MantleMotion.needsHop(0.6, 0.65f, PROFILE), "juvenile, low lip");
+    }
+
+    @Test
+    void hopShortensTheRiseWithoutOvershooting() {
+        final Run plain = simulate(65.0, -0.5, false);
+        final Run hop = simulate(65.0, -0.5, true);
+        assertTrue(hop.ticks() < plain.ticks(), hop.ticks() + " vs " + plain.ticks());
+        assertTrue(hop.highestY() <= 65.0 + 1.0e-9, "overshot: " + hop.highestY());
+        assertFalse(hop.enteredWall());
+        assertEquals(MantlePhase.RECOVER, hop.lastPhase());
+        assertEquals(65.0, hop.y(), 1.0e-9);
     }
 
     @Test
