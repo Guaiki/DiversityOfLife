@@ -46,11 +46,22 @@ public final class MantleProfile {
     public final double lipInset;
     /** How far past the face the front paws plant on the top by the end of the crest. */
     public final double plantDepth;
+    /** Grips each front paw takes on the way up, the last one being the lip. */
+    public final int gripsPerHand;
+    /** First grips on the face, as shares of the lip's height: the leading paw's and the other's. */
+    public final double firstGripHigh;
+    public final double firstGripLow;
+    /** How far a paw leaves the face in the middle of a swing between grips. */
+    public final double swingOut;
 
     private MantleProfile(Builder b) {
         if (!(b.minMantleHeight > 0.0 && b.maxMantleHeight >= b.minMantleHeight && b.probeDistance > 0.0)) {
             throw new IllegalArgumentException("Bad mantle heights: min " + b.minMantleHeight
                     + ", max " + b.maxMantleHeight + ", probe " + b.probeDistance);
+        }
+        if (!(b.gripsPerHand > 0 && b.firstGripLow >= 0.0 && b.firstGripHigh <= 1.0 && b.swingOut >= 0.0)) {
+            throw new IllegalArgumentException("Bad mantle grips: " + b.gripsPerHand + " per paw, first at "
+                    + b.firstGripHigh + "/" + b.firstGripLow + ", swing out " + b.swingOut);
         }
         if (!(b.reachTicks > 0 && b.crestStart > 0.0 && b.crestStart < 1.0 && b.recoverDistance > 0.0
                 && b.riseTicks > 0 && b.crestTicks > 0 && b.recoverTicks > 0
@@ -76,6 +87,10 @@ public final class MantleProfile {
         this.crestPitch = b.crestPitch;
         this.lipInset = b.lipInset;
         this.plantDepth = b.plantDepth;
+        this.gripsPerHand = b.gripsPerHand;
+        this.firstGripHigh = b.firstGripHigh;
+        this.firstGripLow = b.firstGripLow;
+        this.swingOut = b.swingOut;
     }
 
     /** Starts from the civet's numbers. */
@@ -100,6 +115,10 @@ public final class MantleProfile {
         private float crestPitch = 20.0f;
         private double lipInset = 0.06;
         private double plantDepth = 0.25;
+        private int gripsPerHand = 1;
+        private double firstGripHigh = 0.75;
+        private double firstGripLow = 0.5;
+        private double swingOut = 0.12;
 
         private Builder() {
         }
@@ -158,6 +177,20 @@ public final class MantleProfile {
         public Builder paws(double lipInset, double plantDepth) {
             this.lipInset = lipInset;
             this.plantDepth = plantDepth;
+            return this;
+        }
+
+        /**
+         * @param perHand   grips each front paw takes, the lip being the last
+         * @param firstHigh first grip of the leading paw, as a share of the lip's height
+         * @param firstLow  first grip of the other paw
+         * @param swingOut  how far a paw leaves the face mid-swing, blocks
+         */
+        public Builder grips(int perHand, double firstHigh, double firstLow, double swingOut) {
+            this.gripsPerHand = perHand;
+            this.firstGripHigh = firstHigh;
+            this.firstGripLow = firstLow;
+            this.swingOut = swingOut;
             return this;
         }
 

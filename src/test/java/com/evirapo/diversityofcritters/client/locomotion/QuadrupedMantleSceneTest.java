@@ -135,10 +135,14 @@ class QuadrupedMantleSceneTest {
             final double miss = distanceUnits(leg, s.anchorX, s.anchorY, s.anchorZ, y);
             assertTrue(miss < 0.5, LEGS[leg] + " off its footing by " + miss + "u");
         }
+        // Past half the rise the leading paw has reached the lip; the other is climbing to it.
+        final LocomotionState.LegState leading = this.state.legs()[FRONT[0]];
+        assertEquals(1.0, leading.anchorY, 1.0e-9, "leading paw on the lip");
+        assertEquals(1.0 + PROFILE.lipInset, leading.anchorZ, 1.0e-9, "just past the face");
+        final LocomotionState.LegState trailing = this.state.legs()[FRONT[1]];
+        assertTrue(trailing.anchorY < 1.0 && trailing.anchorY > 0.4, "trailing paw on its way: " + trailing.anchorY);
         for (int leg : FRONT) {
             final LocomotionState.LegState s = this.state.legs()[leg];
-            assertEquals(1.0, s.anchorY, 1.0e-9, "front anchor on the lip");
-            assertEquals(1.0 + PROFILE.lipInset, s.anchorZ, 1.0e-9, "just past the face");
             // Whatever the paw cannot reach, it reports.
             final double miss = distanceUnits(leg, s.anchorX, s.anchorY, s.anchorZ, y);
             assertEquals(Math.max(s.anchorShortfall, 0.0f), miss, 0.3, LEGS[leg] + " shortfall vs actual miss");

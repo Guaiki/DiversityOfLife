@@ -16,11 +16,13 @@ import org.jetbrains.annotations.Nullable;
  *
  * <table>
  *   <tr><th>Phase</th><th>Front paws</th><th>Hind legs</th><th>Body</th></tr>
- *   <tr><td>REACH</td><td>leave the ground for the lip</td><td>anchored where they stood</td><td>0 to reach pitch</td></tr>
- *   <tr><td>RISE</td><td>on the lip</td><td>anchored</td><td>to rise pitch</td></tr>
+ *   <tr><td>REACH</td><td>leave the ground for their first grips</td><td>anchored where they stood</td><td>0 to reach pitch</td></tr>
+ *   <tr><td>RISE</td><td>climb the face in alternate grips to the lip</td><td>anchored</td><td>to rise pitch</td></tr>
  *   <tr><td>CREST</td><td>from the lip onto the top</td><td>let go, off the ground</td><td>to crest pitch</td></tr>
  *   <tr><td>RECOVER</td><td>hand back to the ground path</td><td>ground path</td><td>level</td></tr>
  * </table>
+ *
+ * <p>Where the front paws go is {@link GripPlanner}'s call; the first front leg in the rig leads.
  *
  * <p>The server raises the entity through RISE and CREST. Until the crest the body stands on its
  * hind legs at the foot of the wall, so the pose holds the body down by as much as the entity has
@@ -37,6 +39,8 @@ public final class MantleDriver {
 
     private final MantleProfile profile;
     private final boolean[] rear;
+    private final GripPlanner.Hand leading = new GripPlanner.Hand();
+    private final GripPlanner.Hand trailing = new GripPlanner.Hand();
 
     /**
      * @param rear per leg, in the rig's order: whether it is a hind leg
@@ -74,11 +78,14 @@ public final class MantleDriver {
             state.mantlePitch = (float) -Math.toRadians(
                     MantleProgress.pitchDegrees(progress.phase, progress.t, this.profile));
             state.mantleLock = lock(progress);
+            GripPlanner.plan(progress.phase, progress.t, mantle.lipY - mantle.startY, this.profile,
+                    this.leading, this.trailing);
+            int fronts = 0;
             for (int i = 0; i < legs.length; i++) {
                 if (this.rear[i]) {
                     hind(legs[i], progress);
                 } else {
-                    this.front(legs[i], progress, mantle);
+                    front(legs[i], progress.phase, fronts++ == 0 ? this.leading : this.trailing, mantle);
                 }
             }
         } else if (state.mantleActive) {
@@ -130,39 +137,23 @@ public final class MantleDriver {
         }
     }
 
-    /** Front paw: up to the lip, then onto the top, then back to the ground path. */
-    private void front(LocomotionState.LegState leg, MantleProgress progress, MantleState mantle) {
-        final float s = MantleProgress.smoothstep(progress.t);
-        final double depth;
-        switch (progress.phase) {
-            case REACH -> {
-                leg.mantleWeight = s;
-                leg.contactOverride = 0.0f;
-                depth = this.profile.lipInset;
-            }
-            case RISE -> {
-                leg.mantleWeight = 1.0f;
-                leg.contactOverride = 1.0f;
-                depth = this.profile.lipInset;
-            }
-            case CREST -> {
-                leg.mantleWeight = 1.0f;
-                leg.contactOverride = 1.0f;
-                depth = this.profile.lipInset + (this.profile.plantDepth - this.profile.lipInset) * s;
-            }
-            case RECOVER -> {
-                leg.mantleWeight = 1.0f - s;
-                leg.contactOverride = LocomotionState.LegState.NO_OVERRIDE;
-                depth = this.profile.plantDepth;
-            }
+    /** Front paw: where the grip planner puts it, planted unless it is swinging. */
+    private static void front(LocomotionState.LegState leg, MantlePhase phase, GripPlanner.Hand hand,
+                              MantleState mantle) {
+        leg.mantleWeight = hand.anchorWeight;
+        switch (phase) {
+            case REACH -> leg.contactOverride = 0.0f;
+            case RISE -> leg.contactOverride = 1.0f - hand.swingWeight;
+            case CREST -> leg.contactOverride = 1.0f;
+            case RECOVER -> leg.contactOverride = LocomotionState.LegState.NO_OVERRIDE;
             default -> {
                 leg.mantleWeight = 0.0f;
                 return;
             }
         }
-        // Onto the lip straight ahead of where the paw is, across the face.
+        // Straight ahead of where the paw is, across the face.
         final Direction facing = mantle.facing;
-        final double along = mantle.wallCoord() + (facing.getStepX() + facing.getStepZ()) * depth;
+        final double along = mantle.wallCoord() + (facing.getStepX() + facing.getStepZ()) * hand.depth;
         if (facing.getStepX() != 0) {
             leg.anchorX = along;
             leg.anchorZ = leg.soleZ;
@@ -170,7 +161,7 @@ public final class MantleDriver {
             leg.anchorX = leg.soleX;
             leg.anchorZ = along;
         }
-        leg.anchorY = mantle.lipY;
+        leg.anchorY = mantle.startY + hand.height;
     }
 
     /** Hind leg: planted until the crest, then off the ground. */
