@@ -78,6 +78,10 @@ public class CivetModel<T extends CivetEntity> extends HierarchicalModel<T> impl
 				// Starting values, to be tuned by eye with the overlay (F6) and bypass (F9).
 				.stabilise("Head", 0.6F)
 				.lag("Tail", 0.12F, 0.35F, 30.0F)
+				// Over the crest the rigid torso cannot bend: the head dips toward the top and the
+				// tail swings down as a counterweight (xRot + raises a tail, lowers a head).
+				.arch("Head", 0.5F)
+				.arch("Tail", -0.6F)
 				.mantle(MantleProfile.CIVET)
 				.build();
 	}

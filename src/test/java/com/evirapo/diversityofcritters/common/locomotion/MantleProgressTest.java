@@ -105,6 +105,16 @@ class MantleProgressTest {
     }
 
     @Test
+    void archIsStraightWhileRearingAndContinuous() {
+        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.REACH, 0.7f));
+        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.RISE, 1.0f));
+        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.CREST, 0.0f));
+        assertEquals(1.0f, MantleProgress.archShare(MantlePhase.CREST, 1.0f));
+        assertEquals(1.0f, MantleProgress.archShare(MantlePhase.RECOVER, 0.0f));
+        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.RECOVER, 1.0f));
+    }
+
+    @Test
     void phasesFollowEachOtherAsTheBodyRises() {
         MantlePhase last = MantlePhase.REACH;
         for (int step = 0; step <= 100; step++) {

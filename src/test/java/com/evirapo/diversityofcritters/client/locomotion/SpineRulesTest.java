@@ -53,6 +53,53 @@ class SpineRulesTest {
         assertEquals(-0.03f, this.head.xRot, 1.0e-6f);
     }
 
+    @Test
+    void archBendsEachBoneByItsWeight() {
+        final SpineRules.Declarations d = new SpineRules.Declarations();
+        d.arch("Head", 0.5f);
+        d.arch("Tail", -0.6f);
+        bind(d).write(this.state, 0.0f, 0.0f, 0.0f, 1.0f, 0.4f);
+        assertEquals(0.2f, this.head.xRot, 1.0e-6f);
+        assertEquals(-0.24f, this.tail.xRot, 1.0e-6f);
+        assertEquals(0.0f, this.body.xRot, 0.0f);
+    }
+
+    @Test
+    void noArchLeavesTheOtherRulesExactlyAsBefore() {
+        final SpineRules.Declarations plain = new SpineRules.Declarations();
+        plain.stabilise("Head", 0.6f);
+        plain.lag("Tail", 0.1f, 0.5f, 30.0f);
+        final SpineRules withoutArch = bind(plain);
+
+        final SpineRules.Declarations arched = new SpineRules.Declarations();
+        arched.stabilise("Head", 0.6f);
+        arched.lag("Tail", 0.1f, 0.5f, 30.0f);
+        arched.arch("Head", 0.5f);
+        arched.arch("Tail", -0.6f);
+        final SpineRules withArch = bind(arched);
+
+        final float[] expected = run(withoutArch, new LocomotionState());
+        final float[] actual = run(withArch, new LocomotionState());
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals(Float.floatToIntBits(expected[i]), Float.floatToIntBits(actual[i]), "value " + i);
+        }
+    }
+
+    /** A few frames of tilting and turning; returns head and tail rotations. */
+    private float[] run(SpineRules rules, LocomotionState state) {
+        for (ModelPart part : List.of(this.head, this.tail, this.body)) {
+            part.resetPose();
+        }
+        rules.track(state, 0.0f, 0.0f, 0.0f, DT);
+        for (int i = 1; i <= 5; i++) {
+            this.head.resetPose();
+            this.tail.resetPose();
+            rules.track(state, 0.05f * i, 0.02f * i, 10.0f * i, DT);
+            rules.write(state, 0.05f * i, 0.02f * i, 10.0f * i, 1.0f, 0.0f);
+        }
+        return new float[]{this.head.xRot, this.head.yRot, this.head.zRot, this.tail.xRot, this.tail.yRot, this.tail.zRot};
+    }
+
     private SpineRules tailLag(float maxDegrees) {
         final SpineRules.Declarations d = new SpineRules.Declarations();
         d.lag("Tail", 0.1f, 0.5f, maxDegrees);

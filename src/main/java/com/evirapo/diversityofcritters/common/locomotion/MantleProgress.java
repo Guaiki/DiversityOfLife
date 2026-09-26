@@ -72,6 +72,18 @@ public final class MantleProgress {
         };
     }
 
+    /**
+     * How much of the profile's arch the spine takes, in [0, 1]: straight while the body rears up,
+     * bending over the crest to the most on top, straightening out as the body walks on.
+     */
+    public static float archShare(MantlePhase phase, float t) {
+        return switch (phase) {
+            case CREST -> smoothstep(t);
+            case RECOVER -> 1.0f - smoothstep(t);
+            default -> 0.0f;
+        };
+    }
+
     public static float smoothstep(float x) {
         final float t = x < 0.0f ? 0.0f : Math.min(x, 1.0f);
         return t * t * (3.0f - 2.0f * t);

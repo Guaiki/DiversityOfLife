@@ -42,6 +42,8 @@ public final class MantleProfile {
     public final float reachPitch;
     public final float risePitch;
     public final float crestPitch;
+    /** Spine curvature at its most, on top of the crest (see MantleProgress.archShare). */
+    public final float archDegrees;
     /** How far past the face the front paws grip the lip. */
     public final double lipInset;
     /** How far past the face the front paws plant on the top by the end of the crest. */
@@ -85,6 +87,7 @@ public final class MantleProfile {
         this.reachPitch = b.reachPitch;
         this.risePitch = b.risePitch;
         this.crestPitch = b.crestPitch;
+        this.archDegrees = b.archDegrees;
         this.lipInset = b.lipInset;
         this.plantDepth = b.plantDepth;
         this.gripsPerHand = b.gripsPerHand;
@@ -113,6 +116,7 @@ public final class MantleProfile {
         private float reachPitch = 35.0f;
         private float risePitch = 80.0f;
         private float crestPitch = 20.0f;
+        private float archDegrees = 25.0f;
         private double lipInset = 0.06;
         private double plantDepth = 0.25;
         private int gripsPerHand = 1;
@@ -171,6 +175,11 @@ public final class MantleProfile {
             this.reachPitch = reach;
             this.risePitch = rise;
             this.crestPitch = crest;
+            return this;
+        }
+
+        public Builder arch(float degrees) {
+            this.archDegrees = degrees;
             return this;
         }
 

@@ -31,6 +31,8 @@ public final class LocomotionState {
     public final Spring mantleAuthority = new Spring(0.2f);
     /** Body pitch the mantle asks for, radians, model convention (negative lifts the head end). */
     public float mantlePitch;
+    /** Spine curvature the mantle asks for, radians, before its authority. */
+    public float mantleArch;
     /** Share of the body's rise since the start that the pose holds back down, in [0, 1]. */
     public float mantleLock;
     /** Pelvis sink the mantle asks for this frame, model units, model +Y down. */

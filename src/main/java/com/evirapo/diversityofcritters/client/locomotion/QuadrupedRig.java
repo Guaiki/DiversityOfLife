@@ -268,7 +268,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         }
 
         // --- Head and tail answer what was done to the body.
-        this.spine.write(state, pitch, roll, state.bodyYaw, gate);
+        this.spine.write(state, pitch, roll, state.bodyYaw, gate, state.mantleArch * mantle * gate);
     }
 
     /**
@@ -469,6 +469,15 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         /** How far an anchored leg may lengthen or shorten, as a fraction of its length. */
         public Builder<T> anchorStretchLimit(float fraction) {
             this.anchorStretchLimit = fraction;
+            return this;
+        }
+
+        /**
+         * The bone takes {@code weight} of the spine curvature a mantle asks for, on its xRot. With
+         * a rigid torso: head toward the top, tail as a counterweight.
+         */
+        public Builder<T> arch(String boneName, float weight) {
+            this.spine.arch(boneName, weight);
             return this;
         }
 
