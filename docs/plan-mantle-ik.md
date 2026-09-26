@@ -12,7 +12,7 @@
 | 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
 | 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | 🟨 Recorte MVP hecho (3.1, 3.3–3.6; 133 tests). Sin probar en juego hasta la Fase 4. Pendientes 3.2, 3.7, 3.8, 3.9 |
-| 4 — Lado servidor: controlador de mantle | 🟨 Código y tests (138 en verde). Falta la prueba en juego (`/civet_debug mantle`) |
+| 4 — Lado servidor: controlador de mantle | ✅ Hecho. Probado en juego (H2 validado) |
 | 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
 | 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
 
@@ -359,7 +359,7 @@ Los umbrales viven en `MantleProfile`, no en el código. REACH es la única fase
 | 3.6 | Compensación de pivote | El pitch se aplica en `BandedPlamCivet` (pivote a ras de suelo). El driver traslada la pelvis `R(pitch)·p − p`, con `p` = punto medio de las caderas traseras, para que el giro ocurra alrededor de ellas. Las traseras ancladas (3.3) absorben el error residual. |
 | 3.7 | `SpineRules.ARCH` | Nueva regla: curvatura escalar repartida por peso: `.arch("Head", -0.5f).arch("Tail", 0.6f)`. En el civet (torso rígido) el arqueo es cabeza hacia la cima + cola de contrapeso. Test: con arco 0 las demás reglas dan exactamente lo mismo que antes. |
 | 3.8 | Micro-salto | Si `lipHeight > profile.reach` (juvenil, o adulto con labio a 1.0 y mala geometría): el servidor mete un impulso al final de RISE (§7.3). En cliente no cambia nada: la Y sube más rápido y las fases la siguen. |
-| 3.9 | Hack de 90° | No aplica al mantle: `renderToBuffer` sólo rota para `CLIMB_UP/DOWN/HANG`, y el mantle nunca pone esos estados (§7.3). Verificar que no se cruzan. |
+| 3.9 | Hack de 90° | No aplica al mantle: `renderToBuffer` sólo rota para `CLIMB_UP/DOWN/HANG`, y el mantle nunca pone esos estados (§7.3). Verificar que no se cruzan. **Hecho:** revisados todos los `setClimbState`; ninguno se alcanza con mantle activo (el move control devuelve antes, `updateClimbState` se salta, `CivetClimbGoal` exige `CLIMB_UP`). Cierre: el controlador no arranca si ya trepa (el comando podía) y aborta si aparece un estado de trepada. |
 
 **Recorte para el MVP:** 3.1 + 3.3 sin agarres (manos directas al labio) + 3.4 + 3.5 + 3.6. Sin 3.2 ni 3.7.
 
@@ -435,7 +435,8 @@ fase ya es la misma en ambos lados.
   `continuesUp`, no está libre). `/civet_debug` muestra `mantling=`.
 - Pendiente de la 3.8 (micro-salto): el juvenil. No se ha tocado.
 
-**Prueba en juego pendiente** (F6 para ver la fila `mantle:`)
+**Prueba en juego** — hecha y correcta (H2): la maniobra completa funciona con `/civet_debug mantle` y desde el
+path. Lista usada:
 1. Civet adulto frente a un bloque, `/civet_debug mantle <dirección>`: REACH → RISE → CREST → RECOVER; manos
    al labio, traseras en el suelo hasta la cresta, termina encima. Nada de `[Mantle] ... gravity` en el log.
 2. Losa, escalera, valla, muro de 2, tronco de 3: el comando dice por qué no.

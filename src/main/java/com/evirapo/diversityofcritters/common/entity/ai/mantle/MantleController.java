@@ -198,6 +198,10 @@ public final class MantleController {
         if (this.critter.isInWaterOrBubble()) {
             return "in water";
         }
+        if (this.critter.isClimbing()) {
+            // Never both: the climb pose turns the whole model and would fight the mantle's.
+            return "climbing";
+        }
         if (this.critter.isLocomotionSuspended()) {
             return "busy";
         }
@@ -212,6 +216,7 @@ public final class MantleController {
 
     private boolean canMantle() {
         return this.critter.onGround()
+                && !this.critter.isClimbing()
                 && this.critter.hurtTime == 0
                 && !this.critter.isInWaterOrBubble()
                 && !this.critter.isLocomotionSuspended();
