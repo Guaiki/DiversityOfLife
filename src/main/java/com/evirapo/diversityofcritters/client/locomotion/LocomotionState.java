@@ -61,6 +61,11 @@ public final class LocomotionState {
     public String rigName = "?";
     public float debugAuthority;
     public float debugUnitsPerBlock;
+    /** World point the body turned about this frame, while a mantle held the pose. */
+    public boolean debugPivotValid;
+    public double debugPivotX;
+    public double debugPivotY;
+    public double debugPivotZ;
 
     public LegState[] ensureLegs(int count) {
         if (this.legs.length != count) {

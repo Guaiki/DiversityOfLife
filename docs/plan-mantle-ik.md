@@ -13,7 +13,7 @@
 | 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
 | 3 — `MantleDriver` + `GripPlanner` + arqueo | ✅ Código y tests completos (150). MVP probado en juego; falta ver 3.2 (agarres), 3.7 (arqueo) y 3.8 (salto del juvenil) |
 | 4 — Lado servidor: controlador de mantle | ✅ Hecho. Probado en juego (H2 validado) |
-| 5 — Overlay de debug del mantle (en paralelo con 3) | ⬜ Pendiente |
+| 5 — Overlay de debug del mantle (en paralelo con 3) | ✅ Código. Falta verlo en juego |
 | 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
 
 ---
@@ -478,6 +478,19 @@ Sobre el `LocomotionDebug` de la tarea 0.7:
 - Dump F7: una fila por pata con ancla, peso, faltante; una fila de mantle.
 
 Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constante tiene que salir de una captura.
+
+**Notas de lo hecho**
+- Durante el mantle, cara/labio/cima salen del mantle sincronizado (`readMantle`), no de la sonda: pasada la
+  subida la sonda ya no ve pared. Cara en azul desde la Y de inicio, labio en blanco, cima en verde hasta
+  `plantDepth`. Sin mantle se sigue dibujando la sonda (verde/naranja) como en la Fase 1.
+- Cruz por ancla: verde si la suela llega (|faltante| < 0.25 u), roja si no; magenta si es el pin de F10. El
+  cubo cian de siempre es la suela alcanzada.
+- Pivote: cubo naranja en las caderas ponderadas sobre las que gira el cuerpo (bajo mantle, las traseras). El
+  rig sólo lo calcula mientras el overlay o un dump capturan.
+- Texto: la fila `mantle:` suma arco y `lip +x / reach y` (con `HOP` si toca salto). Dump F7: ya tenía una fila
+  por pata con ancla/peso/faltante y la fila de mantle.
+- El arco de columna no se dibuja en el mundo: se lee en la fila `mantle:` y en la cabeza/cola del modelo.
+- Perfil usado por el overlay: el del civet (como la sonda de la Fase 1), hasta que haya más especies.
 
 ---
 

@@ -207,6 +207,9 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         float meanX = 0.0f;
         float meanY = 0.0f;
         float meanZ = 0.0f;
+        float pivotX = 0.0f;
+        float pivotY = 0.0f;
+        float pivotZ = 0.0f;
         for (int i = 0; i < count; i++) {
             final ModelPart hip = this.legs.get(i).hip();
             QuadrupedSolver.hipShift(this.rotation, this.pelvis.xRot, this.pelvis.yRot, this.pelvis.zRot,
@@ -223,6 +226,9 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             meanX += this.shiftX[i] * w;
             meanY += this.shiftY[i] * w;
             meanZ += this.shiftZ[i] * w;
+            pivotX += hip.x * w;
+            pivotY += hip.y * w;
+            pivotZ += hip.z * w;
             totalWeight += w;
         }
         meanX /= totalWeight;
@@ -234,6 +240,15 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.pelvis.x -= meanX;
         this.pelvis.y += drop - meanY + bodyDrop;
         this.pelvis.z -= meanZ;
+
+        state.debugPivotValid = mantle > 0.01f && LocomotionDebugFlags.capturing();
+        if (state.debugPivotValid) {
+            this.space.toWorld(this.pelvisChain, pivotX / totalWeight, pivotY / totalWeight, pivotZ / totalWeight,
+                    this.world);
+            state.debugPivotX = this.world.x;
+            state.debugPivotY = this.world.y;
+            state.debugPivotZ = this.world.z;
+        }
 
         // --- Anchored legs: the pelvis goes first, by what they cannot reach.
         final float anchorDown = this.anchorPelvis(legStates, gate);

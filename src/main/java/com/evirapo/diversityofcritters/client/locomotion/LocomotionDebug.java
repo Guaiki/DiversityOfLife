@@ -3,7 +3,10 @@ package com.evirapo.diversityofcritters.client.locomotion;
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.locomotion.LedgeSample;
 import com.evirapo.diversityofcritters.common.locomotion.LedgeSampler;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
+import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -47,6 +50,9 @@ import java.util.Locale;
  *   <li><b>Bypass</b> (F9): fades every rig out, to compare against the pose as animated.</li>
  *   <li><b>Pin</b> (F10): anchors each rig's first leg where its sole is, to check that an
  *       anchored foot stays put in the world (magenta cross) while the body moves.</li>
+ *   <li><b>Mantle</b> (with the overlay): the face, lip and top being climbed; a cross per anchored
+ *       paw, green when reached and red when short; the body's pivot in orange. The panel adds
+ *       phase, progress, pitch, arch and the lip's height against the critter's reach.</li>
  * </ul>
  *
  * <p>The keys are bound by default only in a development environment; in a release build they
@@ -66,6 +72,9 @@ public final class LocomotionDebug {
     public static final KeyMapping PIN = key("pin", GLFW.GLFW_KEY_F10);
 
     private static final LedgeSample LEDGE = new LedgeSample();
+    private static final MantleState MANTLE = new MantleState();
+    /** A paw within this of its anchor, in model units, counts as there. */
+    private static final float REACHED = 0.25f;
 
     private LocomotionDebug() {
     }
@@ -152,10 +161,21 @@ public final class LocomotionDebug {
                     mark(poseStack, lines, leg.debugCorrectedSoleX, leg.debugCorrectedSoleY, leg.debugCorrectedSoleZ,
                             MARK * 0.7, 0.2f, 1.0f, 1.0f);
                     if (leg.anchorWeight > 0.0f) {
-                        cross(poseStack, lines, leg.anchorX, leg.anchorY, leg.anchorZ, MARK * 3.0, 1.0f, 0.2f, 1.0f);
+                        // Magenta when pinned, else green when the paw gets there and red when short.
+                        final boolean reached = Math.abs(leg.anchorShortfall) < REACHED;
+                        final float r = leg.debugPinned ? 1.0f : reached ? 0.2f : 1.0f;
+                        final float g = leg.debugPinned ? 0.2f : reached ? 1.0f : 0.2f;
+                        final float b = leg.debugPinned ? 1.0f : 0.2f;
+                        cross(poseStack, lines, leg.anchorX, leg.anchorY, leg.anchorZ, MARK * 3.0, r, g, b);
                     }
                 }
-                drawLedge(poseStack, lines, entity);
+                if (state.debugPivotValid) {
+                    mark(poseStack, lines, state.debugPivotX, state.debugPivotY, state.debugPivotZ, MARK * 1.5,
+                            1.0f, 0.6f, 0.1f);
+                }
+                if (!drawMantle(poseStack, lines, entity)) {
+                    drawLedge(poseStack, lines, entity);
+                }
             });
             poseStack.popPose();
             buffers.endBatch(RenderType.lines());
@@ -207,6 +227,53 @@ public final class LocomotionDebug {
         LedgeSampler.sample(entity.level(), entity.position(), yaw, entity.getBbWidth() * 0.5f,
                 entity.getBbHeight(), MantleProfile.CIVET, LEDGE);
         return LEDGE;
+    }
+
+    /**
+     * While mantling, the ledge as the mantle knows it: the probe no longer sees the wall once the
+     * body has risen past it. Face in blue from where the body started, lip in white, top in green.
+     *
+     * @return false when there is no mantle to draw
+     */
+    private static boolean drawMantle(PoseStack poseStack, VertexConsumer lines, Entity entity) {
+        if (!(entity instanceof ILocomotionSubject subject) || !subject.readMantle(MANTLE)) {
+            return false;
+        }
+        final double half = entity.getBbWidth() * 0.5;
+        final int stepX = MANTLE.facing.getStepX();
+        final int stepZ = MANTLE.facing.getStepZ();
+        final double wall = MANTLE.wallCoord();
+        final double thin = 0.003;
+        final double top = MantleProfile.CIVET.plantDepth;
+        if (stepX != 0) {
+            final double z = entity.getZ();
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(wall - thin, MANTLE.startY, z - half,
+                    wall + thin, MANTLE.lipY, z + half), 0.3f, 0.5f, 1.0f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(wall, MANTLE.lipY - thin, z - half,
+                    wall + stepX * 0.02, MANTLE.lipY + thin, z + half), 1.0f, 1.0f, 1.0f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(wall, MANTLE.lipY, z - half,
+                    wall + stepX * top, MANTLE.lipY + thin, z + half), 0.2f, 1.0f, 0.2f, 1.0f);
+        } else {
+            final double x = entity.getX();
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - half, MANTLE.startY, wall - thin,
+                    x + half, MANTLE.lipY, wall + thin), 0.3f, 0.5f, 1.0f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - half, MANTLE.lipY - thin, wall,
+                    x + half, MANTLE.lipY + thin, wall + stepZ * 0.02), 1.0f, 1.0f, 1.0f, 1.0f);
+            LevelRenderer.renderLineBox(poseStack, lines, new AABB(x - half, MANTLE.lipY, wall,
+                    x + half, MANTLE.lipY + thin, wall + stepZ * top), 0.2f, 1.0f, 0.2f, 1.0f);
+        }
+        return true;
+    }
+
+    /** Lip height against what the critter reaches without a hop, while mantling. */
+    private static String describeReach(Entity entity) {
+        if (!(entity instanceof ILocomotionSubject subject) || !subject.readMantle(MANTLE)) {
+            return "";
+        }
+        final float growth = entity instanceof DiverseCritter critter ? critter.growthScale() : 1.0f;
+        final double lip = MANTLE.lipY - MANTLE.startY;
+        final double reach = MantleProfile.CIVET.reach * growth;
+        return String.format(Locale.ROOT, "  lip +%.2f / reach %.2f%s", lip, reach, lip > reach ? " HOP" : "");
     }
 
     /** The wall's face across the body's width, and its lip: green if it can be mantled, orange if not. */
@@ -303,10 +370,10 @@ public final class LocomotionDebug {
         }
         lines[lines.length - 2] = describeLedge(entity);
         lines[lines.length - 1] = String.format(Locale.ROOT,
-                "mantle: %s  t %.2f  h %.2f  authority %.2f  pitch %+.1f°  lock %.2f  sink %+.2fu",
+                "mantle: %s  t %.2f  h %.2f  authority %.2f  pitch %+.1f°  arch %+.1f°  lock %.2f  sink %+.2fu%s",
                 state.mantleProgress.phase, state.mantleProgress.t, state.mantleProgress.h,
-                state.mantleAuthority.value(), Math.toDegrees(state.mantlePitch), state.mantleLock,
-                state.mantleBodyDrop);
+                state.mantleAuthority.value(), Math.toDegrees(state.mantlePitch), Math.toDegrees(state.mantleArch),
+                state.mantleLock, state.mantleBodyDrop, describeReach(entity));
         return lines;
     }
 
