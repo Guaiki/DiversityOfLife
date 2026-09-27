@@ -525,8 +525,9 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.
 3. Planear, trepar un tronco alto, dormir, comer: rig apagado (gate 0).
-4. `/civet_debug mantle` no sirve (busca civets): dejar que el path suba a un bloque (comida encima). El salto
-   del final de la subida debe verse también en el adulto.
+4. `/civet_debug mantle <dirección>` (ahora elige el critter más cercano que pueda hacer mantle, de cualquier
+   especie) y también por path (comida encima de un bloque). El salto del final de la subida debe verse
+   también en el adulto.
 
 ---
 
