@@ -517,6 +517,15 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             return this;
         }
 
+        /**
+         * As {@link #arch(String, float)}, with a different weight while the spine extends (the
+         * body rearing up) than while it flexes (over the top).
+         */
+        public Builder<T> arch(String boneName, float flexWeight, float extendWeight) {
+            this.spine.arch(boneName, flexWeight, extendWeight);
+            return this;
+        }
+
         /** Lets the rig pose the body climbing a ledge, with the species' numbers. */
         public Builder<T> mantle(MantleProfile profile) {
             this.mantleProfile = profile;

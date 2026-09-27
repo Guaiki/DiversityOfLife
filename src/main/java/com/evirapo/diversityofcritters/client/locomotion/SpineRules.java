@@ -19,8 +19,9 @@ import java.util.function.Function;
  *   <li><b>LAG</b>: the bone follows the body's tilt and turning late and settles with a little
  *       overshoot, so a tail trails a turn instead of being welded to the rump.</li>
  *   <li><b>ARCH</b>: a manoeuvre bends the spine by one scalar curvature, shared out by weight:
- *       each arched bone's {@code xRot} gains curvature × weight. With a rigid torso the bend lives
- *       in the head and tail.</li>
+ *       each arched bone's {@code xRot} gains curvature × weight, with one weight for flexing
+ *       (positive curvature) and another for extending (negative). With a rigid torso the bend
+ *       lives in the head and tail.</li>
  * </ul>
  *
  * <p>Declared on a rig builder, bound once to the model's bones; per-entity memory lives in
@@ -33,7 +34,8 @@ public final class SpineRules {
     enum Kind { STABILISE, LAG, ARCH }
 
     /** What a builder asked for, before any bone is resolved. */
-    record Declaration(Kind kind, String boneName, float fraction, float halfLife, float damping, float maxDegrees) {
+    record Declaration(Kind kind, String boneName, float fraction, float halfLife, float damping, float maxDegrees,
+                       float extendFraction) {
     }
 
     /** Declarations collected by a rig builder. */
@@ -41,15 +43,19 @@ public final class SpineRules {
         private final List<Declaration> declared = new ArrayList<>();
 
         public void stabilise(String bone, float fraction) {
-            this.declared.add(new Declaration(Kind.STABILISE, bone, fraction, 0.0f, 0.0f, 0.0f));
+            this.declared.add(new Declaration(Kind.STABILISE, bone, fraction, 0.0f, 0.0f, 0.0f, 0.0f));
         }
 
         public void lag(String bone, float halfLifeSeconds, float damping, float maxDegrees) {
-            this.declared.add(new Declaration(Kind.LAG, bone, 0.0f, halfLifeSeconds, damping, maxDegrees));
+            this.declared.add(new Declaration(Kind.LAG, bone, 0.0f, halfLifeSeconds, damping, maxDegrees, 0.0f));
         }
 
         public void arch(String bone, float weight) {
-            this.declared.add(new Declaration(Kind.ARCH, bone, weight, 0.0f, 0.0f, 0.0f));
+            this.arch(bone, weight, weight);
+        }
+
+        public void arch(String bone, float flexWeight, float extendWeight) {
+            this.declared.add(new Declaration(Kind.ARCH, bone, flexWeight, 0.0f, 0.0f, 0.0f, extendWeight));
         }
 
         /**
@@ -90,6 +96,8 @@ public final class SpineRules {
         final float halfLife;
         final float damping;
         final float maxRadians;
+        /** ARCH: the weight while the spine extends; {@link #fraction} is the one while it flexes. */
+        final float extendFraction;
         /** STABILISE: the fraction this bone itself gives back, after its ancestors. */
         float stabiliseShare;
 
@@ -100,6 +108,7 @@ public final class SpineRules {
             this.halfLife = declaration.halfLife();
             this.damping = declaration.damping();
             this.maxRadians = (float) Math.toRadians(declaration.maxDegrees());
+            this.extendFraction = declaration.extendFraction();
             this.stabiliseShare = declaration.fraction();
         }
     }
@@ -167,7 +176,7 @@ public final class SpineRules {
             final ModelPart bone = rule.bone;
             if (rule.kind == Kind.ARCH) {
                 if (arch != 0.0f) {
-                    bone.xRot += arch * rule.fraction;
+                    bone.xRot += arch * (arch > 0.0f ? rule.fraction : rule.extendFraction);
                 }
                 continue;
             }

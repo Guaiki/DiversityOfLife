@@ -65,6 +65,16 @@ class SpineRulesTest {
     }
 
     @Test
+    void extendingUsesItsOwnWeight() {
+        final SpineRules.Declarations d = new SpineRules.Declarations();
+        d.arch("Head", 0.5f);
+        d.arch("Tail", -0.6f, 0.0f);
+        bind(d).write(this.state, 0.0f, 0.0f, 0.0f, 1.0f, -0.4f);
+        assertEquals(-0.2f, this.head.xRot, 1.0e-6f, "the head lifts while the spine extends");
+        assertEquals(0.0f, this.tail.xRot, 0.0f, "the tail only counterweights a flex");
+    }
+
+    @Test
     void noArchLeavesTheOtherRulesExactlyAsBefore() {
         final SpineRules.Declarations plain = new SpineRules.Declarations();
         plain.stabilise("Head", 0.6f);

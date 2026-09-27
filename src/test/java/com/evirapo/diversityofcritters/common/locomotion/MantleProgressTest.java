@@ -105,13 +105,17 @@ class MantleProgressTest {
     }
 
     @Test
-    void archIsStraightWhileRearingAndContinuous() {
-        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.REACH, 0.7f));
-        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.RISE, 1.0f));
-        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.CREST, 0.0f));
-        assertEquals(1.0f, MantleProgress.archShare(MantlePhase.CREST, 1.0f));
-        assertEquals(1.0f, MantleProgress.archShare(MantlePhase.RECOVER, 0.0f));
-        assertEquals(0.0f, MantleProgress.archShare(MantlePhase.RECOVER, 1.0f));
+    void archExtendsWhileRearingFlexesOverTheCrestAndIsContinuous() {
+        final MantleProfile profile = MantleProfile.builder().arch(25.0f, 30.0f).build();
+        final MantlePhase[] order = {MantlePhase.REACH, MantlePhase.RISE, MantlePhase.CREST, MantlePhase.RECOVER};
+        assertEquals(0.0f, MantleProgress.archDegrees(MantlePhase.REACH, 0.0f, profile));
+        for (int i = 0; i + 1 < order.length; i++) {
+            assertEquals(MantleProgress.archDegrees(order[i], 1.0f, profile),
+                    MantleProgress.archDegrees(order[i + 1], 0.0f, profile), 1.0e-5f, order[i] + " into " + order[i + 1]);
+        }
+        assertEquals(-30.0f, MantleProgress.archDegrees(MantlePhase.RISE, 0.5f, profile), 1.0e-5f, "head up while rearing");
+        assertEquals(25.0f, MantleProgress.archDegrees(MantlePhase.CREST, 1.0f, profile), 1.0e-5f, "head down on top");
+        assertEquals(0.0f, MantleProgress.archDegrees(MantlePhase.RECOVER, 1.0f, profile), 1.0e-6f);
     }
 
     @Test

@@ -73,14 +73,19 @@ public final class MantleProgress {
     }
 
     /**
-     * How much of the profile's arch the spine takes, in [0, 1]: straight while the body rears up,
-     * bending over the crest to the most on top, straightening out as the body walks on.
+     * Spine curvature in degrees; positive bends the head down toward the tail's side of the body.
+     * While the body rears up the spine extends (negative: head up, looking up the face, its
+     * underside clear of the paws reaching past it); over the crest it flexes (positive: head down
+     * toward the top); walking on, it straightens out. Continuous across phase borders.
      */
-    public static float archShare(MantlePhase phase, float t) {
+    public static float archDegrees(MantlePhase phase, float t, MantleProfile profile) {
+        final float s = smoothstep(t);
         return switch (phase) {
-            case CREST -> smoothstep(t);
-            case RECOVER -> 1.0f - smoothstep(t);
-            default -> 0.0f;
+            case NONE -> 0.0f;
+            case REACH -> lerp(s, 0.0f, -profile.rearArchDegrees);
+            case RISE -> -profile.rearArchDegrees;
+            case CREST -> lerp(s, -profile.rearArchDegrees, profile.archDegrees);
+            case RECOVER -> lerp(s, profile.archDegrees, 0.0f);
         };
     }
 

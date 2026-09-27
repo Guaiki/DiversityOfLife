@@ -534,6 +534,21 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   es la diagonal a la delantera que lidera y se mueve a la vez que ella (marcha diagonal). Nunca dos traseras
   en el aire, nunca dentro de la pared, continuo entre fases (tests).
 
+- ¿Se abrían las patas para no hundirse en el cuerpo? No: el rig no tiene colisión con su propio cuerpo; la
+  apertura era el fallo de `atan2`. Pero al ir recta, la pata delantera líder **atravesaba la cabeza**
+  (medido en la malla: hasta 1.5 u dentro, por la mitad de la pata, bajo la nuca, al inicio de RISE con el
+  cuerpo a 35°). Una pata rígida que llega alto con el cuerpo poco encabritado apunta a lo largo del cuerpo y
+  su caña cruza la cara inferior de la cabeza. No dependía del arco del swing ni de la altura de los agarres
+  (barrido: siempre +1.5); sí de encabritarse antes y de la cabeza. Solución:
+  - `reachPitch` 35 → 50: el cuerpo se encabrita más antes de que las manos suban.
+  - El arco de columna ahora tiene signo (`MantleProgress.archDegrees`): **extensión** mientras se encabrita
+    (`rearArchDegrees` 70 → la cabeza, con peso 0.5, mira 35° hacia arriba por la pared) y **flexión** sobre
+    la cresta (`archDegrees` 25, como antes). `arch(hueso, pesoFlexión, pesoExtensión)`: la cola sólo hace de
+    contrapeso en la flexión (`.arch("Tail", -0.6, 0)`).
+  - Resultado: la pata pasa 0.6–0.7 u por debajo de la cabeza. `MantleClearanceTest` recorre un mantle
+    completo con la configuración del civet y falla si cualquier punto de la caña delantera entra en la cabeza.
+  - El torso no empeora: las caderas nacen dentro del torso (hasta +1.3 u también en reposo); eso es de la malla.
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

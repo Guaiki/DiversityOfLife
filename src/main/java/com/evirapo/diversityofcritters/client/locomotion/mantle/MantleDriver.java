@@ -120,8 +120,8 @@ public final class MantleDriver {
             state.mantlePitch = (float) -Math.toRadians(
                     MantleProgress.pitchDegrees(progress.phase, progress.t, this.profile));
             state.mantleLock = lock(progress);
-            state.mantleArch = (float) Math.toRadians(this.profile.archDegrees)
-                    * MantleProgress.archShare(progress.phase, progress.t);
+            state.mantleArch = (float) Math.toRadians(
+                    MantleProgress.archDegrees(progress.phase, progress.t, this.profile));
 
             final double lipHeight = mantle.lipY - mantle.startY;
             GripPlanner.plan(progress.phase, progress.t, lipHeight, this.profile, this.leading, this.trailing);

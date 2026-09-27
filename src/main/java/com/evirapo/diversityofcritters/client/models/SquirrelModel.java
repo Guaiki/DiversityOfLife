@@ -101,7 +101,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                 .stabilise("Head", 0.6F)
                 .lag("Tail", 0.1F, 0.3F, 35.0F)
                 .arch("Head", 0.5F)
-                .arch("Tail", -0.6F)
+                .arch("Tail", -0.6F, 0.0F)
                 .mantle(MantleProfile.SQUIRREL)
                 .build();
     }
