@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * A whole mantle the way it plays in game: the server moves the body tick by tick, the client gets
  * its position every few ticks and interpolates it, and the rig poses the model at 60 frames a
- * second. Records every sole and the body's pitch per frame, to find where the motion jerks.
+ * second. Every sole and the body's pitch are recorded per frame; none may jerk.
  */
 class MantleSmoothnessTest {
 
