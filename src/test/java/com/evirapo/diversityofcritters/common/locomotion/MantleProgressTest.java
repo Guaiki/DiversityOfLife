@@ -23,7 +23,7 @@ class MantleProgressTest {
 
     @Test
     void reachCountsTicksWhileStanding() {
-        final MantleProgress p = at(64.0, 3.0);
+        final MantleProgress p = at(64.0, PROFILE.reachTicks * 0.5);
         assertEquals(MantlePhase.REACH, p.phase);
         assertEquals(0.5f, p.t, 1.0e-6f);
         assertEquals(0.0f, p.h, 1.0e-6f);

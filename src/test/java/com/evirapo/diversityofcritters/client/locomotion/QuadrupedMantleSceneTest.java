@@ -138,8 +138,9 @@ class QuadrupedMantleSceneTest {
         }
         // Past half the rise the leading paw has reached the lip; the other is climbing to it.
         final LocomotionState.LegState leading = this.state.legs()[FRONT[0]];
-        assertEquals(1.0, leading.anchorY, 1.0e-9, "leading paw on the lip");
-        assertEquals(1.0 + PROFILE.lipInset, leading.anchorZ, 1.0e-9, "just past the face");
+        // Anchors pass through a float spring: equal to within its precision.
+        assertEquals(1.0, leading.anchorY, 1.0e-6, "leading paw on the lip");
+        assertEquals(1.0 + PROFILE.lipInset, leading.anchorZ, 1.0e-6, "just past the face");
         final LocomotionState.LegState trailing = this.state.legs()[FRONT[1]];
         assertTrue(trailing.anchorY < 1.0 && trailing.anchorY > 0.4, "trailing paw on its way: " + trailing.anchorY);
         for (int leg : FRONT) {
@@ -176,7 +177,7 @@ class QuadrupedMantleSceneTest {
             final LocomotionState.LegState s = this.state.legs()[leg];
             assertTrue(s.anchorY > PROFILE.hindFaceGrip && s.anchorY < 1.0, LEGS[leg] + " up the face: " + s.anchorY);
             assertEquals(1.0 - com.evirapo.diversityofcritters.client.locomotion.mantle.GripPlanner.FACE_GAP,
-                    s.anchorZ, 1.0e-9, LEGS[leg] + " against the face");
+                    s.anchorZ, 1.0e-6, LEGS[leg] + " against the face");
             assertEquals(1.0f, s.contactOverride, 1.0e-6f, LEGS[leg] + " planted on it");
         }
         assertTrue(this.state.mantleLock < 0.5f, "the body is going up with the entity");

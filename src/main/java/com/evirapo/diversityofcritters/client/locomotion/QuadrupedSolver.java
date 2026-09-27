@@ -32,6 +32,9 @@ public final class QuadrupedSolver {
     static final float RELEASE_HALF_LIFE = 0.15f;
     /** Rate at which contact and support weights follow their targets, per second. */
     static final float WEIGHT_RATE = 15.0f;
+    /** Pitch smoothing on terrain, and while a mantle poses the body, seconds. */
+    static final float PITCH_HALF_LIFE = 0.18f;
+    static final float MANTLE_PITCH_HALF_LIFE = 0.08f;
     /** Share of the ideal tilt that actually reaches a foot (the drop limit eats the rest). */
     static final float TILT_EFFICIENCY = 0.85f;
 
@@ -169,6 +172,9 @@ public final class QuadrupedSolver {
             roll *= 1.0f - mantle;
             drop *= 1.0f - mantle;
         }
+        // The terrain pitch is noisy and wants heavy smoothing; a mantle's is already a smooth curve
+        // that has to be followed closely, or the body falls behind the legs placed around it.
+        state.pelvisPitch.setHalfLife(PITCH_HALF_LIFE + (MANTLE_PITCH_HALF_LIFE - PITCH_HALF_LIFE) * mantle);
         updateOrSnap(state.pelvisPitch, pitch, dt, smooth);
         updateOrSnap(state.pelvisRoll, roll, dt, smooth);
         updateOrSnap(state.pelvisDrop, drop, dt, smooth);

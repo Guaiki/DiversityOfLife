@@ -160,7 +160,7 @@ public final class MantleProfile {
         private double minMantleHeight = 0.6;
         private double maxMantleHeight = 1.0625;
         private double probeDistance = 0.5;
-        private int reachTicks = 6;
+        private int reachTicks = 8;
         private double crestStart = 0.55;
         private double recoverDistance = 0.75;
         private int riseTicks = 10;

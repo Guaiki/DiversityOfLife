@@ -192,6 +192,15 @@ public final class LocomotionState {
          * the anchor is out of reach, negative when too close to fold into.
          */
         public float anchorShortfall;
+        /**
+         * The mantle's anchor for this leg, smoothed, relative to the lip block. Targets move in
+         * little kinks (the client interpolates the body in straight segments, a hold on the face
+         * climbs with the hip, one move hands over to the next); following them through a short
+         * critically damped spring takes the kinks out without delaying the phases.
+         */
+        public final Spring mantleAnchorX = new Spring(0.05f);
+        public final Spring mantleAnchorY = new Spring(0.05f);
+        public final Spring mantleAnchorZ = new Spring(0.05f);
         /** Anchor weight the mantle wants for this leg, before its authority. */
         public float mantleWeight;
         /** Where this leg's hip was when the pose was last written under a mantle, world. */

@@ -580,6 +580,21 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   - Test `hindFeetPushAgainstTheWallAllTheWayUp`: a lo largo de toda la cresta, cada trasera apoyada en la cara
     queda a < 0.5 u de su agarre (antes 1.6–7 u; ahora 0–0.27 u).
 
+- El movimiento no se veía fluido. `MantleSmoothnessTest` reproduce la cadena completa: el servidor mueve el
+  cuerpo tick a tick (`MantleMotion`), el cliente recibe la posición cada 3 ticks y la interpola como un mob
+  vanilla, y el rig posa a 60 fps; mide el cambio de velocidad de cada suela de un frame al siguiente (u/frame²)
+  y el del pitch. Punto de partida: CREST máx 9.32 (rms 2.16), RECOVER 4.90, pitch hasta 36° por detrás.
+  - Reparto del desplazamiento de pelvis: una pata cuenta en el promedio en proporción suave a lo que falla (no
+    un sí/no): no hay salto cuando una empieza a fallar.
+  - Anclas suavizadas por pata (muelle críticamente amortiguado de 0.05 s, en coordenadas del bloque del labio
+    para no perder precisión): quita los quiebros que meten la interpolación del cliente por tramos, el agarre
+    que sube con la cadera y los relevos entre movimientos, sin retrasar las fases. (Suavizar la entrada —la Y—
+    se probó y se descartó: retrasaba la entrada en RECOVER y la hacía saltar a mitad.)
+  - Pitch bajo mantle: semivida 0.08 s en vez de 0.18 (mezclada por autoridad); el retraso baja de 36° a ~22°.
+  - `reachTicks` 6 → 8: las manos subían del suelo a la cara en 3 ticks cada una.
+  - Resultado: ninguna fase por encima de 1.9 u/frame² (un swing normal pica en 1–2); CREST rms 0.51, RECOVER
+    máx 0.81. El test falla si cualquier suela pasa de 2.5 o el pitch de 1°/frame².
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

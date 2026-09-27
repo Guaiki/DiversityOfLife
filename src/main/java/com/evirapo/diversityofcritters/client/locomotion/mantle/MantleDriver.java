@@ -150,6 +150,9 @@ public final class MantleDriver {
             place(legs, this.otherFront, progress.phase, this.trailing, mantle, false);
             place(legs, this.leadHind, progress.phase, this.leadingHind, mantle, true);
             place(legs, this.otherHind, progress.phase, this.trailingHind, mantle, true);
+            for (LocomotionState.LegState leg : legs) {
+                smooth(leg, mantle, dt);
+            }
         } else if (state.mantleActive) {
             state.mantleActive = false;
             state.mantleProgress.phase = MantlePhase.NONE;
@@ -290,6 +293,31 @@ public final class MantleDriver {
             default -> 0.0;
         };
     }
+
+    /**
+     * Follows the leg's planned anchor through its spring. A leg the mantle was not holding yet
+     * starts right on its target: while its weight is nil where the anchor sits does not show.
+     */
+    private static void smooth(LocomotionState.LegState leg, MantleState mantle, float dt) {
+        final float x = (float) (leg.anchorX - mantle.lipX);
+        final float y = (float) (leg.anchorY - mantle.lipBlockY);
+        final float z = (float) (leg.anchorZ - mantle.lipZ);
+        if (leg.anchorWeight < SMOOTH_FROM_WEIGHT) {
+            leg.mantleAnchorX.snap(x);
+            leg.mantleAnchorY.snap(y);
+            leg.mantleAnchorZ.snap(z);
+        } else {
+            leg.mantleAnchorX.update(x, dt);
+            leg.mantleAnchorY.update(y, dt);
+            leg.mantleAnchorZ.update(z, dt);
+        }
+        leg.anchorX = mantle.lipX + leg.mantleAnchorX.value();
+        leg.anchorY = mantle.lipBlockY + leg.mantleAnchorY.value();
+        leg.anchorZ = mantle.lipZ + leg.mantleAnchorZ.value();
+    }
+
+    /** Below this anchor weight a leg's anchor jumps to its target instead of following it. */
+    static final float SMOOTH_FROM_WEIGHT = 0.01f;
 
     /** Share of the rise the pose holds down: all of it until the crest, none on top. */
     static float lock(MantleProgress progress) {

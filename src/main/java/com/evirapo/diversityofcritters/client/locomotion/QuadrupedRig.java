@@ -47,8 +47,8 @@ import java.util.Optional;
 @OnlyIn(Dist.CLIENT)
 public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> extends LocomotionRig<T> {
 
-    /** A leg this close to its anchor, in model units, counts as there. */
-    private static final float MISS_EPSILON = 1.0e-3f;
+    /** A leg missing its anchor by this much, model units, counts fully in sharing the pelvis move. */
+    private static final float MISS_SOFT = 1.0f;
     /** Below this the gate is closed enough to leave the pose alone. */
     private static final float GATE_EPSILON = 1.0e-3f;
 
@@ -352,10 +352,10 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             missY += this.target.y * k;
             missZ += this.target.z * k;
             // Only the legs that miss share the move: a leg already at its anchor must not dilute
-            // what another needs (the body closing on a wall its hind feet cannot reach yet).
-            if (Math.abs(miss) > MISS_EPSILON) {
-                total += w;
-            }
+            // what another needs (the body closing on a wall its hind feet cannot reach yet). How
+            // much a leg counts grows with its miss, so a leg starting to miss does not jolt the body.
+            final float missing = Math.min(Math.abs(miss) / MISS_SOFT, 1.0f);
+            total += w * missing * missing * (3.0f - 2.0f * missing);
         }
         // A half-weighted anchor moves the pelvis half as far.
         final float share = 1.0f / Math.max(total, 1.0f);
