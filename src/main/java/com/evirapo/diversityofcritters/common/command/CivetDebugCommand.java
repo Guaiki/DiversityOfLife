@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.common.entity.ai.FindFoodBowlGoal;
 import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.locomotion.LedgeSample;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -56,17 +57,22 @@ public class CivetDebugCommand {
     }
 
     /**
-     * Makes the nearest civet mantle the ledge in front of it, turning it to {@code direction}
-     * first if given. Repeatable captures for tuning.
+     * Makes the nearest critter that can climb a ledge (civet, squirrel...) mantle the one in front
+     * of it, turning it to {@code direction} first if given. Repeatable captures for tuning.
      */
     private static int mantle(CommandSourceStack source, Direction direction) {
-        CivetEntity civet = nearest(source);
-        if (civet == null) return 0;
-        MantleController mantle = civet.mantle();
-        if (mantle == null) {
-            source.sendFailure(Component.literal("[CivetDebug] This critter cannot mantle."));
+        Vec3 pos = source.getPosition();
+        DiverseCritter civet = source.getLevel().getEntitiesOfClass(DiverseCritter.class,
+                        new AABB(pos.x - 10, pos.y - 10, pos.z - 10, pos.x + 10, pos.y + 10, pos.z + 10),
+                        critter -> critter.mantle() != null)
+                .stream()
+                .min((a, b) -> Double.compare(a.distanceToSqr(pos), b.distanceToSqr(pos)))
+                .orElse(null);
+        if (civet == null) {
+            source.sendFailure(Component.literal("[CivetDebug] No critter that can mantle within 10 blocks."));
             return 0;
         }
+        MantleController mantle = civet.mantle();
         if (mantle.isActive()) {
             source.sendFailure(Component.literal("[CivetDebug] Already mantling."));
             return 0;
