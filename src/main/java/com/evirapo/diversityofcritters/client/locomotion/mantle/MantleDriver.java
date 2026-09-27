@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.client.locomotion.mantle;
 
 import com.evirapo.diversityofcritters.client.locomotion.LocomotionState;
+import com.evirapo.diversityofcritters.common.locomotion.MantleMotion;
 import com.evirapo.diversityofcritters.common.locomotion.MantlePhase;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
@@ -16,14 +17,16 @@ import org.jetbrains.annotations.Nullable;
  *
  * <table>
  *   <tr><th>Phase</th><th>Front paws</th><th>Hind feet</th><th>Body</th></tr>
- *   <tr><td>REACH</td><td>leave the ground for their first grips</td><td>planted where they stood</td><td>0 to reach pitch</td></tr>
+ *   <tr><td>REACH</td><td>up to their first grips, one after the other</td><td>a step each, keeping up with the body</td><td>0 to reach pitch</td></tr>
  *   <tr><td>RISE</td><td>climb the face in alternate grips to the lip</td><td>alternate steps toward the wall</td><td>to rise pitch</td></tr>
- *   <tr><td>CREST</td><td>from the lip onto the top</td><td>scramble onto the face, one then the other</td><td>to crest pitch</td></tr>
- *   <tr><td>RECOVER</td><td>hand back to the ground path</td><td>hand back to the ground path</td><td>level</td></tr>
+ *   <tr><td>CREST</td><td>from the lip onto the top, one after the other</td><td>scramble onto the face, one then the other</td><td>to crest pitch</td></tr>
+ *   <tr><td>RECOVER</td><td>hand back to the walk</td><td>hand back to the walk</td><td>level</td></tr>
  * </table>
  *
  * <p>Where the paws go is {@link GripPlanner}'s call. The first front leg in the rig leads, and the
- * hind foot diagonal to it moves with it, as in a walk.
+ * hind foot diagonal to it moves with it, as in a walk: some leg is always moving, so the critter
+ * never seems to stop for the climb. The walk cycle is held back only while the climb places the
+ * legs ({@link LocomotionState#mantleCycleHold}).
  *
  * <p>The server raises the entity through RISE and CREST. Until the crest the body stands on its
  * hind legs at the foot of the wall, so the pose holds the body down by as much as the entity has
@@ -111,7 +114,7 @@ public final class MantleDriver {
 
         if (mantle != null) {
             if (!state.mantleActive || state.mantleStartTick != mantle.startTick) {
-                this.begin(state, mantle, legs);
+                this.begin(state, mantle, legs, x, z, bodyHalfWidth);
             }
             final MantleProgress progress = MantleProgress.of(y, mantle.startY, mantle.lipY,
                     gameTime - mantle.startTick, mantle.pastFace(x, z), bodyHalfWidth, this.profile,
@@ -120,6 +123,8 @@ public final class MantleDriver {
             state.mantlePitch = (float) -Math.toRadians(
                     MantleProgress.pitchDegrees(progress.phase, progress.t, this.profile));
             state.mantleLock = lock(progress);
+            state.mantleCycleHold = progress.phase == MantlePhase.RECOVER
+                    ? 1.0f - MantleProgress.smoothstep(progress.t) : 1.0f;
             state.mantleArch = (float) Math.toRadians(
                     MantleProgress.archDegrees(progress.phase, progress.t, this.profile));
 
@@ -127,7 +132,7 @@ public final class MantleDriver {
             GripPlanner.plan(progress.phase, progress.t, lipHeight, this.profile, this.leading, this.trailing);
             GripPlanner.planHind(progress.phase, progress.t, lipHeight,
                     baseDepth(legs, this.leadHind, mantle), baseDepth(legs, this.otherHind, mantle),
-                    this.profile, this.leadingHind, this.trailingHind);
+                    state.mantleApproach, this.profile, this.leadingHind, this.trailingHind);
             place(legs, this.leadFront, progress.phase, this.leading, mantle, false);
             place(legs, this.otherFront, progress.phase, this.trailing, mantle, false);
             place(legs, this.leadHind, progress.phase, this.leadingHind, mantle, true);
@@ -166,11 +171,17 @@ public final class MantleDriver {
         }
     }
 
-    /** A new mantle: remember where the hind feet stand; they step on from there. */
-    private void begin(LocomotionState state, MantleState mantle, LocomotionState.LegState[] legs) {
+    /**
+     * A new mantle: remember where the hind feet stand, and how far the body still has to go to
+     * the face; the feet step on from there.
+     */
+    private void begin(LocomotionState state, MantleState mantle, LocomotionState.LegState[] legs,
+                       double x, double z, float bodyHalfWidth) {
         state.mantleActive = true;
         state.mantleStartTick = mantle.startTick;
         state.mantleStartY = mantle.startY;
+        final double pinned = -(bodyHalfWidth + MantleMotion.PIN_GAP);
+        state.mantleApproach = (float) Math.max(0.0, pinned - mantle.pastFace(x, z));
         for (int i = 0; i < legs.length; i++) {
             final LocomotionState.LegState leg = legs[i];
             if (this.rear[i]) {
@@ -198,10 +209,9 @@ public final class MantleDriver {
         final LocomotionState.LegState leg = legs[index];
         leg.mantleWeight = hand.anchorWeight;
         switch (phase) {
-            // The front paws leave the ground at once; the hind feet are still standing.
-            case REACH -> leg.contactOverride = hind ? 1.0f : 0.0f;
+            case REACH -> leg.contactOverride = 1.0f - hand.swingWeight;
             case RISE -> leg.contactOverride = 1.0f - hand.swingWeight;
-            case CREST -> leg.contactOverride = hind ? 1.0f - hand.swingWeight : 1.0f;
+            case CREST -> leg.contactOverride = 1.0f - hand.swingWeight;
             case RECOVER -> leg.contactOverride = LocomotionState.LegState.NO_OVERRIDE;
             default -> {
                 leg.mantleWeight = 0.0f;

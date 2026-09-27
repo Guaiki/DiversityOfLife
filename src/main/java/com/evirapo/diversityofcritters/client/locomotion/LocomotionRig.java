@@ -92,12 +92,14 @@ public abstract class LocomotionRig<T extends LivingEntity & ILocomotionSubject>
     }
 
     /**
-     * How much a mantle is posing this entity, in [0, 1], as of its last frame. Models scale their
-     * walk cycle down by it so the legs are not animated and anchored at once.
+     * How much of the walk cycle a mantle holds back for this entity, in [0, 1], as of its last
+     * frame. Models scale their walk down by it so the legs are not animated and placed by the climb
+     * at once; it lets the walk back in as the body walks onto the top.
      */
-    public final float mantleAuthority(T entity) {
+    public final float mantleCycleHold(T entity) {
         final LocomotionState state = LocomotionStateCache.peek(entity);
-        return state == null ? 0.0f : Mth.clamp(state.mantleAuthority.value(), 0.0f, 1.0f);
+        return state == null ? 0.0f
+                : Mth.clamp(state.mantleAuthority.value(), 0.0f, 1.0f) * Mth.clamp(state.mantleCycleHold, 0.0f, 1.0f);
     }
 
     /** Turns the rig off for good, logging why once. */

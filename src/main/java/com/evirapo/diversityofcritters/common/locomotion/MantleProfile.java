@@ -67,7 +67,10 @@ public final class MantleProfile {
     public final double plantDepth;
     /** Grips each front paw takes on the way up, the last one being the lip. */
     public final int gripsPerHand;
-    /** First grips on the face, as shares of the lip's height: the leading paw's and the other's. */
+    /**
+     * First grips on the face, as shares of the lip's height: the higher for the paw that reaches
+     * second (the body has reared further by then), the lower for the one that leads.
+     */
     public final double firstGripHigh;
     public final double firstGripLow;
     /** How far a paw leaves the face in the middle of a swing between grips. */
@@ -259,8 +262,8 @@ public final class MantleProfile {
 
         /**
          * @param perHand   grips each front paw takes, the lip being the last
-         * @param firstHigh first grip of the leading paw, as a share of the lip's height
-         * @param firstLow  first grip of the other paw
+         * @param firstHigh first grip of the paw that reaches second, as a share of the lip's height
+         * @param firstLow  first grip of the leading paw
          * @param swingOut  how far a paw leaves the face mid-swing, blocks
          */
         public Builder grips(int perHand, double firstHigh, double firstLow, double swingOut) {

@@ -549,6 +549,20 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
     completo con la configuración del civet y falla si cualquier punto de la caña delantera entra en la cabeza.
   - El torso no empeora: las caderas nacen dentro del torso (hasta +1.3 u también en reposo); eso es de la malla.
 
+- El animal parecía detenerse al llegar a la pared: en REACH las traseras seguían ancladas mientras subían las
+  dos delanteras a la vez, y el ciclo de caminar se apagaba entero al empezar el mantle. Ahora el paso sigue:
+  - REACH: las delanteras suben a la cara **una tras otra** y cada trasera da un paso **a la vez que su
+    diagonal**; ese paso cubre lo que el cuerpo aún avanza hasta la cara (`mantleApproach`), así no se quedan
+    atrás. La que sube primero, con el cuerpo aún bajo, toma el agarre bajo (`firstGripLow`); la segunda, el
+    alto. El cuerpo se encabrita rápido al principio de REACH (curva ease-out en pitch y extensión de columna),
+    para que la primera mano no pase por la cabeza (lo vigila `MantleClearanceTest`).
+  - CREST: las delanteras también pasan a la cima una tras otra, emparejadas con las traseras que trepan.
+  - RECOVER: el ciclo de caminar vuelve poco a poco (`mantleCycleHold` 1 → 0) mientras anda sobre la cima; antes
+    volvía sólo al acabar el mantle y las patas se deslizaban sin animar. Los modelos usan
+    `rig.mantleCycleHold(entity)` en vez de la autoridad.
+  - Test: desde el inicio de REACH hasta el final de CREST, siempre hay alguna pata en el aire (salvo en el
+    instante exacto del relevo entre dos movimientos).
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

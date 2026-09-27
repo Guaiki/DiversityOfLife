@@ -9,10 +9,12 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
  * climb the face ({@link #plan}); hind feet step in and scramble up after them ({@link #planHind}).
  *
  * <ul>
- *   <li>REACH: both paws come up to their first grips on the face, one higher than the other.</li>
+ *   <li>REACH: the paws come up to their first grips on the face one after the other: the walk
+ *       carries on into the climb instead of stopping for it. The paw moving first, with the body
+ *       still low, takes the lower grip; the other, once the body has reared further, the higher.</li>
  *   <li>RISE: the paws climb in alternate grips, first then second, up to the lip. Only one paw is
  *       ever in swing; the other holds. A swing is an arc: it rises, leaves the face, comes back.</li>
- *   <li>CREST: both paws on the lip, sliding onto the top.</li>
+ *   <li>CREST: from the lip onto the top, one paw after the other.</li>
  *   <li>RECOVER: planted on the top, handing back to the ground path.</li>
  * </ul>
  *
@@ -57,14 +59,16 @@ public final class GripPlanner {
         final float s = MantleProgress.smoothstep(t);
         switch (phase) {
             case REACH -> {
-                first.set(lipHeight * profile.firstGripHigh, -FACE_GAP, s, 0.0f);
-                second.set(lipHeight * profile.firstGripLow, -FACE_GAP, s, 0.0f);
+                // Off the ground and up to the face, a paw at a time; until its turn a paw walks on.
+                final float u0 = half(t, 0);
+                final float u1 = half(t, 1);
+                first.set(lipHeight * profile.firstGripLow, -FACE_GAP, MantleProgress.smoothstep(u0), arc(u0));
+                second.set(lipHeight * profile.firstGripHigh, -FACE_GAP, MantleProgress.smoothstep(u1), arc(u1));
             }
             case RISE -> climb(t, lipHeight, profile, first, second);
             case CREST -> {
-                final double depth = profile.lipInset + (profile.plantDepth - profile.lipInset) * s;
-                first.set(lipHeight, depth, 1.0f, 0.0f);
-                second.set(lipHeight, depth, 1.0f, 0.0f);
+                ontoTop(first, half(t, 0), lipHeight, profile);
+                ontoTop(second, half(t, 1), lipHeight, profile);
             }
             case RECOVER -> {
                 first.set(lipHeight, profile.plantDepth, 1.0f - s, 0.0f);
@@ -77,12 +81,30 @@ public final class GripPlanner {
         }
     }
 
+    /** Progress through its half of a phase for the paw moving first (0) or second (1). */
+    static float half(float t, int which) {
+        return Math.max(0.0f, Math.min(t * 2.0f - which, 1.0f));
+    }
+
+    /** How much of a paw is in the air along a move from 0 to 1. */
+    private static float arc(float u) {
+        return u <= 0.0f || u >= 1.0f ? 0.0f : (float) Math.sin(Math.PI * u);
+    }
+
+    /** From the lip onto the top, lifting a little on the way. */
+    private static void ontoTop(Hand hand, float u, double lipHeight, MantleProfile profile) {
+        final float s = MantleProgress.smoothstep(u);
+        final float bulge = arc(u);
+        hand.set(lipHeight + profile.swingOut * 0.5 * bulge, lerp(s, profile.lipInset, profile.plantDepth), 1.0f, bulge);
+    }
+
     /**
      * The hind feet, walking with the front paws: the first hind foot to move is the one diagonal to
      * the leading front paw, and it swings when that paw does.
      *
      * <ul>
-     *   <li>REACH: planted where they stood.</li>
+     *   <li>REACH: one step each, one after the other, covering what the body still travels to the
+     *       face ({@code approach}), so they keep up instead of being left behind.</li>
      *   <li>RISE: {@code 2 × hindSteps} alternate steps toward the wall, each a small arc.</li>
      *   <li>CREST: one after the other, they scramble onto the face below the lip.</li>
      *   <li>RECOVER: on the face, handing back to the ground path.</li>
@@ -90,15 +112,25 @@ public final class GripPlanner {
      *
      * @param firstDepth  where the first foot stood, past the face (negative)
      * @param secondDepth likewise for the other
+     * @param approach    how far the body still moves toward the face while reaching, blocks
      */
     public static void planHind(MantlePhase phase, float t, double lipHeight, double firstDepth,
-                                double secondDepth, MantleProfile profile, Hand first, Hand second) {
+                                double secondDepth, double approach, MantleProfile profile, Hand first,
+                                Hand second) {
         final double faceHeight = lipHeight * profile.hindFaceGrip;
         switch (phase) {
             case REACH -> {
-                first.set(0.0, stepDepth(firstDepth, 0, profile), 1.0f, 0.0f);
-                second.set(0.0, stepDepth(secondDepth, 0, profile), 1.0f, 0.0f);
+                approachStep(first, firstDepth, approach, half(t, 0), profile);
+                approachStep(second, secondDepth, approach, half(t, 1), profile);
+                return;
             }
+            default -> {
+            }
+        }
+        // From here on the feet stand where the approach left them.
+        firstDepth = Math.min(firstDepth + approach, -FACE_GAP);
+        secondDepth = Math.min(secondDepth + approach, -FACE_GAP);
+        switch (phase) {
             case RISE -> {
                 final int swings = 2 * profile.hindSteps;
                 if (swings == 0) {
@@ -142,6 +174,14 @@ public final class GripPlanner {
         }
     }
 
+    /** The step a hind foot takes to keep up with the body closing on the face. */
+    private static void approachStep(Hand hand, double start, double approach, float u, MantleProfile profile) {
+        final float s = MantleProgress.smoothstep(u);
+        final float bulge = approach > 1.0e-6 ? arc(u) : 0.0f;
+        final double depth = Math.min(lerp(s, start, start + approach), -FACE_GAP);
+        hand.set(profile.hindStepLift * bulge, depth, 1.0f, bulge);
+    }
+
     /** A foot's depth after {@code steps} steps from {@code start}, never closer than the face allows. */
     static double stepDepth(double start, int steps, MantleProfile profile) {
         return Math.min(start + steps * profile.hindStepLength, -FACE_GAP);
@@ -150,7 +190,7 @@ public final class GripPlanner {
     /** One step toward the wall, lifting the foot in the middle. */
     private static void step(Hand hand, double start, int done, float u, MantleProfile profile) {
         final float s = MantleProgress.smoothstep(u);
-        final float bulge = (float) Math.sin(Math.PI * u);
+        final float bulge = arc(u);
         final double depth = lerp(s, stepDepth(start, done, profile), stepDepth(start, done + 1, profile));
         hand.set(profile.hindStepLift * bulge, depth, 1.0f, bulge);
     }
@@ -158,7 +198,7 @@ public final class GripPlanner {
     /** From the ground onto the face, pulling back off it in the middle. */
     private static void scramble(Hand hand, double groundDepth, double faceHeight, float u, MantleProfile profile) {
         final float s = MantleProgress.smoothstep(u);
-        final float bulge = (float) Math.sin(Math.PI * u);
+        final float bulge = arc(u);
         final double depth = lerp(s, groundDepth, -FACE_GAP) - profile.hindStepLift * bulge;
         hand.set(lerp(s, 0.0, faceHeight), depth, 1.0f, bulge);
     }
@@ -178,8 +218,8 @@ public final class GripPlanner {
         final int firstDone = (swing + 1) / 2;
         final int secondDone = swing / 2;
 
-        final double firstStart = lipHeight * profile.firstGripHigh;
-        final double secondStart = lipHeight * profile.firstGripLow;
+        final double firstStart = lipHeight * profile.firstGripLow;
+        final double secondStart = lipHeight * profile.firstGripHigh;
         if (firstMoves) {
             swingBetween(first, firstStart, firstDone, perHand, u, lipHeight, profile);
             hold(second, secondStart, secondDone, perHand, lipHeight, profile);
@@ -203,7 +243,7 @@ public final class GripPlanner {
         final boolean ontoLip = from + 1 >= perHand;
         final float rise = MantleProgress.smoothstep(ontoLip ? u / OVER_LIP_AT : u);
         final float across = ontoLip ? MantleProgress.smoothstep((u - OVER_LIP_AT) / (1.0f - OVER_LIP_AT)) : rise;
-        final float bulge = (float) Math.sin(Math.PI * u);
+        final float bulge = arc(u);
         final double height = lerp(rise, gripHeight(start, from, perHand, lipHeight),
                 gripHeight(start, from + 1, perHand, lipHeight));
         final double depth = lerp(across, gripDepth(from, perHand, profile), gripDepth(from + 1, perHand, profile))

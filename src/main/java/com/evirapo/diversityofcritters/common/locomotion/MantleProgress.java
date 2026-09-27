@@ -65,7 +65,8 @@ public final class MantleProgress {
         final float s = smoothstep(t);
         return switch (phase) {
             case NONE -> 0.0f;
-            case REACH -> lerp(s, 0.0f, profile.reachPitch);
+            // Rears quickly at first, so the body is up before the first paw reaches the face.
+            case REACH -> lerp(easeOut(t), 0.0f, profile.reachPitch);
             case RISE -> lerp(s, profile.reachPitch, profile.risePitch);
             case CREST -> lerp(s, profile.risePitch, profile.crestPitch);
             case RECOVER -> lerp(s, profile.crestPitch, 0.0f);
@@ -82,11 +83,18 @@ public final class MantleProgress {
         final float s = smoothstep(t);
         return switch (phase) {
             case NONE -> 0.0f;
-            case REACH -> lerp(s, 0.0f, -profile.rearArchDegrees);
+            case REACH -> lerp(easeOut(t), 0.0f, -profile.rearArchDegrees);
             case RISE -> -profile.rearArchDegrees;
             case CREST -> lerp(s, -profile.rearArchDegrees, profile.archDegrees);
             case RECOVER -> lerp(s, profile.archDegrees, 0.0f);
         };
+    }
+
+    /** Fast at first, settling at 1. */
+    public static float easeOut(float x) {
+        final float t = x < 0.0f ? 0.0f : Math.min(x, 1.0f);
+        final float u = 1.0f - t;
+        return 1.0f - u * u;
     }
 
     public static float smoothstep(float x) {

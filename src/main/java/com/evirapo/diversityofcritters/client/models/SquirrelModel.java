@@ -336,7 +336,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
             float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
             float idleWeight   = busyBody ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
             // A mantle poses the legs itself; the walk cycle steps aside for it.
-            float cycleWeight  = 1.0F - this.locomotionRig.mantleAuthority(entity);
+            float cycleWeight  = 1.0F - this.locomotionRig.mantleCycleHold(entity);
             float sprintWeight = entity.sprintProgress * cycleWeight;
             float walkWeight   = (1.0F - entity.sprintProgress) * cycleWeight;
 

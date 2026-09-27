@@ -111,8 +111,53 @@ class GripPlannerTest {
     private static final double HIND_FIRST = -0.3;
     private static final double HIND_SECOND = -0.28;
 
+    private static final double APPROACH = 0.1;
+
     private void planHind(MantlePhase phase, float t, MantleProfile profile) {
-        GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, profile, this.first, this.second);
+        GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, profile, this.first, this.second);
+    }
+
+    @Test
+    void reachIsAWalk() {
+        // First half: the leading paw and the hind foot diagonal to it; second half: the other two.
+        plan(MantlePhase.REACH, 0.25f, ONE);
+        assertTrue(this.first.swingWeight > 0.5f && this.second.swingWeight == 0.0f && this.second.anchorWeight == 0.0f,
+                "leading paw up, the other still walking");
+        planHind(MantlePhase.REACH, 0.25f, ONE);
+        assertTrue(this.first.swingWeight > 0.5f && this.second.swingWeight == 0.0f, "diagonal hind foot steps with it");
+
+        plan(MantlePhase.REACH, 0.75f, ONE);
+        assertTrue(this.second.swingWeight > 0.5f && this.first.swingWeight == 0.0f && this.first.anchorWeight == 1.0f);
+        planHind(MantlePhase.REACH, 0.75f, ONE);
+        assertTrue(this.second.swingWeight > 0.5f && this.first.swingWeight == 0.0f);
+    }
+
+    @Test
+    void someLegIsAlwaysMovingUntilTheTop() {
+        final GripPlanner.Hand hindFirst = new GripPlanner.Hand();
+        final GripPlanner.Hand hindSecond = new GripPlanner.Hand();
+        for (MantlePhase phase : new MantlePhase[]{MantlePhase.REACH, MantlePhase.RISE, MantlePhase.CREST}) {
+            for (int i = 1; i < STEPS; i++) {
+                final float t = i / (float) STEPS;
+                // A move hands over to the next exactly at the quarter marks; between them something swings.
+                if (Math.abs(t * 2.0f - Math.round(t * 2.0f)) < 0.02f) {
+                    continue;
+                }
+                plan(phase, t, ONE);
+                GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, ONE, hindFirst, hindSecond);
+                final float moving = Math.max(Math.max(this.first.swingWeight, this.second.swingWeight),
+                        Math.max(hindFirst.swingWeight, hindSecond.swingWeight));
+                assertTrue(moving > 0.05f, phase + " at " + t + ": every leg standing still");
+            }
+        }
+    }
+
+    @Test
+    void hindFeetKeepUpWithTheApproach() {
+        planHind(MantlePhase.REACH, 1.0f, ONE);
+        assertEquals(HIND_FIRST + APPROACH, this.first.depth, 1.0e-9);
+        assertEquals(HIND_SECOND + APPROACH, this.second.depth, 1.0e-9);
+        assertEquals(0.0, this.first.height, 1.0e-9);
     }
 
     @Test
@@ -170,8 +215,8 @@ class GripPlannerTest {
     @Test
     void hindFeetStepInThenClimbTheFace() {
         planHind(MantlePhase.RISE, 1.0f, ONE);
-        assertEquals(HIND_FIRST + ONE.hindStepLength, this.first.depth, 1.0e-9);
-        assertEquals(HIND_SECOND + ONE.hindStepLength, this.second.depth, 1.0e-9);
+        assertEquals(HIND_FIRST + APPROACH + ONE.hindStepLength, this.first.depth, 1.0e-9);
+        assertEquals(HIND_SECOND + APPROACH + ONE.hindStepLength, this.second.depth, 1.0e-9);
         assertEquals(0.0, this.first.height, 1.0e-9);
 
         planHind(MantlePhase.CREST, 1.0f, ONE);

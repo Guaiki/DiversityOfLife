@@ -31,6 +31,13 @@ public final class LocomotionState {
     public final Spring mantleAuthority = new Spring(0.2f);
     /** Body pitch the mantle asks for, radians, model convention (negative lifts the head end). */
     public float mantlePitch;
+    /** How far the body still had to move to the face when the mantle began, blocks. */
+    public float mantleApproach;
+    /**
+     * Share of the walk cycle the mantle holds back, before its authority: all of it while the legs
+     * are placed by the climb, letting it back in as the body walks onto the top.
+     */
+    public float mantleCycleHold;
     /** Spine curvature the mantle asks for, radians, before its authority. */
     public float mantleArch;
     /** Share of the body's rise since the start that the pose holds back down, in [0, 1]. */
