@@ -171,17 +171,38 @@ class QuadrupedMantleSceneTest {
     void crestScramblesTheHindFeetOntoTheFace() {
         settle(0.9, 30.0);
         assertEquals(MantlePhase.CREST, this.state.mantleProgress.phase);
-        // Late in the crest the leading hind foot is already on the face, the other on its way.
-        final LocomotionState.LegState lead = this.state.legs()[HIND[1]];
-        assertEquals(PROFILE.hindFaceGrip, lead.anchorY, 1.0e-9, "leading hind foot up the face");
-        assertEquals(1.0 - com.evirapo.diversityofcritters.client.locomotion.mantle.GripPlanner.FACE_GAP,
-                lead.anchorZ, 1.0e-9, "against the face");
-        final LocomotionState.LegState other = this.state.legs()[HIND[0]];
-        assertTrue(other.anchorY > 0.0 && other.anchorY < PROFILE.hindFaceGrip, "other hind foot climbing: " + other.anchorY);
-        assertTrue(other.contactOverride < 1.0f, "a scrambling foot is not planted");
+        // Late in the crest both hind feet are up the face, high up with the body, pushing on it.
+        for (int leg : HIND) {
+            final LocomotionState.LegState s = this.state.legs()[leg];
+            assertTrue(s.anchorY > PROFILE.hindFaceGrip && s.anchorY < 1.0, LEGS[leg] + " up the face: " + s.anchorY);
+            assertEquals(1.0 - com.evirapo.diversityofcritters.client.locomotion.mantle.GripPlanner.FACE_GAP,
+                    s.anchorZ, 1.0e-9, LEGS[leg] + " against the face");
+            assertEquals(1.0f, s.contactOverride, 1.0e-6f, LEGS[leg] + " planted on it");
+        }
         assertTrue(this.state.mantleLock < 0.5f, "the body is going up with the entity");
         for (int leg : FRONT) {
             assertTrue(this.state.legs()[leg].anchorZ > 1.0 + PROFILE.lipInset, "front paws move onto the top");
+        }
+    }
+
+    @Test
+    void hindFeetPushAgainstTheWallAllTheWayUp() {
+        // Through the crest, every hind foot that is not mid-swing reaches its hold on the face:
+        // none is left hanging in the air below the rising body.
+        frame(this.rig, this.state, 0.0, 0.0, true);
+        for (double y = PROFILE.crestStart + 0.02; y < 1.0; y += 0.05) {
+            for (int i = 0; i < 90; i++) {
+                frame(this.rig, this.state, y, 30.0, true);
+            }
+            assertEquals(MantlePhase.CREST, this.state.mantleProgress.phase);
+            for (int leg : HIND) {
+                final LocomotionState.LegState s = this.state.legs()[leg];
+                if (s.contactOverride < 0.9f || s.anchorY <= 1.0e-9) {
+                    continue;
+                }
+                final double miss = distanceUnits(leg, s.anchorX, s.anchorY, s.anchorZ, y);
+                assertTrue(miss < 0.5, LEGS[leg] + " hangs " + miss + "u off the wall at y " + String.format("%.2f", y));
+            }
         }
     }
 

@@ -75,12 +75,22 @@ public final class MantleProfile {
     public final double firstGripLow;
     /** How far a paw leaves the face in the middle of a swing between grips. */
     public final double swingOut;
+    /**
+     * How far the drawn body closes on the wall over the crest, blocks. The collision box has to
+     * stay off the face until it is level with the top, but a cresting animal brings its hind end
+     * in so its hind feet can push on the wall; the drawn body does, and gives it back as the box
+     * walks onto the top.
+     */
+    public final double crestTuck;
     /** Steps each hind leg takes toward the wall while the body rears up. */
     public final int hindSteps;
     /** How far each of those steps goes, and how high the foot lifts on it, blocks. */
     public final double hindStepLength;
     public final double hindStepLift;
-    /** Where the hind feet scramble onto the face over the crest, as a share of the lip's height. */
+    /**
+     * The lowest the hind feet push against the face over the crest, as a share of the lip's height;
+     * they climb higher as the body rises, as far as their legs reach.
+     */
     public final double hindFaceGrip;
 
     private MantleProfile(Builder b) {
@@ -134,6 +144,7 @@ public final class MantleProfile {
         this.firstGripHigh = b.firstGripHigh;
         this.firstGripLow = b.firstGripLow;
         this.swingOut = b.swingOut;
+        this.crestTuck = b.crestTuck;
         this.hindSteps = b.hindSteps;
         this.hindStepLength = b.hindStepLength;
         this.hindStepLift = b.hindStepLift;
@@ -173,6 +184,7 @@ public final class MantleProfile {
         private double firstGripHigh = 0.75;
         private double firstGripLow = 0.5;
         private double swingOut = 0.12;
+        private double crestTuck = 0.2;
         private int hindSteps = 1;
         private double hindStepLength = 0.06;
         private double hindStepLift = 0.06;
@@ -285,6 +297,11 @@ public final class MantleProfile {
             this.hindStepLength = length;
             this.hindStepLift = lift;
             this.hindFaceGrip = faceGrip;
+            return this;
+        }
+
+        public Builder crestTuck(double blocks) {
+            this.crestTuck = blocks;
             return this;
         }
 

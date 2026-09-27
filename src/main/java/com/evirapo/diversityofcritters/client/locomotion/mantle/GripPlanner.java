@@ -106,18 +106,22 @@ public final class GripPlanner {
      *   <li>REACH: one step each, one after the other, covering what the body still travels to the
      *       face ({@code approach}), so they keep up instead of being left behind.</li>
      *   <li>RISE: {@code 2 × hindSteps} alternate steps toward the wall, each a small arc.</li>
-     *   <li>CREST: one after the other, they scramble onto the face below the lip.</li>
-     *   <li>RECOVER: on the face, handing back to the ground path.</li>
+     *   <li>CREST: one after the other, they scramble onto the face and push against it, as high
+     *       as the rising body lets them reach ({@code faceHeight}).</li>
+     *   <li>RECOVER: one after the other they step from the face onto the top, then hand back to
+     *       the walk.</li>
      * </ul>
      *
      * @param firstDepth  where the first foot stood, past the face (negative)
      * @param secondDepth likewise for the other
      * @param approach    how far the body still moves toward the face while reaching, blocks
+     * @param firstFace   where on the face the first foot pushes, above the start; it climbs with
+     *                    the body so the foot stays against the wall instead of hanging below it
+     * @param secondFace  likewise for the other
      */
     public static void planHind(MantlePhase phase, float t, double lipHeight, double firstDepth,
-                                double secondDepth, double approach, MantleProfile profile, Hand first,
-                                Hand second) {
-        final double faceHeight = lipHeight * profile.hindFaceGrip;
+                                double secondDepth, double approach, double firstFace, double secondFace,
+                                MantleProfile profile, Hand first, Hand second) {
         switch (phase) {
             case REACH -> {
                 approachStep(first, firstDepth, approach, half(t, 0), profile);
@@ -154,24 +158,55 @@ public final class GripPlanner {
             case CREST -> {
                 final double firstGround = stepDepth(firstDepth, profile.hindSteps, profile);
                 final double secondGround = stepDepth(secondDepth, profile.hindSteps, profile);
-                if (t < 0.5f) {
-                    scramble(first, firstGround, faceHeight, t * 2.0f, profile);
-                    second.set(0.0, secondGround, 1.0f, 0.0f);
+                // Both up the face early, before the rising body leaves a foot on the ground out of reach.
+                final float half = HIND_SCRAMBLE_END * 0.5f;
+                final float u0 = Math.min(t / half, 1.0f);
+                final float u1 = Math.max(0.0f, Math.min((t - half) / half, 1.0f));
+                if (u0 < 1.0f) {
+                    scramble(first, firstGround, firstFace, u0, profile);
                 } else {
-                    first.set(faceHeight, -FACE_GAP, 1.0f, 0.0f);
-                    scramble(second, secondGround, faceHeight, Math.min((t - 0.5f) * 2.0f, 1.0f), profile);
+                    first.set(firstFace, -FACE_GAP, 1.0f, 0.0f);
+                }
+                if (u1 <= 0.0f) {
+                    second.set(0.0, secondGround, 1.0f, 0.0f);
+                } else if (u1 < 1.0f) {
+                    scramble(second, secondGround, secondFace, u1, profile);
+                } else {
+                    second.set(secondFace, -FACE_GAP, 1.0f, 0.0f);
                 }
             }
             case RECOVER -> {
-                final float s = MantleProgress.smoothstep(t);
-                first.set(faceHeight, -FACE_GAP, 1.0f - s, 0.0f);
-                second.set(faceHeight, -FACE_GAP, 1.0f - s, 0.0f);
+                // Onto the top one after the other, then back to the walk once the body is over it.
+                final float hold = 1.0f - MantleProgress.smoothstep((t - HIND_ONTO_TOP) / (1.0f - HIND_ONTO_TOP));
+                ontoTopFromFace(first, Math.min(t / (HIND_ONTO_TOP * 0.5f), 1.0f), firstFace, lipHeight, hold, profile);
+                ontoTopFromFace(second, Math.max(0.0f, Math.min((t - HIND_ONTO_TOP * 0.5f) / (HIND_ONTO_TOP * 0.5f), 1.0f)),
+                        secondFace, lipHeight, hold, profile);
             }
             default -> {
                 first.set(0.0, 0.0, 0.0f, 0.0f);
                 second.set(0.0, 0.0, 0.0f, 0.0f);
             }
         }
+    }
+
+    /** Share of CREST by which both hind feet are up the face, one half each. */
+    static final float HIND_SCRAMBLE_END = 0.6f;
+
+    /** Share of RECOVER the hind feet spend stepping onto the top, one half each, before letting go. */
+    static final float HIND_ONTO_TOP = 0.6f;
+
+    /**
+     * From the face over the lip onto the top: up to the lip's height first, then across, pulling
+     * back off the face in the middle, as the front paws do.
+     */
+    private static void ontoTopFromFace(Hand hand, float u, double faceHeight, double lipHeight, float weight,
+                                        MantleProfile profile) {
+        final float rise = MantleProgress.smoothstep(u / OVER_LIP_AT);
+        final float across = MantleProgress.smoothstep((u - OVER_LIP_AT) / (1.0f - OVER_LIP_AT));
+        final float bulge = arc(u);
+        final double height = lerp(rise, faceHeight, lipHeight);
+        final double depth = lerp(across, -FACE_GAP, profile.lipInset) - profile.hindStepLift * bulge;
+        hand.set(height, depth, weight, bulge);
     }
 
     /** The step a hind foot takes to keep up with the body closing on the face. */

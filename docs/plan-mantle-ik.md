@@ -563,6 +563,23 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   - Test: desde el inicio de REACH hasta el final de CREST, siempre hay alguna pata en el aire (salvo en el
     instante exacto del relevo entre dos movimientos).
 
+- Las traseras quedaban en el aire al subir. Medido en la malla: en la cresta la cadera trasera está a
+  **0.5 bloques** de la pared y la pata alcanza 0.43 estirada; ninguna altura de agarre podía tocarla (fallaba
+  por hasta 7 u). La caja de colisión no puede acercarse (hasta estar al nivel de la cima chocaría con la cara),
+  así que el acercamiento es visual:
+  - `crestTuck` (0.2 bloques): el cuerpo dibujado se mete hacia la pared durante CREST y lo devuelve en
+    RECOVER a medida que la caja avanza sobre la cima (nunca más de lo que le queda por andar).
+  - El agarre de cada trasera en la cara sube con el cuerpo: se calcula desde dónde quedó **su cadera el frame
+    anterior** (el rig la registra al escribir la pose), bajando `√(alcance² − distancia²)`; nunca por debajo
+    de `hindFaceGrip` ni por encima del labio.
+  - Las traseras suben a la cara en el primer 60 % de CREST (antes, la segunda esperaba a la mitad y el cuerpo
+    ya la había dejado sin alcance desde el suelo). En RECOVER pasan de la cara a la cima una tras otra y sólo
+    entonces vuelven al paso.
+  - El desplazamiento de pelvis por anclas no alcanzadas se promedia ahora sólo entre las patas que fallan: las
+    que ya llegan no diluyen lo que otra necesita.
+  - Test `hindFeetPushAgainstTheWallAllTheWayUp`: a lo largo de toda la cresta, cada trasera apoyada en la cara
+    queda a < 0.5 u de su agarre (antes 1.6–7 u; ahora 0–0.27 u).
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

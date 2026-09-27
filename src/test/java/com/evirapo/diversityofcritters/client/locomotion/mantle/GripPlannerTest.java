@@ -114,7 +114,8 @@ class GripPlannerTest {
     private static final double APPROACH = 0.1;
 
     private void planHind(MantlePhase phase, float t, MantleProfile profile) {
-        GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, profile, this.first, this.second);
+        GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, LIP * profile.hindFaceGrip,
+                LIP * profile.hindFaceGrip, profile, this.first, this.second);
     }
 
     @Test
@@ -144,7 +145,8 @@ class GripPlannerTest {
                     continue;
                 }
                 plan(phase, t, ONE);
-                GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, ONE, hindFirst, hindSecond);
+                GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, APPROACH, LIP * ONE.hindFaceGrip,
+                        LIP * ONE.hindFaceGrip, ONE, hindFirst, hindSecond);
                 final float moving = Math.max(Math.max(this.first.swingWeight, this.second.swingWeight),
                         Math.max(hindFirst.swingWeight, hindSecond.swingWeight));
                 assertTrue(moving > 0.05f, phase + " at " + t + ": every leg standing still");
@@ -179,8 +181,11 @@ class GripPlannerTest {
         for (MantlePhase phase : ORDER) {
             for (int i = 0; i <= STEPS; i++) {
                 planHind(phase, i / (float) STEPS, ONE);
-                assertTrue(this.first.depth <= -GripPlanner.FACE_GAP + 1.0e-12, phase + " first at " + this.first.depth);
-                assertTrue(this.second.depth <= -GripPlanner.FACE_GAP + 1.0e-12, phase + " second at " + this.second.depth);
+                // In front of the face, or over the lip once up to its height.
+                assertTrue(this.first.depth <= -GripPlanner.FACE_GAP + 1.0e-12 || this.first.height >= LIP - 1.0e-9,
+                        phase + " first at " + this.first.depth + ", " + this.first.height);
+                assertTrue(this.second.depth <= -GripPlanner.FACE_GAP + 1.0e-12 || this.second.height >= LIP - 1.0e-9,
+                        phase + " second at " + this.second.depth + ", " + this.second.height);
             }
         }
     }
@@ -223,6 +228,19 @@ class GripPlannerTest {
         assertEquals(LIP * ONE.hindFaceGrip, this.first.height, 1.0e-9);
         assertEquals(LIP * ONE.hindFaceGrip, this.second.height, 1.0e-9);
         assertEquals(-GripPlanner.FACE_GAP, this.first.depth, 1.0e-9);
+    }
+
+    @Test
+    void hindFeetStepOntoTheTopBeforeLettingGo() {
+        // Past their steps both hind feet stand on the lip, still held; then they hand back to the walk.
+        planHind(MantlePhase.RECOVER, GripPlanner.HIND_ONTO_TOP, ONE);
+        assertEquals(LIP, this.first.height, 1.0e-9);
+        assertEquals(LIP, this.second.height, 1.0e-9);
+        assertEquals(ONE.lipInset, this.first.depth, 1.0e-9);
+        assertEquals(1.0f, this.first.anchorWeight, 1.0e-6f);
+        planHind(MantlePhase.RECOVER, 1.0f, ONE);
+        assertEquals(0.0f, this.first.anchorWeight, 1.0e-6f);
+        assertEquals(0.0f, this.second.anchorWeight, 1.0e-6f);
     }
 
     private double[] snapshot() {

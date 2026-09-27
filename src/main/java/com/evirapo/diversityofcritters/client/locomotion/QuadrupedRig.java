@@ -47,6 +47,8 @@ import java.util.Optional;
 @OnlyIn(Dist.CLIENT)
 public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> extends LocomotionRig<T> {
 
+    /** A leg this close to its anchor, in model units, counts as there. */
+    private static final float MISS_EPSILON = 1.0e-3f;
     /** Below this the gate is closed enough to leave the pose alone. */
     private static final float GATE_EPSILON = 1.0e-3f;
 
@@ -95,12 +97,14 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.maxAnchorShift = builder.maxAnchorShiftFraction * legs.get(0).soleOffset();
         this.rear = new boolean[legs.size()];
         final float[] side = new float[legs.size()];
+        final float[] length = new float[legs.size()];
         for (int i = 0; i < legs.size(); i++) {
             this.rear[i] = legs.get(i).hip().z > 0.0f;
             side[i] = legs.get(i).hip().x;
+            length[i] = legs.get(i).soleOffset();
         }
         this.mantle = builder.mantleProfile == null ? null
-                : new MantleDriver(builder.mantleProfile, this.rear, side);
+                : new MantleDriver(builder.mantleProfile, this.rear, side, length);
         this.shiftX = new float[legs.size()];
         this.shiftY = new float[legs.size()];
         this.shiftZ = new float[legs.size()];
@@ -247,6 +251,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.pelvis.zRot += roll;
         this.pelvis.x -= meanX;
         this.pelvis.y += drop - meanY + bodyDrop;
+        // Toward the wall over a crest: the head end is model -Z.
+        this.pelvis.z -= state.mantleTuck * gate;
         this.pelvis.z -= meanZ;
 
         state.debugPivotValid = mantle > 0.01f && LocomotionDebugFlags.capturing();
@@ -292,6 +298,21 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
 
         // --- Head and tail answer what was done to the body.
         this.spine.write(state, pitch, roll, state.bodyYaw, gate, state.mantleArch * mantle * gate);
+
+        // Where the hind hips ended up: the mantle places the hind feet against the wall from them
+        // next frame.
+        if (mantle > 0.0f) {
+            for (int i = 0; i < count; i++) {
+                final LocomotionState.LegState leg = legStates[i];
+                leg.mantleHipValid = this.rear[i];
+                if (this.rear[i]) {
+                    this.space.toWorld(this.legs.get(i).fromRoot(), 0.0f, 0.0f, 0.0f, this.world);
+                    leg.mantleHipX = this.world.x;
+                    leg.mantleHipY = this.world.y;
+                    leg.mantleHipZ = this.world.z;
+                }
+            }
+        }
     }
 
     /**
@@ -330,7 +351,11 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             missX += this.target.x * k;
             missY += this.target.y * k;
             missZ += this.target.z * k;
-            total += w;
+            // Only the legs that miss share the move: a leg already at its anchor must not dilute
+            // what another needs (the body closing on a wall its hind feet cannot reach yet).
+            if (Math.abs(miss) > MISS_EPSILON) {
+                total += w;
+            }
         }
         // A half-weighted anchor moves the pelvis half as far.
         final float share = 1.0f / Math.max(total, 1.0f);

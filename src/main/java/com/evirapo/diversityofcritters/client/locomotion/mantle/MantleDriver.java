@@ -53,12 +53,15 @@ public final class MantleDriver {
     private final GripPlanner.Hand trailing = new GripPlanner.Hand();
     private final GripPlanner.Hand leadingHind = new GripPlanner.Hand();
     private final GripPlanner.Hand trailingHind = new GripPlanner.Hand();
+    /** Hind leg length, hip to sole, model units: how far below the hips the feet can push. */
+    private final float hindLength;
 
     /**
      * @param rear per leg, in the rig's order: whether it is a hind leg
      * @param side per leg: its hip's sideways position (model X), to pair the diagonals
+     * @param length per leg: hip to sole, model units
      */
-    public MantleDriver(MantleProfile profile, boolean[] rear, float[] side) {
+    public MantleDriver(MantleProfile profile, boolean[] rear, float[] side, float[] length) {
         this.profile = profile;
         this.rear = rear.clone();
         int leadFront = -1;
@@ -89,6 +92,13 @@ public final class MantleDriver {
                 }
             }
         }
+        float hindLength = 0.0f;
+        for (int i = 0; i < rear.length; i++) {
+            if (rear[i]) {
+                hindLength = Math.max(hindLength, length[i]);
+            }
+        }
+        this.hindLength = hindLength;
         this.leadFront = leadFront;
         this.otherFront = otherFront;
         this.leadHind = leadHind;
@@ -132,7 +142,10 @@ public final class MantleDriver {
             GripPlanner.plan(progress.phase, progress.t, lipHeight, this.profile, this.leading, this.trailing);
             GripPlanner.planHind(progress.phase, progress.t, lipHeight,
                     baseDepth(legs, this.leadHind, mantle), baseDepth(legs, this.otherHind, mantle),
-                    state.mantleApproach, this.profile, this.leadingHind, this.trailingHind);
+                    state.mantleApproach,
+                    this.hindFaceHeight(legs, this.leadHind, mantle, lipHeight, unitsPerBlock),
+                    this.hindFaceHeight(legs, this.otherHind, mantle, lipHeight, unitsPerBlock),
+                    this.profile, this.leadingHind, this.trailingHind);
             place(legs, this.leadFront, progress.phase, this.leading, mantle, false);
             place(legs, this.otherFront, progress.phase, this.trailing, mantle, false);
             place(legs, this.leadHind, progress.phase, this.leadingHind, mantle, true);
@@ -159,8 +172,12 @@ public final class MantleDriver {
                 leg.anchorWeight = leg.mantleWeight * authority;
             }
             state.mantleBodyDrop = (float) ((y - state.mantleStartY) * unitsPerBlock) * state.mantleLock * authority;
+            state.mantleTuck = mantle != null
+                    ? (float) (this.tuck(state.mantleProgress, mantle.pastFace(x, z), bodyHalfWidth) * unitsPerBlock) * authority
+                    : state.mantleTuck * (authority / Math.max(state.mantleAuthority.value(), authority));
         } else {
             state.mantleBodyDrop = 0.0f;
+            state.mantleTuck = 0.0f;
             if (state.mantleOwnsAnchors) {
                 state.mantleOwnsAnchors = false;
                 for (LocomotionState.LegState leg : legs) {
@@ -191,6 +208,32 @@ public final class MantleDriver {
             }
         }
     }
+
+    /**
+     * Where on the face a hind foot pushes, above the start: as far down the face as its leg reaches
+     * from where its hip was last frame, so the foot stays against the wall as the body rises
+     * instead of hanging below it. A hip standing off the wall by {@code d} reaches
+     * {@code √(reach² − d²)} down the face. Never below the profile's lowest face grip, never over
+     * the lip.
+     */
+    private double hindFaceHeight(LocomotionState.LegState[] legs, int index, MantleState mantle, double lipHeight,
+                                  float unitsPerBlock) {
+        final double lowest = lipHeight * this.profile.hindFaceGrip;
+        final double top = Math.max(lipHeight - HIND_BELOW_LIP, lowest);
+        if (index < 0 || !legs[index].mantleHipValid) {
+            return lowest;
+        }
+        final LocomotionState.LegState leg = legs[index];
+        final double reach = this.hindLength / unitsPerBlock * HIND_REACH;
+        final double off = Math.max(-mantle.pastFace(leg.mantleHipX, leg.mantleHipZ) - GripPlanner.FACE_GAP, 0.0);
+        final double down = Math.sqrt(Math.max(reach * reach - off * off, 0.0));
+        return Math.min(Math.max(leg.mantleHipY - mantle.startY - down, lowest), top);
+    }
+
+    /** Share of a hind leg's length its foot reaches from the hip: a little past straight, within stretch. */
+    static final double HIND_REACH = 1.05;
+    /** How far under the lip the hind feet push at the highest. */
+    static final double HIND_BELOW_LIP = 0.03;
 
     /** How far in front of the face a hind foot stood when the mantle began (negative). */
     private static double baseDepth(LocomotionState.LegState[] legs, int leg, MantleState mantle) {
@@ -230,6 +273,22 @@ public final class MantleDriver {
             leg.anchorZ = along;
         }
         leg.anchorY = mantle.startY + hand.height;
+    }
+
+    /**
+     * How far the drawn body closes on the wall, blocks: in over the crest, then given back as the
+     * body walks onto the top, never more than the body has yet to walk.
+     */
+    private double tuck(MantleProgress progress, double pastFace, float bodyHalfWidth) {
+        return switch (progress.phase) {
+            case CREST -> this.profile.crestTuck * MantleProgress.smoothstep(progress.t);
+            case RECOVER -> {
+                final double walked = Math.max(pastFace + bodyHalfWidth + MantleMotion.PIN_GAP, 0.0);
+                yield Math.max(this.profile.crestTuck - walked, 0.0)
+                        * (1.0 - MantleProgress.smoothstep(progress.t));
+            }
+            default -> 0.0;
+        };
     }
 
     /** Share of the rise the pose holds down: all of it until the crest, none on top. */

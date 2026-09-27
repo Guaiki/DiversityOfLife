@@ -31,6 +31,8 @@ public final class LocomotionState {
     public final Spring mantleAuthority = new Spring(0.2f);
     /** Body pitch the mantle asks for, radians, model convention (negative lifts the head end). */
     public float mantlePitch;
+    /** How far the drawn body moves toward the wall this frame, model units, after authority. */
+    public float mantleTuck;
     /** How far the body still had to move to the face when the mantle began, blocks. */
     public float mantleApproach;
     /**
@@ -192,6 +194,11 @@ public final class LocomotionState {
         public float anchorShortfall;
         /** Anchor weight the mantle wants for this leg, before its authority. */
         public float mantleWeight;
+        /** Where this leg's hip was when the pose was last written under a mantle, world. */
+        public boolean mantleHipValid;
+        public double mantleHipX;
+        public double mantleHipY;
+        public double mantleHipZ;
         /** Where a hind foot stood when the mantle began, world. */
         public double mantleBaseX;
         public double mantleBaseY;
