@@ -12,6 +12,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 
@@ -65,6 +66,10 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final Vector3f shift = new Vector3f();
     private final Matrix4f worldToPelvis = new Matrix4f();
     private final Vector3f target = new Vector3f();
+    private final Matrix3f aimRotation = new Matrix3f();
+    private final Quaternionf aimTurn = new Quaternionf();
+    private final Quaternionf aimShare = new Quaternionf();
+    private final Vector3f aimAxis = new Vector3f();
     private final float anchorStretchLimit;
     private final float maxAnchorShift;
     /** Legs behind the body's middle (model +Z): the ones a mantle pivots on. */
@@ -353,16 +358,29 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             leg.anchorShortfall = 0.0f;
             return;
         }
-        // The sole hangs down the bone's +Y. With no yaw, rotateZYX(z, 0, x) takes it to
-        // (-sin z cos x, cos z cos x, sin x).
-        final float pitch = (float) Math.asin(Mth.clamp(this.target.z / distance, -1.0f, 1.0f));
-        final float roll = (float) Math.atan2(-this.target.x, this.target.y);
+        // The sole hangs down the bone's +Y. Turn that axis from where the ground pose left it to the
+        // anchor along the shortest arc, and only as far as the weight says. Blending the turn, not
+        // Euler angles, keeps the paw on a straight path: two angles blended apart swing it
+        // sideways, and solving for them directly breaks down (a large roll out of a tiny sideways
+        // offset) when the leg points along the body, as it does reaching up a wall.
+        this.aimRotation.rotationZYX(hip.zRot, hip.yRot, hip.xRot);
+        this.aimAxis.set(0.0f, 1.0f, 0.0f);
+        this.aimRotation.transform(this.aimAxis);
+        this.aimTurn.rotationTo(this.aimAxis.x, this.aimAxis.y, this.aimAxis.z,
+                this.target.x / distance, this.target.y / distance, this.target.z / distance);
+        if (w < 1.0f) {
+            this.aimTurn.set(this.aimShare.identity().nlerp(this.aimTurn, w));
+        }
+        this.aimRotation.rotateLocal(this.aimTurn).getEulerAnglesZYX(this.aimAxis);
+        if (!this.finite(this.aimAxis.x + this.aimAxis.y + this.aimAxis.z, "leg aim")) {
+            return;
+        }
         final float reach = this.reachable(distance, length);
         leg.anchorShortfall = distance - reach;
 
-        hip.xRot = Mth.lerp(w, hip.xRot, pitch);
-        hip.yRot = Mth.lerp(w, hip.yRot, 0.0f);
-        hip.zRot = Mth.lerp(w, hip.zRot, roll);
+        hip.xRot = this.aimAxis.x;
+        hip.yRot = this.aimAxis.y;
+        hip.zRot = this.aimAxis.z;
         hip.yScale = Mth.lerp(w, hip.yScale, reach / length);
     }
 

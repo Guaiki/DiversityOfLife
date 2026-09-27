@@ -162,6 +162,24 @@ class QuadrupedAnchorTest {
         assertTrue(full < half && half < none, full + " < " + half + " < " + none);
     }
 
+    @Test
+    void reachingUpAndForwardTravelsStraightWithoutSplaying() {
+        // Up the front of a wall, reared up: the target ends above the hip, a hair to the side. The
+        // leg points along the body, where solving for Euler angles directly flipped the roll by
+        // nearly half a turn and swept the paw out sideways.
+        final double[] t = offsetFromRest(0.3f, 13.0f, 8.0f);
+        restingState();
+        final double startX = sole(FRONT_LEFT).x;
+        double widest = 0.0;
+        for (int step = 1; step <= 20; step++) {
+            scene(t[0], t[1], t[2], step / 20.0f);
+            final double sideways = Math.abs(sole(FRONT_LEFT).x - startX) * this.unitsPerBlock;
+            widest = Math.max(widest, sideways);
+        }
+        // 0.3 of it is the target's own offset.
+        assertTrue(widest < 0.6, "the paw strayed " + widest + "u sideways on its way");
+    }
+
     /** Every bone's pose values, in a fixed order. */
     private float[] pose() {
         final List<ModelPart> parts = this.model.root().getAllParts().toList();
