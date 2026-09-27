@@ -1,6 +1,11 @@
 package com.evirapo.diversityofcritters.client.models;
 
 import com.evirapo.diversityofcritters.client.animations.SquirrelAnims;
+import com.evirapo.diversityofcritters.client.locomotion.ILocomotionModel;
+import com.evirapo.diversityofcritters.client.locomotion.LocomotionRig;
+import com.evirapo.diversityofcritters.client.locomotion.QuadrupedRig;
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
+import net.minecraft.client.Minecraft;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -14,9 +19,13 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import org.joml.Vector3f;
 
-public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T> {
+public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T> implements ILocomotionModel<T> {
 
     private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
+    /** The model is drawn at half size, like the civet's. */
+    private static final float MODEL_SCALE = 0.5F;
+
+    private final LocomotionRig<T> locomotionRig;
 
     // Flags para renderToBuffer — se actualizan en setupAnim cada frame.
     private boolean isClimbingRender = false;
@@ -82,6 +91,19 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
         this.Toe1        = this.Leg.getChild("Toe1");
         this.Leg2        = this.squirrel.getChild("Leg2");
         this.Toe2        = this.Leg2.getChild("Toe2");
+
+        // The legs hang straight from the root; their feet and toes ride along rigidly.
+        // Front left/right, rear left/right; the first leads the grips of a mantle.
+        this.locomotionRig = QuadrupedRig.<T, SquirrelModel<T>>builder(this)
+                .pelvis("root")
+                .legs("Leg4", "Leg3", "Leg", "Leg2")
+                // Starting values, to be tuned by eye with the overlay (F6) and bypass (F9).
+                .stabilise("Head", 0.6F)
+                .lag("Tail", 0.1F, 0.3F, 35.0F)
+                .arch("Head", 0.5F)
+                .arch("Tail", -0.6F)
+                .mantle(MantleProfile.SQUIRREL)
+                .build();
     }
 
     public static LayerDefinition createBodyLayer() {
@@ -233,10 +255,17 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
-    public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount,
+    public void setupAnim(T entity, float limbSwing, float limbSwingAmount,
                           float ageInTicks, float netHeadYaw, float headPitch) {
-
         this.root().getAllParts().forEach(ModelPart::resetPose);
+        this.animatePose(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+        // Last, so it corrects the finished pose. Runs even when the animation stood the rig down
+        // (sleeping, gliding, climbing): that is what lets it fade out instead of snapping off.
+        this.locomotionRig.apply(entity, Minecraft.getInstance().getPartialTick());
+    }
+
+    private void animatePose(T entity, float limbSwing, float limbSwingAmount,
+                             float ageInTicks, float netHeadYaw, float headPitch) {
 
         boolean sleepingLike    = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
         boolean gliding         = entity.isGliding();
@@ -306,8 +335,10 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
 
             float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
             float idleWeight   = busyBody ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
-            float sprintWeight = entity.sprintProgress;
-            float walkWeight   = 1.0F - sprintWeight;
+            // A mantle poses the legs itself; the walk cycle steps aside for it.
+            float cycleWeight  = 1.0F - this.locomotionRig.mantleAuthority(entity);
+            float sprintWeight = entity.sprintProgress * cycleWeight;
+            float walkWeight   = (1.0F - entity.sprintProgress) * cycleWeight;
 
             if (idleWeight > 0.01F) {
                 animateWithWeight(entity.idleAnimationState, SquirrelAnims.Idle, ageInTicks, idleWeight);
@@ -360,8 +391,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     // ─────────────────────────────────────────────────────────────────────────
 
     public void translateToBone11(PoseStack poseStack) {
-        poseStack.scale(0.5f, 0.5f, 0.5f);
-        poseStack.translate(0.0, 1.5, 0.0);
+        this.applyRootTransform(poseStack);
         this.squirrel.translateAndRotate(poseStack);
         this.Leg3.translateAndRotate(poseStack);
         this.bone11.translateAndRotate(poseStack);
@@ -373,9 +403,7 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
                                float red, float green, float blue, float alpha) {
         poseStack.pushPose();
 
-
-        poseStack.scale(0.5f, 0.5f, 0.5f);
-        poseStack.translate(0, 1.5F, 0);
+        this.applyRootTransform(poseStack);
 
         if (this.isClimbingRender) {
             if (this.isClimbingDownRender) {
@@ -396,6 +424,21 @@ public class SquirrelModel<T extends SquirrelEntity> extends HierarchicalModel<T
     @Override
     public ModelPart root() {
         return squirrel;
+    }
+
+    /**
+     * Shared with the locomotion rig and the leaf layer, so bones are placed in the world exactly
+     * where they are drawn.
+     */
+    @Override
+    public void applyRootTransform(PoseStack poseStack) {
+        poseStack.scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        poseStack.translate(0.0F, 1.5F, 0.0F);
+    }
+
+    @Override
+    public float rendererScale(T entity) {
+        return entity.growthScale();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

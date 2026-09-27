@@ -11,10 +11,10 @@
 | 0 — Pipeline de locomoción base + rig de terreno en el civet | ✅ Hecho (88 tests en verde). Rig de terreno probado en juego; cabeza/cola (0.6) pendientes de ajuste fino en juego |
 | 1 — `LedgeSampler` | ✅ Hecho. Overlay probado en juego |
 | 2 — Objetivos de pata anclados al mundo | ✅ Hecho. Pin (F10) probado en juego |
-| 3 — `MantleDriver` + `GripPlanner` + arqueo | ✅ Código y tests completos (150). MVP probado en juego; falta ver 3.2 (agarres), 3.7 (arqueo) y 3.8 (salto del juvenil) |
+| 3 — `MantleDriver` + `GripPlanner` + arqueo | ✅ Hecho. Probado en juego |
 | 4 — Lado servidor: controlador de mantle | ✅ Hecho. Probado en juego (H2 validado) |
-| 5 — Overlay de debug del mantle (en paralelo con 3) | ✅ Código. Falta verlo en juego |
-| 6 — Integración y tuning (civet → squirrel) | ⬜ Pendiente |
+| 5 — Overlay de debug del mantle (en paralelo con 3) | ✅ Hecho. Probado en juego |
+| 6 — Integración y tuning (civet → squirrel) | 🟨 6.1/6.2 civet validado en juego. 6.3 squirrel: código y tests (154); falta probarlo en juego. 6.4 tuning abierto |
 
 ---
 
@@ -502,6 +502,31 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
 | 6.2 | Civet juvenil (escala 0.65): verificar micro-salto y presupuesto. Newborn: excluido (`maxUpStep` 0.5, no necesita mantle). | 0.5 d |
 | 6.3 | Squirrel: rig en `SquirrelModel` sobre los huesos raíz de cada pata (los hijos siguen rígidos); si hace falta doblar rodilla, solver analítico de dos huesos (ley de cosenos) en `math/`. `applyRootTransform` compartido con `translateToBone11` para que la capa de hojas no se desalinee; reconciliar con `SquirrelGlideGoal` y sus estados de trepada. | 2 – 3 d |
 | 6.4 | Tuning general sobre capturas: losas, escaleras, bordes en diagonal, grupos de civets, lag simulado. | 3 – 5 d |
+
+**Notas de lo hecho**
+- 6.1/6.2: civet adulto y juvenil validados en juego con los valores por defecto del perfil. Newborn excluido
+  (`MantleController.tryStartFromPath` no arranca con `isNewborn()`).
+- 6.3 Squirrel, sin tocar la malla:
+  - Rig en `SquirrelModel`: pelvis = raíz, patas `Leg4`, `Leg3` (delanteras) y `Leg`, `Leg2` (traseras), un
+    hueso cada una; pies y dedos (`bone10/11/16/17`, `Toe1/2`) son hijos rígidos. Suela a 12.02 / 12 u. No hizo
+    falta el solver de dos huesos.
+  - `applyRootTransform` (escala 0.5 + `translate(0, 1.5, 0)`) lo usan `renderToBuffer`, el rig **y**
+    `translateToBone11`, así la capa de hojas no se desalinea.
+  - `SquirrelEntity`: `isLocomotionSuspended` añade planeo y comer planta; `growthScale()` (lo lee también
+    `SquirrelRenderer.scale`); `maxUpStep` 0 durante el mantle; `updateClimbState` no pasa a `CLIMB_UP` con mantle.
+  - `SquirrelGlideGoal` no arranca con mantle activo; `SquirrelMoveControl` cede el movimiento al mantle igual
+    que el del civet.
+  - `MantleProfile.SQUIRREL`: patas de 0.375 bloques y caderas a 0.22 → alcance ≈ 0.97, así que **el adulto
+    también salta** el último tramo de un bloque completo (`reach` 0.95). Resto de valores, los del civet.
+  - El disparo por path pasó a `MantleController.tryStartFromPath()`, compartido por las dos especies.
+  - `SquirrelRigSceneTest`: suelas en su sitio, terreno, y traseras plantadas mientras se encabrita.
+
+**Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
+1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
+2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.
+3. Planear, trepar un tronco alto, dormir, comer: rig apagado (gate 0).
+4. `/civet_debug mantle` no sirve (busca civets): dejar que el path suba a un bloque (comida encima). El salto
+   del final de la subida debe verse también en el adulto.
 
 ---
 

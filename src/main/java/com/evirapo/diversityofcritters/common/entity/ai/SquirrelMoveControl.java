@@ -1,5 +1,6 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
+import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
@@ -34,6 +35,12 @@ public class SquirrelMoveControl extends MoveControl {
 
     @Override
     public void tick() {
+        // A ledge climb in progress owns movement outright.
+        final MantleController mantle = this.squirrel.mantle();
+        if (mantle != null && mantle.tick()) {
+            return;
+        }
+
         boolean isGlidingNow = this.squirrel.isGliding();
 
         // --- GLIDE: manos fuera. SquirrelGlideGoal es dueño de la física. ---
@@ -89,6 +96,10 @@ public class SquirrelMoveControl extends MoveControl {
         }
 
         if (!this.squirrel.getNavigation().isDone()) {
+            // Before the climb logic: a climbable column one block high is mantled, not climbed.
+            if (mantle != null && mantle.tryStartFromPath()) {
+                return;
+            }
             updateClimbDirectionFromPath();
             // updateClimbDirectionFromPath puede haber entregado el control al glide.
             if (this.squirrel.isGliding()) {

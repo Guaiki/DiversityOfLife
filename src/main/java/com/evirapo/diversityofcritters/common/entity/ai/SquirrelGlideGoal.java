@@ -72,7 +72,7 @@ public class SquirrelGlideGoal extends Goal {
 
         // ESCENARIO 2: en altura, cayendo, sin pared trepable.
         if (squirrel.isNewborn() || squirrel.isSleeping() || squirrel.isOrderedToSit()) return false;
-        if (squirrel.onGround() || squirrel.isClimbing()) return false;
+        if (squirrel.onGround() || squirrel.isClimbing() || squirrel.isMantling()) return false;
         if (squirrel.isInWater() || squirrel.isInWaterOrBubble()) return false;
         if (squirrel.isInPostGlideCooldown()) return false;
         // Block glide during the brief arc after cresting a log column: the squirrel

@@ -10,6 +10,9 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -29,6 +32,8 @@ import org.slf4j.Logger;
 public final class MantleController {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    /** A path node this close (horizontally, squared) is near enough to start mantling toward. */
+    private static final double PATH_NODE_RANGE_SQR = 1.5D * 1.5D;
     /** How often the lip is checked for having been broken or changed, in ticks. */
     private static final int LIP_CHECK_INTERVAL = 4;
     /** How far the lip's top may move before it counts as a different lip. */
@@ -112,6 +117,33 @@ public final class MantleController {
         LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}{}", this.critter, this.lip, this.facing,
                 String.format("%.2f", s.lipHeight), this.hop ? ", with a hop" : "");
         return true;
+    }
+
+    /**
+     * Starts a mantle when the path's next node is one block up and near: the probe then decides
+     * whether there is a ledge to climb, or a step, stairs or a wall to climb instead. Call before
+     * the species' own climb logic, while vanilla would still step the body straight up the block.
+     * Newborns never mantle.
+     */
+    public boolean tryStartFromPath() {
+        if (this.active || this.critter.isNewborn()) {
+            return false;
+        }
+        final Path path = this.critter.getNavigation().getPath();
+        if (path == null || path.isDone() || path.getNextNodeIndex() >= path.getNodeCount()) {
+            return false;
+        }
+        final Node next = path.getNode(path.getNextNodeIndex());
+        if (next.y != Mth.floor(this.critter.getY() + 0.01D) + 1) {
+            return false;
+        }
+        final double dx = next.x + 0.5D - this.critter.getX();
+        final double dz = next.z + 0.5D - this.critter.getZ();
+        if (dx * dx + dz * dz > PATH_NODE_RANGE_SQR) {
+            return false;
+        }
+        final float headingYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
+        return this.tryStart(headingYaw, true);
     }
 
     /**

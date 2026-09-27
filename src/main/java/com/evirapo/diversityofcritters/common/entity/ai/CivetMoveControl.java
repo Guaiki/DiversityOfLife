@@ -20,8 +20,6 @@ public class CivetMoveControl extends MoveControl {
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
     private static final int LOOKAHEAD_NODES = 5;
-    /** A path node this close (horizontally, squared) is near enough to start mantling toward. */
-    private static final double MANTLE_NODE_RANGE_SQR = 1.5D * 1.5D;
 
     private boolean wasClimbingLastTick = false;
     private int postClimbDampingTicks = 0;
@@ -80,7 +78,7 @@ public class CivetMoveControl extends MoveControl {
 
         if (!this.civet.getNavigation().isDone()) {
             // Before the climb logic: a climbable column one block high is mantled, not climbed.
-            if (this.tryMantleFromPath()) {
+            if (mantle != null && mantle.tryStartFromPath()) {
                 return;
             }
             updateClimbDirectionFromPath();
@@ -116,33 +114,6 @@ public class CivetMoveControl extends MoveControl {
         } else {
             this.civet.setZza(0.0F);
         }
-    }
-
-    /**
-     * Starts a mantle when the path's next node is one block up and near: the probe then decides
-     * whether there is a ledge to climb, or a step, stairs or a wall to climb instead. Runs before
-     * the body touches the wall, while vanilla would still step it straight up the block.
-     */
-    private boolean tryMantleFromPath() {
-        final MantleController mantle = this.civet.mantle();
-        if (mantle == null || this.civet.isNewborn() || this.civet.isClimbing()) {
-            return false;
-        }
-        final Path path = this.civet.getNavigation().getPath();
-        if (path == null || path.isDone() || path.getNextNodeIndex() >= path.getNodeCount()) {
-            return false;
-        }
-        final Node next = path.getNode(path.getNextNodeIndex());
-        if (next.y != Mth.floor(this.civet.getY() + 0.01D) + 1) {
-            return false;
-        }
-        final double dx = next.x + 0.5D - this.civet.getX();
-        final double dz = next.z + 0.5D - this.civet.getZ();
-        if (dx * dx + dz * dz > MANTLE_NODE_RANGE_SQR) {
-            return false;
-        }
-        final float headingYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
-        return mantle.tryStart(headingYaw, true);
     }
 
     private void updateClimbDirectionFromPath() {

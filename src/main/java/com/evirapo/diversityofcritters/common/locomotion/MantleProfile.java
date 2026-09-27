@@ -9,6 +9,12 @@ public final class MantleProfile {
     /** Civet: one full block, but not fences or walls. */
     public static final MantleProfile CIVET = builder().build();
 
+    /**
+     * Squirrel: shorter legs and hips closer together than the civet's reach about 0.97 blocks
+     * rearing up, so even an adult hops the last of a full block.
+     */
+    public static final MantleProfile SQUIRREL = builder().hop(0.95, 0.5, 3.0).build();
+
     // --- The ledge probe.
     /** A rise lower than this is an ordinary step, not a ledge. */
     public final double minMantleHeight;

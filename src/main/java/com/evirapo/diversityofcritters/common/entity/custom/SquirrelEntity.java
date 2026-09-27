@@ -1,5 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
+import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
+import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -157,6 +159,7 @@ public class SquirrelEntity extends DiverseCritter {
     public SquirrelEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
+        this.mantle = new MantleController(this, MantleProfile.SQUIRREL);
         this.moveControl = new SquirrelMoveControl(this);
         this.idleAnimationState.start(0);
     }
@@ -248,7 +251,8 @@ public class SquirrelEntity extends DiverseCritter {
 
             boolean isNewborn = this.isNewborn();
             double desiredSpeed = isNewborn ? 0.1D : 0.25D;
-            float desiredStep   = isNewborn ? 0.5F : 1.0F;
+            // A mantle lifts the body itself; vanilla stepping would jump it up the block at once.
+            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : 1.0F);
 
             if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
                 this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);
@@ -692,6 +696,21 @@ public class SquirrelEntity extends DiverseCritter {
     // --- GLIDE ---
     public boolean isGliding() { return this.entityData.get(IS_GLIDING); }
 
+    /** Gliding and eating pose the legs themselves; the rig stands down. */
+    @Override
+    public boolean isLocomotionSuspended() {
+        return super.isLocomotionSuspended() || this.isGliding() || this.isEatingPlant();
+    }
+
+    /** Drawn at this size by the renderer; the rig and the mantle measure legs with it. */
+    @Override
+    public float growthScale() {
+        if (this.isNewborn()) {
+            return 0.45F;
+        }
+        return this.isJuvenile() ? 0.65F : 1.0F;
+    }
+
     /** Al apagar el glide se arman AMBOS cooldowns (postGlide + postDescent):
      *  triple protección contra el re-trigger del climb al aterrizar. */
     public void setGliding(boolean gliding) {
@@ -950,6 +969,7 @@ public class SquirrelEntity extends DiverseCritter {
         }
 
         if (this.postDescentCooldown > 0 || this.postGlideCooldown > 0) return;
+        if (this.isMantling()) return;
         if (!this.horizontalCollision || !hasClimbable) return;
         if (this.isEatingPlant() || this.isNewborn() || this.onGround()) return;
         if (this.isInWater() || this.isInWaterOrBubble()) return;

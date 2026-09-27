@@ -45,13 +45,8 @@ public class SquirrelRenderer <T extends SquirrelEntity> extends MobRenderer<T, 
 
     @Override
     protected void scale(@NotNull T entity, PoseStack poseStack, float partialTickTime) {
-        if (entity.isNewborn()) {
-            poseStack.scale(0.45F, 0.45F, 0.45F);
-        } else if (entity.isJuvenile()) {
-            poseStack.scale(0.65F, 0.65F, 0.65F);
-        } else {
-            poseStack.scale(1.0F, 1.0F, 1.0F);
-        }
+        final float scale = entity.growthScale();
+        poseStack.scale(scale, scale, scale);
         super.scale(entity, poseStack, partialTickTime);
     }
 
