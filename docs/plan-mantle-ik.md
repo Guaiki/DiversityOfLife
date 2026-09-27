@@ -521,6 +521,19 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   - El disparo por path pasó a `MantleController.tryStartFromPath()`, compartido por las dos especies.
   - `SquirrelRigSceneTest`: suelas en su sitio, terreno, y traseras plantadas mientras se encabrita.
 
+**6.4 — ajustes tras probar en juego**
+- Las delanteras se abrían hacia fuera antes de apoyarse en la pared. Causa: la pata anclada se apuntaba
+  resolviendo dos ángulos de Euler (`asin`/`atan2`) y mezclándolos con los de la ruta de suelo. Encabritado, el
+  objetivo queda por encima de la cadera (`d.y < 0`) y el `atan2` voltea el roll casi media vuelta por un
+  desvío lateral mínimo. Ahora la pata gira desde donde la dejó la ruta de suelo hasta el ancla por el arco más
+  corto (cuaternión, `nlerp` por el peso) y se vuelve a Euler con `getEulerAnglesZYX`. Test: alcanzando
+  pared arriba, antes se desviaba 7.96 u de lado; ahora queda dentro del desvío propio del objetivo.
+- Sólo las delanteras "caminaban". `GripPlanner.planHind`: en RISE cada trasera da `hindSteps` (1) pasos
+  alternos hacia la pared (`hindStepLength` 0.06, `hindStepLift` 0.06), en CREST trepan la cara una tras otra
+  hasta `hindFaceGrip` (0.45 del labio) y en RECOVER vuelven a la ruta de suelo. La primera trasera en moverse
+  es la diagonal a la delantera que lidera y se mueve a la vez que ella (marcha diagonal). Nunca dos traseras
+  en el aire, nunca dentro de la pared, continuo entre fases (tests).
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

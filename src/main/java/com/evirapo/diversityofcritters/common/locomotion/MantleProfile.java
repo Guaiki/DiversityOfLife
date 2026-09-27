@@ -70,6 +70,13 @@ public final class MantleProfile {
     public final double firstGripLow;
     /** How far a paw leaves the face in the middle of a swing between grips. */
     public final double swingOut;
+    /** Steps each hind leg takes toward the wall while the body rears up. */
+    public final int hindSteps;
+    /** How far each of those steps goes, and how high the foot lifts on it, blocks. */
+    public final double hindStepLength;
+    public final double hindStepLift;
+    /** Where the hind feet scramble onto the face over the crest, as a share of the lip's height. */
+    public final double hindFaceGrip;
 
     private MantleProfile(Builder b) {
         if (!(b.minMantleHeight > 0.0 && b.maxMantleHeight >= b.minMantleHeight && b.probeDistance > 0.0)) {
@@ -79,6 +86,11 @@ public final class MantleProfile {
         if (!(b.reach > 0.0 && b.hopFrom >= 0.0 && b.hopFrom < 1.0 && b.hopBoost >= 1.0)) {
             throw new IllegalArgumentException("Bad mantle hop: reach " + b.reach + ", from " + b.hopFrom
                     + ", boost " + b.hopBoost);
+        }
+        if (!(b.hindSteps >= 0 && b.hindStepLength >= 0.0 && b.hindStepLift >= 0.0
+                && b.hindFaceGrip >= 0.0 && b.hindFaceGrip <= 1.0)) {
+            throw new IllegalArgumentException("Bad mantle hind steps: " + b.hindSteps + " of " + b.hindStepLength
+                    + " lifting " + b.hindStepLift + ", face grip " + b.hindFaceGrip);
         }
         if (!(b.gripsPerHand > 0 && b.firstGripLow >= 0.0 && b.firstGripHigh <= 1.0 && b.swingOut >= 0.0)) {
             throw new IllegalArgumentException("Bad mantle grips: " + b.gripsPerHand + " per paw, first at "
@@ -116,6 +128,10 @@ public final class MantleProfile {
         this.firstGripHigh = b.firstGripHigh;
         this.firstGripLow = b.firstGripLow;
         this.swingOut = b.swingOut;
+        this.hindSteps = b.hindSteps;
+        this.hindStepLength = b.hindStepLength;
+        this.hindStepLift = b.hindStepLift;
+        this.hindFaceGrip = b.hindFaceGrip;
     }
 
     /** Starts from the civet's numbers. */
@@ -148,6 +164,10 @@ public final class MantleProfile {
         private double firstGripHigh = 0.75;
         private double firstGripLow = 0.5;
         private double swingOut = 0.12;
+        private int hindSteps = 1;
+        private double hindStepLength = 0.06;
+        private double hindStepLift = 0.06;
+        private double hindFaceGrip = 0.45;
 
         private Builder() {
         }
@@ -237,6 +257,20 @@ public final class MantleProfile {
             this.firstGripHigh = firstHigh;
             this.firstGripLow = firstLow;
             this.swingOut = swingOut;
+            return this;
+        }
+
+        /**
+         * @param steps    steps each hind leg takes toward the wall while rearing up
+         * @param length   how far each goes, blocks
+         * @param lift     how high the foot lifts on it, blocks
+         * @param faceGrip where the hind feet scramble onto the face, as a share of the lip's height
+         */
+        public Builder hindSteps(int steps, double length, double lift, double faceGrip) {
+            this.hindSteps = steps;
+            this.hindStepLength = length;
+            this.hindStepLift = lift;
+            this.hindFaceGrip = faceGrip;
             return this;
         }
 

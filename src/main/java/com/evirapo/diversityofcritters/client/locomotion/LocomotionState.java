@@ -185,6 +185,10 @@ public final class LocomotionState {
         public float anchorShortfall;
         /** Anchor weight the mantle wants for this leg, before its authority. */
         public float mantleWeight;
+        /** Where a hind foot stood when the mantle began, world. */
+        public double mantleBaseX;
+        public double mantleBaseY;
+        public double mantleBaseZ;
         /** The debug pin owns this leg's anchor. */
         public boolean debugPinned;
 

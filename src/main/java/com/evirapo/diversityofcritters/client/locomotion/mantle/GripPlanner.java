@@ -5,7 +5,8 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
 
 /**
- * Where the two front paws are through a mantle, relative to the wall, free of Minecraft types.
+ * Where the paws are through a mantle, relative to the wall, free of Minecraft types. Front paws
+ * climb the face ({@link #plan}); hind feet step in and scramble up after them ({@link #planHind}).
  *
  * <ul>
  *   <li>REACH: both paws come up to their first grips on the face, one higher than the other.</li>
@@ -74,6 +75,92 @@ public final class GripPlanner {
                 second.set(0.0, 0.0, 0.0f, 0.0f);
             }
         }
+    }
+
+    /**
+     * The hind feet, walking with the front paws: the first hind foot to move is the one diagonal to
+     * the leading front paw, and it swings when that paw does.
+     *
+     * <ul>
+     *   <li>REACH: planted where they stood.</li>
+     *   <li>RISE: {@code 2 × hindSteps} alternate steps toward the wall, each a small arc.</li>
+     *   <li>CREST: one after the other, they scramble onto the face below the lip.</li>
+     *   <li>RECOVER: on the face, handing back to the ground path.</li>
+     * </ul>
+     *
+     * @param firstDepth  where the first foot stood, past the face (negative)
+     * @param secondDepth likewise for the other
+     */
+    public static void planHind(MantlePhase phase, float t, double lipHeight, double firstDepth,
+                                double secondDepth, MantleProfile profile, Hand first, Hand second) {
+        final double faceHeight = lipHeight * profile.hindFaceGrip;
+        switch (phase) {
+            case REACH -> {
+                first.set(0.0, stepDepth(firstDepth, 0, profile), 1.0f, 0.0f);
+                second.set(0.0, stepDepth(secondDepth, 0, profile), 1.0f, 0.0f);
+            }
+            case RISE -> {
+                final int swings = 2 * profile.hindSteps;
+                if (swings == 0) {
+                    first.set(0.0, stepDepth(firstDepth, 0, profile), 1.0f, 0.0f);
+                    second.set(0.0, stepDepth(secondDepth, 0, profile), 1.0f, 0.0f);
+                    return;
+                }
+                final float scaled = Math.max(0.0f, Math.min(t, 1.0f)) * swings;
+                final int swing = Math.min((int) scaled, swings - 1);
+                final float u = scaled - swing;
+                final int firstDone = (swing + 1) / 2;
+                final int secondDone = swing / 2;
+                if (swing % 2 == 0) {
+                    step(first, firstDepth, firstDone, u, profile);
+                    second.set(0.0, stepDepth(secondDepth, secondDone, profile), 1.0f, 0.0f);
+                } else {
+                    first.set(0.0, stepDepth(firstDepth, firstDone, profile), 1.0f, 0.0f);
+                    step(second, secondDepth, secondDone, u, profile);
+                }
+            }
+            case CREST -> {
+                final double firstGround = stepDepth(firstDepth, profile.hindSteps, profile);
+                final double secondGround = stepDepth(secondDepth, profile.hindSteps, profile);
+                if (t < 0.5f) {
+                    scramble(first, firstGround, faceHeight, t * 2.0f, profile);
+                    second.set(0.0, secondGround, 1.0f, 0.0f);
+                } else {
+                    first.set(faceHeight, -FACE_GAP, 1.0f, 0.0f);
+                    scramble(second, secondGround, faceHeight, Math.min((t - 0.5f) * 2.0f, 1.0f), profile);
+                }
+            }
+            case RECOVER -> {
+                final float s = MantleProgress.smoothstep(t);
+                first.set(faceHeight, -FACE_GAP, 1.0f - s, 0.0f);
+                second.set(faceHeight, -FACE_GAP, 1.0f - s, 0.0f);
+            }
+            default -> {
+                first.set(0.0, 0.0, 0.0f, 0.0f);
+                second.set(0.0, 0.0, 0.0f, 0.0f);
+            }
+        }
+    }
+
+    /** A foot's depth after {@code steps} steps from {@code start}, never closer than the face allows. */
+    static double stepDepth(double start, int steps, MantleProfile profile) {
+        return Math.min(start + steps * profile.hindStepLength, -FACE_GAP);
+    }
+
+    /** One step toward the wall, lifting the foot in the middle. */
+    private static void step(Hand hand, double start, int done, float u, MantleProfile profile) {
+        final float s = MantleProgress.smoothstep(u);
+        final float bulge = (float) Math.sin(Math.PI * u);
+        final double depth = lerp(s, stepDepth(start, done, profile), stepDepth(start, done + 1, profile));
+        hand.set(profile.hindStepLift * bulge, depth, 1.0f, bulge);
+    }
+
+    /** From the ground onto the face, pulling back off it in the middle. */
+    private static void scramble(Hand hand, double groundDepth, double faceHeight, float u, MantleProfile profile) {
+        final float s = MantleProgress.smoothstep(u);
+        final float bulge = (float) Math.sin(Math.PI * u);
+        final double depth = lerp(s, groundDepth, -FACE_GAP) - profile.hindStepLift * bulge;
+        hand.set(lerp(s, 0.0, faceHeight), depth, 1.0f, bulge);
     }
 
     /**

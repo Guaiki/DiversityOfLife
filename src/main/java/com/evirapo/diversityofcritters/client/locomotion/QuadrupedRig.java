@@ -94,10 +94,13 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         this.anchorStretchLimit = builder.anchorStretchLimit;
         this.maxAnchorShift = builder.maxAnchorShiftFraction * legs.get(0).soleOffset();
         this.rear = new boolean[legs.size()];
+        final float[] side = new float[legs.size()];
         for (int i = 0; i < legs.size(); i++) {
             this.rear[i] = legs.get(i).hip().z > 0.0f;
+            side[i] = legs.get(i).hip().x;
         }
-        this.mantle = builder.mantleProfile == null ? null : new MantleDriver(builder.mantleProfile, this.rear);
+        this.mantle = builder.mantleProfile == null ? null
+                : new MantleDriver(builder.mantleProfile, this.rear, side);
         this.shiftX = new float[legs.size()];
         this.shiftY = new float[legs.size()];
         this.shiftZ = new float[legs.size()];

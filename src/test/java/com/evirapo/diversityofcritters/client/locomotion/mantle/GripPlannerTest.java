@@ -108,6 +108,78 @@ class GripPlannerTest {
         assertTrue(this.first.depth < -GripPlanner.FACE_GAP - 0.05, "mid-swing depth " + this.first.depth);
     }
 
+    private static final double HIND_FIRST = -0.3;
+    private static final double HIND_SECOND = -0.28;
+
+    private void planHind(MantlePhase phase, float t, MantleProfile profile) {
+        GripPlanner.planHind(phase, t, LIP, HIND_FIRST, HIND_SECOND, profile, this.first, this.second);
+    }
+
+    @Test
+    void hindFeetNeverBothInTheAir() {
+        final MantleProfile twoSteps = MantleProfile.builder().hindSteps(2, 0.05, 0.05, 0.5).build();
+        for (MantleProfile profile : new MantleProfile[]{ONE, twoSteps}) {
+            for (MantlePhase phase : ORDER) {
+                for (int i = 0; i <= STEPS; i++) {
+                    planHind(phase, i / (float) STEPS, profile);
+                    assertTrue(this.first.swingWeight == 0.0f || this.second.swingWeight == 0.0f,
+                            phase + " at " + i + ": both hind feet off");
+                }
+            }
+        }
+    }
+
+    @Test
+    void hindFeetNeverEnterTheWall() {
+        for (MantlePhase phase : ORDER) {
+            for (int i = 0; i <= STEPS; i++) {
+                planHind(phase, i / (float) STEPS, ONE);
+                assertTrue(this.first.depth <= -GripPlanner.FACE_GAP + 1.0e-12, phase + " first at " + this.first.depth);
+                assertTrue(this.second.depth <= -GripPlanner.FACE_GAP + 1.0e-12, phase + " second at " + this.second.depth);
+            }
+        }
+    }
+
+    @Test
+    void hindFeetContinuousAcrossPhases() {
+        for (int p = 0; p + 1 < ORDER.length; p++) {
+            planHind(ORDER[p], 1.0f, ONE);
+            final double[] end = snapshot();
+            planHind(ORDER[p + 1], 0.0f, ONE);
+            final double[] start = snapshot();
+            for (int k = 0; k < end.length; k++) {
+                assertEquals(end[k], start[k], 1.0e-6, ORDER[p] + " into " + ORDER[p + 1] + ", value " + k);
+            }
+        }
+    }
+
+    @Test
+    void hindFeetWalkWithTheFrontPaws() {
+        // The first hind foot swings when the leading paw does, the second with the other paw.
+        GripPlanner.plan(MantlePhase.RISE, 0.25f, LIP, ONE, this.first, this.second);
+        final boolean leadPawSwings = this.first.swingWeight > 0.0f;
+        planHind(MantlePhase.RISE, 0.25f, ONE);
+        assertTrue(leadPawSwings && this.first.swingWeight > 0.5f && this.second.swingWeight == 0.0f);
+
+        GripPlanner.plan(MantlePhase.RISE, 0.75f, LIP, ONE, this.first, this.second);
+        final boolean otherPawSwings = this.second.swingWeight > 0.0f;
+        planHind(MantlePhase.RISE, 0.75f, ONE);
+        assertTrue(otherPawSwings && this.second.swingWeight > 0.5f && this.first.swingWeight == 0.0f);
+    }
+
+    @Test
+    void hindFeetStepInThenClimbTheFace() {
+        planHind(MantlePhase.RISE, 1.0f, ONE);
+        assertEquals(HIND_FIRST + ONE.hindStepLength, this.first.depth, 1.0e-9);
+        assertEquals(HIND_SECOND + ONE.hindStepLength, this.second.depth, 1.0e-9);
+        assertEquals(0.0, this.first.height, 1.0e-9);
+
+        planHind(MantlePhase.CREST, 1.0f, ONE);
+        assertEquals(LIP * ONE.hindFaceGrip, this.first.height, 1.0e-9);
+        assertEquals(LIP * ONE.hindFaceGrip, this.second.height, 1.0e-9);
+        assertEquals(-GripPlanner.FACE_GAP, this.first.depth, 1.0e-9);
+    }
+
     private double[] snapshot() {
         return new double[]{this.first.height, this.first.depth, this.first.anchorWeight, this.first.swingWeight,
                 this.second.height, this.second.depth, this.second.anchorWeight, this.second.swingWeight};
