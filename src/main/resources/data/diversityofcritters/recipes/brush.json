@@ -7,7 +7,7 @@
   ],
   "key": {
     "S": { "item": "minecraft:stick" },
-    "F": { "item": "minecraft:wheat" }
+    "W": { "item": "minecraft:wheat" }
   },
   "result": {
     "item": "diversityofcritters:brush",

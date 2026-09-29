@@ -26,7 +26,10 @@ public class CivetClimbGoal extends Goal {
 
     public CivetClimbGoal(CivetEntity civet, double speed, int searchRadius) {
         this.civet = civet;
-        this.setFlags(EnumSet.of(Flag.MOVE));
+        // LOOK además de MOVE: sin él, LookAtPlayerGoal y RandomLookAroundGoal siguen corriendo
+        // mientras la civeta cuelga del tronco, y con LookAtAdditive dibujando la cabeza eso se ve
+        // como un temblor. Spec §5.
+        this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }
 
     @Override

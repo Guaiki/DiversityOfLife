@@ -7,9 +7,16 @@ import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.client.animations.SquirrelAnims;
+import com.evirapo.diversityofcritters.client.animations.SquirrelBabyAnims;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
+import net.darkblade.deluxelib.anim.AnimSource;
+import net.darkblade.deluxelib.anim.Loop;
+import net.darkblade.deluxelib.anim.StandardAnimation;
+
+import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -71,34 +78,8 @@ public class SquirrelEntity extends DiverseCritter {
         return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
     }
 
-    // --- ANIMATION STATES ---
-    public final AnimationState idleAnimationState   = new AnimationState();
-    public final AnimationState idleStandUpState     = new AnimationState();
-    public final AnimationState idleSniffLeftState   = new AnimationState();
-    public final AnimationState idleSniffRightState  = new AnimationState();
-    public final AnimationState idleSitStartingState = new AnimationState();
-    public final AnimationState idleSitState         = new AnimationState();
-    public final AnimationState idleSitEndingState   = new AnimationState();
-    public final AnimationState idleLayStartingState = new AnimationState();
-    public final AnimationState idleLayState         = new AnimationState();
-    public final AnimationState idleLayEndingState   = new AnimationState();
-    public final AnimationState climbIdleState       = new AnimationState();
-    public final AnimationState climbingUpState      = new AnimationState();
-    public final AnimationState climbingDownState    = new AnimationState();
-    public final AnimationState drinkStartingState   = new AnimationState();
-    public final AnimationState drinkIdleState       = new AnimationState();
-    public final AnimationState drinkEndingState     = new AnimationState();
-    public final AnimationState cleanStartingState   = new AnimationState();
-    public final AnimationState cleanIdleState       = new AnimationState();
-    public final AnimationState cleanEndingState     = new AnimationState();
-    public final AnimationState preparingCryState    = new AnimationState();
-    public final AnimationState cryingState          = new AnimationState();
-    public final AnimationState stoppingCryState     = new AnimationState();
-    public final AnimationState swimAnimationState   = new AnimationState();
-    public final AnimationState glideState            = new AnimationState();
-    public final AnimationState eatPlantStartingState = new AnimationState();
-    public final AnimationState eatPlantIdleState     = new AnimationState();
-    public final AnimationState eatPlantEndingState   = new AnimationState();
+    // Sin AnimationState: TODAS las animaciones de la ardilla, adulta y bebé, viven en el
+    // MobAnimator — el adulto en la capa 0 y el bebé en la 1.
 
     // --- SYNCED DATA ---
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
@@ -116,33 +97,12 @@ public class SquirrelEntity extends DiverseCritter {
     public static final byte CLIMB_HANG = 3;
 
     // --- VARIABLES ---
-    private CritterEatItemGoal forFoodGoal;
+    private CritterEatItemChainGoal forFoodGoal;
     private int tamingFeedsLeft = 0;
-    private int cryTimer = 0;
-    private int stopCryTimer = 0;
-    private boolean wasCryingClient = false;
-
-    private IdleVariant prevClientVariant = IdleVariant.NONE;
-    private int clientIdleTick = 0;
-
-    private boolean prevCleaningClient = false;
-    private int clientCleanTick = 0;
-    private int clientCleanEndingTick = 0;
-
-    private boolean prevDrinkingClient = false;
-    private int clientDrinkTick = 0;
-    private int clientDrinkEndingTick = 0;
-
-    private boolean prevEatingPlantClient = false;
-    private int clientEatPlantTick = 0;
-    private int clientEatPlantEndingTick = 0;
 
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
-    public float sprintProgress = 0.0F;
-
-    public boolean isVariantActive = false;
 
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
@@ -161,7 +121,6 @@ public class SquirrelEntity extends DiverseCritter {
         this.setMaxUpStep(1);
         this.mantle = new MantleController(this, MantleProfile.SQUIRREL);
         this.moveControl = new SquirrelMoveControl(this);
-        this.idleAnimationState.start(0);
     }
 
     // --- SETUP ---
@@ -198,32 +157,43 @@ public class SquirrelEntity extends DiverseCritter {
 
         this.goalSelector.addGoal(2, new SquirrelGlideGoal(this));
 
-        this.goalSelector.addGoal(3, new BabyCryGoal(this));
+        this.goalSelector.addGoal(3, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(3, new FindCryingBabyGoal(this, 1.4D, 24.0D));
-        this.goalSelector.addGoal(4, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(4, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(5, new NaturalMateGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SQUIRREL_FOOD), false));
+        // Solo domesticados: en un salvaje pelearia con la alerta por el flag MOVE, tirando del bicho
+        // HACIA la amenaza de la que el otro sistema lo aparta, y dos goals con intenciones opuestas
+        // dan tembleque, no comportamiento. Gateado por isTame() no llegan a coexistir nunca: el
+        // sistema de wariness se apaga entero al domesticar.
+        //
+        // Sigue valiendo para llamar con comida a una mascota en modo wandering, donde FollowOwnerGoal
+        // no corre. Y deja el sigilo como canal para domesticar: agachado se congela el temporizador
+        // de alerta y el critter se queda vigilandote mientras te acercas.
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SQUIRREL_FOOD), false) {
+            @Override public boolean canUse() { return isTame() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isTame() && super.canContinueToUse(); }
+        });
 
         this.goalSelector.addGoal(7, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(8, new CritterCleanGoal(this));
+        this.goalSelector.addGoal(8, new CritterCleanChainGoal(this));
         this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, SquirrelEntity.class, 1.2D, 16.0D));
-        this.forFoodGoal = new CritterEatItemGoal(this, DoCTags.Items.SQUIRREL_FOOD);
+        this.forFoodGoal = new CritterEatItemChainGoal(this, DoCTags.Items.SQUIRREL_FOOD);
         this.goalSelector.addGoal(10, this.forFoodGoal);
 
         this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
+        this.goalSelector.addGoal(13, new CritterDrinkChainGoal(this));
 
-        this.goalSelector.addGoal(14, new SquirrelEatLeavesGoal(this, 1.1D, 12));
+        this.goalSelector.addGoal(14, new SquirrelEatLeavesChainGoal(this, 1.1D, 12));
 
         this.goalSelector.addGoal(16, new SquirrelClimbGoal(this));
 
-        this.goalSelector.addGoal(17, new CritterIdleGoal(this));
+        this.goalSelector.addGoal(17, new CritterIdleVariantGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
         this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
@@ -234,6 +204,14 @@ public class SquirrelEntity extends DiverseCritter {
         });
         this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
+
+        // Sin flags: la prioridad da igual, va el último por legibilidad. Los pesos son los del
+        // sorteo original (20 / 25 / 25); sentarse y tumbarse los lleva CritterIdleVariantGoal.
+        this.goalSelector.addGoal(22, new CritterIdleGestureGoal(this, 120, 120)
+                .add(IdleVariant.STRETCH, "stretch", 20)
+                .add(IdleVariant.SNIFF_LEFT, "sniff_left", 25)
+                .add(IdleVariant.SNIFF_RIGHT, "sniff_right", 25)
+                .condition(c -> !this.isClimbing() && !this.isGliding()));
 
         // Sin targetSelector: el squirrel es herbívoro, no caza.
     }
@@ -292,78 +270,223 @@ public class SquirrelEntity extends DiverseCritter {
             }
         }
 
-        if (this.level().isClientSide) {
-            IdleVariant currentVariant = getIdleVariant();
+    }
 
-            if (currentVariant != prevClientVariant) {
-                this.clientIdleTick = 0;
-                this.prevClientVariant = currentVariant;
-            }
-            if (currentVariant != IdleVariant.NONE) {
-                this.clientIdleTick++;
-            }
+    // --- ANIMACIONES ---
 
-            boolean currentCleaning = isCleaning();
-            if (currentCleaning && !prevCleaningClient) {
-                this.clientCleanTick = 0;
-                this.clientCleanEndingTick = 0;
-            } else if (!currentCleaning && prevCleaningClient) {
-                this.clientCleanEndingTick = 1;
-                this.clientCleanTick = 0;
-            }
-            if (currentCleaning) {
-                this.clientCleanTick++;
-            } else if (this.clientCleanEndingTick > 0) {
-                this.clientCleanEndingTick++;
-                if (this.clientCleanEndingTick > 10) this.clientCleanEndingTick = 0;
-            }
-            this.prevCleaningClient = currentCleaning;
+    /**
+     * Locomoción de suelo al estilo Athenian/Arpy: tres animaciones REPEATING registradas en la capa
+     * 0 con playCondition mutuamente excluyentes. El crossfade entre ellas lo hace el BlendState de
+     * DeluxeLib, no pesos calculados a mano en el modelo, y el clip corre a su propio ritmo en vez de
+     * ir atado a limbSwing.
+     *
+     * <p>Las duraciones son las longitudes reales de los clips en {@link SquirrelAnims}; si los
+     * vuelves a exportar desde Blockbench con otra longitud hay que actualizarlas aquí.
+     */
+    @Override
+    public void registerAnimations() {
+        StandardAnimation idle = new StandardAnimation("idle",
+                new AnimSource(() -> SquirrelAnims.Idle), Loop.REPEATING, 0, 9, 2.0F);
+        StandardAnimation walk = new StandardAnimation("walk",
+                new AnimSource(() -> SquirrelAnims.Walk), Loop.REPEATING, 0, 8, 0.6441F);
+        StandardAnimation run = new StandardAnimation("run",
+                new AnimSource(() -> SquirrelAnims.Run), Loop.REPEATING, 0, 7, 0.3333F);
 
-            boolean currentDrinking = IsDrinking();
-            if (currentDrinking && !prevDrinkingClient) {
-                this.clientDrinkTick = 0;
-                this.clientDrinkEndingTick = 0;
-            } else if (!currentDrinking && prevDrinkingClient) {
-                this.clientDrinkEndingTick = 1;
-                this.clientDrinkTick = 0;
-            }
-            if (currentDrinking) {
-                this.clientDrinkTick++;
-            } else if (this.clientDrinkEndingTick > 0) {
-                this.clientDrinkEndingTick++;
-                if (this.clientDrinkEndingTick > 5) {   // 5 ticks = 250 ms = withLength(0.25F)
-                    this.clientDrinkEndingTick = 0;
-                }
-            }
-            this.prevDrinkingClient = currentDrinking;
+        idle.blendInMs(250).blendOutMs(150);
+        walk.blendInMs(150).blendOutMs(150);
+        run.blendInMs(150).blendOutMs(150);
 
-            boolean currentEatingPlant = isEatingPlant();
-            if (currentEatingPlant && !prevEatingPlantClient) {
-                this.clientEatPlantTick = 0;
-                this.clientEatPlantEndingTick = 0;
-            } else if (!currentEatingPlant && prevEatingPlantClient) {
-                this.clientEatPlantEndingTick = 1;
-                this.clientEatPlantTick = 0;
-            }
-            if (currentEatingPlant) {
-                this.clientEatPlantTick++;
-            } else if (this.clientEatPlantEndingTick > 0) {
-                this.clientEatPlantEndingTick++;
-                if (this.clientEatPlantEndingTick > 6) {
-                    this.clientEatPlantEndingTick = 0;
-                }
-            }
-            this.prevEatingPlantClient = currentEatingPlant;
+        // Un único signo de movimiento: isMoving(), que ya combina velocidad y camino pendiente
+        // pasados por la histéresis (ver DiverseCritter.aiStep). Leer la navegación aquí en crudo
+        // hacía parpadear idle/walk cada vez que algo recreaba la ruta desde fuera de un goal.
+        idle.setPlayCondition(a -> groundLocomotionAllowed() && !this.isMoving());
+        walk.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && !this.isSprinting());
+        run.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && this.isSprinting());
 
-            if (this.isSprinting()) {
-                this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
-            } else {
-                this.sprintProgress = Math.max(0.0F, this.sprintProgress - 0.1F);
-            }
+        // --- Sentarse por orden: cadena de 3 fases dirigida por CritterOrderedSitGoal ---
+        // La entrada y la salida son PLAY_ONCE y sólo arrancan con play() desde el goal; eso es lo
+        // que permite que la salida suene entera cuando isOrderedToSit() ya es false.
+        //
+        // El bucle SÍ necesita playCondition. MobAnimator.tick() auto-arranca toda animación
+        // REPEATING cuya condición se cumpla, y la condición por defecto es `true`: dejarlo sin
+        // condición hacía que se encendiera solo y, al tener mejor prioridad que idle, la ardilla
+        // se quedaba sentada para siempre aunque no estuviera domesticada.
+        //
+        // Misma prioridad las tres, para que el bucle no auto-arranque encima de su propia entrada
+        // (el guard de MobAnimator es `current.getPriority() <= base.getPriority()`).
+        StandardAnimation sitEnter = new StandardAnimation("ordered_sit_enter",
+                new AnimSource(() -> SquirrelAnims.SIT_STARTING), Loop.PLAY_ONCE, 0, 5, 0.5F);
+        StandardAnimation sitLoop = new StandardAnimation("ordered_sit_loop",
+                new AnimSource(() -> SquirrelAnims.SIT_IDLE), Loop.REPEATING, 0, 5, 4.0F);
+        StandardAnimation sitExit = new StandardAnimation("ordered_sit_exit",
+                new AnimSource(() -> SquirrelAnims.SIT_ENDING), Loop.PLAY_ONCE, 0, 5, 0.5F);
 
-            setupAnimationStatesClient();
-            handleCryingAnimationClient();
-        }
+        sitEnter.blendInMs(150).blendOutMs(120).setNextAnimation("ordered_sit_loop");
+        sitLoop.blendInMs(120).blendOutMs(150);
+        sitLoop.setPlayCondition(a -> this.isOrderedToSit());
+        // locksMovement: AnimationLockGoal congela a la ardilla mientras dura la salida, que es lo
+        // que impedía que se deslizara con la pose de levantarse a medias.
+        sitExit.blendInMs(120).blendOutMs(200).locksMovement();
+
+        this.animator().register(idle, walk, run, sitEnter, sitLoop, sitExit);
+
+        // --- Actividades (prioridad 6) ---
+        registerChain("drink", () -> SquirrelAnims.DRINK_STARTING, 0.25F,
+                () -> SquirrelAnims.DRINK_IDLE, 1.0F,
+                () -> SquirrelAnims.DRINK_ENDING, 0.25F, P_ACTIVITY)
+                .setPlayCondition(a -> this.IsDrinking());
+
+        registerChain("clean", () -> SquirrelAnims.GROOMING_STARTING, 0.5F,
+                () -> SquirrelAnims.GROOMING_IDLE, 0.5F,
+                () -> SquirrelAnims.GROOMING_ENDING, 0.5F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isCleaning());
+
+        registerChain("eat", () -> SquirrelAnims.EATING_STARTING, 0.25F,
+                () -> SquirrelAnims.EATING_IDLE, 0.5F,
+                () -> SquirrelAnims.EATING_ENDING, 0.25F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isEatingPlant());
+
+        // --- Variantes de idle (prioridad 7) ---
+        // Las de un solo clip no tienen entrada ni salida: al terminar, el bucle se para por su
+        // condición y idle entra con su propio crossfade.
+        // El export de Blockbench traía cruzados estos dos: lo que llamaba "Lay" es en realidad
+        // erguirse (STAND_UP_*, cadena de 3 fases) y lo que llamaba "Stand up" es estirarse
+        // (stretch, clip suelto). Ya está corregido aquí y en tools/swap_squirrel_anims.py, que es
+        // quien traduce los nombres crudos del export.
+        registerSingle("stretch", () -> SquirrelAnims.stretch, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STRETCH);
+        registerSingle("sniff_left", () -> SquirrelAnims.SniffLeft, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_LEFT);
+        registerSingle("sniff_right", () -> SquirrelAnims.SniffRight, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_RIGHT);
+
+        registerChain("idle_sit", () -> SquirrelAnims.SIT_STARTING, 0.5F,
+                () -> SquirrelAnims.SIT_IDLE, 4.0F,
+                () -> SquirrelAnims.SIT_ENDING, 0.5F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SIT);
+
+        registerChain("idle_stand_up", () -> SquirrelAnims.STAND_UP_STARTING, 1.0F,
+                () -> SquirrelAnims.STAND_UP_IDLE, 1.0F,
+                () -> SquirrelAnims.STAND_UP_ENDING, 1.0F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STAND_UP);
+
+        // --- Estados continuos: no los dirige ningún goal, sólo su condición ---
+        // Prioridades 0-3, o sea por encima de todo lo demás: si la ardilla planea, trepa, nada o
+        // duerme, eso manda sobre cualquier actividad o locomoción.
+        StandardAnimation glide = new StandardAnimation("glide",
+                new AnimSource(() -> SquirrelAnims.GLIDING), Loop.REPEATING, 0, 0, 0.1295F);
+        StandardAnimation climbUp = new StandardAnimation("climb_up",
+                new AnimSource(() -> SquirrelAnims.CLIMBING_UP), Loop.REPEATING, 0, 1, 1.0F);
+        StandardAnimation climbDown = new StandardAnimation("climb_down",
+                new AnimSource(() -> SquirrelAnims.CLIMBING_DOWN), Loop.REPEATING, 0, 1, 1.0F);
+        StandardAnimation climbHang = new StandardAnimation("climb_hang",
+                new AnimSource(() -> SquirrelAnims.CLIMB_IDLE), Loop.REPEATING, 0, 1, 4.0F);
+        StandardAnimation swim = new StandardAnimation("swim",
+                new AnimSource(() -> SquirrelAnims.Swim), Loop.REPEATING, 0, 2, 2.0F);
+        StandardAnimation sleepEnter = new StandardAnimation("sleep_enter",
+                new AnimSource(() -> SquirrelAnims.preparing_sleep), Loop.REPEATING, 0, 3, 2.0F);
+        StandardAnimation sleepLoop = new StandardAnimation("sleep_loop",
+                new AnimSource(() -> SquirrelAnims.Sleep), Loop.REPEATING, 0, 3, 4.0F);
+        StandardAnimation sleepExit = new StandardAnimation("sleep_exit",
+                new AnimSource(() -> SquirrelAnims.awakening), Loop.REPEATING, 0, 3, 2.0F);
+
+        // Fundidos cortos en trepada y planeo: renderToBuffer gira el modelo -90° de golpe al entrar,
+        // así que un crossfade largo mezclaría poses con orientaciones distintas.
+        glide.blendInMs(100).blendOutMs(100);
+        climbUp.blendInMs(100).blendOutMs(100);
+        climbDown.blendInMs(100).blendOutMs(100);
+        climbHang.blendInMs(150).blendOutMs(150);
+        // El modelo variaba la velocidad de nado con limbSwingAmount; la librería sólo admite un
+        // multiplicador fijo, así que se toma un valor medio. Si se nota lento o rápido, es aquí.
+        swim.blendInMs(200).blendOutMs(200).playbackSpeed(1.5F);
+        sleepEnter.blendInMs(200).blendOutMs(200);
+        sleepLoop.blendInMs(300).blendOutMs(300);
+        sleepExit.blendInMs(200).blendOutMs(200);
+
+        glide.setPlayCondition(a -> this.isGliding() && this.isAlive());
+        climbUp.setPlayCondition(a -> this.isClimbingUp());
+        climbDown.setPlayCondition(a -> this.isClimbingDown());
+        climbHang.setPlayCondition(a -> this.isHanging());
+        swim.setPlayCondition(a -> this.isInWaterOrBubble() && this.isAlive());
+        sleepEnter.setPlayCondition(a -> this.getSleepState() == SleepState.PREPARING);
+        sleepLoop.setPlayCondition(a -> this.getSleepState() == SleepState.SLEEPING);
+        sleepExit.setPlayCondition(a -> this.getSleepState() == SleepState.AWAKENING);
+
+        this.animator().register(glide, climbUp, climbDown, climbHang, swim,
+                sleepEnter, sleepLoop, sleepExit);
+
+        this.registerBabyAnimations();
+    }
+
+    /**
+     * Las del recién nacido, en la {@link #LAYER_BABY capa 1}. {@code SquirrelBabyModel} tiene su
+     * propia jerarquía de huesos, así que no pueden convivir con las del adulto en la capa 0; cada
+     * modelo lee sólo su capa. Las prioridades son independientes por capa, así que se reutiliza la
+     * misma escala.
+     */
+    private void registerBabyAnimations() {
+        StandardAnimation babyIdle = registerSingle("baby_idle",
+                () -> SquirrelBabyAnims.idle, 4.0F, Loop.REPEATING, P_IDLE, LAYER_BABY);
+        StandardAnimation babyCrawl = registerSingle("baby_crawl",
+                () -> SquirrelBabyAnims.move, 4.0F, Loop.REPEATING, P_WALK, LAYER_BABY);
+
+        babyIdle.setPlayCondition(a -> this.isNewborn() && !this.isMoving());
+        babyCrawl.setPlayCondition(a -> this.isNewborn() && this.isMoving());
+
+        // Dormir no es una cadena dirigida por un goal, sino tres estados sincronizados: se registran
+        // como tres REPEATING con condición sobre SleepState, igual que en el adulto. Una cadena no
+        // valdría, porque su entrada es PLAY_ONCE y nadie la lanzaría.
+        registerSingle("baby_sleep_enter", () -> SquirrelBabyAnims.preparing_sleep,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.PREPARING);
+        registerSingle("baby_sleep_loop", () -> SquirrelBabyAnims.sleep,
+                4.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.SLEEPING);
+        registerSingle("baby_sleep_exit", () -> SquirrelBabyAnims.awakening,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.AWAKENING);
+
+        // El llanto sí es una cadena con dueño: la dirige CritterCryChainGoal. La condición del bucle
+        // está además porque el flag lo apaga también FindCryingBabyGoal cuando la madre lo atiende,
+        // y así se para lo apague quien lo apague.
+        registerChain("cry",
+                () -> SquirrelBabyAnims.preparing_cry, 0.5F,
+                () -> SquirrelBabyAnims.cry, 1.0F,
+                () -> SquirrelBabyAnims.stopping_cry, 0.5F, P_ACTIVITY, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.isCrying());
+    }
+
+
+    /**
+     * Reimplementado sobre el animator: la versión de {@link DiverseCritter} lee contadores que sólo
+     * existen en el cliente, así que en servidor devolvía siempre false. Ahora es correcta en ambos
+     * lados y cubre también la fase de salida.
+     */
+    @Override
+    public boolean isOrderedSitPlaying() {
+        return this.animator().isPlaying("ordered_sit_enter")
+                || this.animator().isPlaying("ordered_sit_loop")
+                || this.animator().isPlaying("ordered_sit_exit");
+    }
+
+    /**
+     * Todo lo que aparta a la ardilla de la locomoción normal de suelo. Las cadenas de actividad y
+     * las variantes de idle todavía las dibuja el camino viejo desde el modelo, así que aquí se
+     * excluyen a mano; según vayan migrando a la capa 0 podrán quitarse de esta lista y dejar que
+     * las resuelva la prioridad.
+     */
+    private boolean groundLocomotionAllowed() {
+        return this.isAlive()
+                // Los recién nacidos se dibujan con SquirrelBabyModel, que tiene su propio juego de
+                // clips (SquirrelBabyAnims) sobre una jerarquía de huesos distinta.
+                && !this.isNewborn()
+                // Sólo se excluye lo que NO vive en la capa 0. Las actividades (sentarse, beber,
+                // acicalarse, comer, variantes de idle) ya no hace falta listarlas: tienen mejor
+                // prioridad que idle, así que la capa las resuelve sola y el relevo es sin huecos.
+                && this.getSleepState() == SleepState.AWAKE
+                && !this.isClimbing()
+                && !this.isGliding()
+                && !this.isInWaterOrBubble();
     }
 
     @Override
@@ -442,129 +565,13 @@ public class SquirrelEntity extends DiverseCritter {
         self().setDeltaMovement(self().getDeltaMovement().add(0.0D, -0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/6, 0.0D));
     }
 
-    private void setupAnimationStatesClient() {
-        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
-        boolean swimming     = this.isInWaterOrBubble();
-        boolean climbing     = this.isClimbing();
-        boolean gliding      = this.isGliding();
-
-        IdleVariant v = getIdleVariant();
-        int ticksActive = this.clientIdleTick;
-
-        int sitStarting = 10;
-        int sitIdle     = 90;
-        int sitEnding   = 10;
-        int sitTotal    = sitStarting + sitIdle + sitEnding;
-
-        int layStarting = 20;
-        int layIdle     = 80;
-        int layEnding   = 20;
-        int layTotal    = layStarting + layIdle + layEnding;
-
-        boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
-
-        boolean isVariantPlaying = false;
-        if (!isOrderedSitPlaying) {
-            if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_LEFT && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
-            else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
-        }
-
-        boolean cleaning        = isCleaning();
-        boolean isCleanStarting = cleaning && this.clientCleanTick <= 10;
-        boolean isCleanIdle     = cleaning && this.clientCleanTick > 10;
-        boolean isCleanEnding   = !cleaning && this.clientCleanEndingTick > 0;
-        boolean isCleanPlaying  = (isCleanStarting || isCleanIdle || isCleanEnding) && !isOrderedSitPlaying;
-
-        boolean drinking = IsDrinking();
-        boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
-        boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
-        boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
-
-        boolean isDrinkPlaying  = (isDrinkStarting || isDrinkIdle || isDrinkEnding) && !isOrderedSitPlaying;
-
-        // --- Eating plant (3 fases) ---
-        boolean eatingPlant = isEatingPlant();
-        boolean isEatStarting = eatingPlant && this.clientEatPlantTick <= 5;
-        boolean isEatIdle     = eatingPlant && this.clientEatPlantTick > 5;
-        boolean isEatEnding   = !eatingPlant && this.clientEatPlantEndingTick > 0;
-
-        boolean isEatPlaying  = (isEatStarting || isEatIdle || isEatEnding) && !isOrderedSitPlaying;
-
-        boolean groundLocomotion = this.isAlive()
-                && !sleepingLike && !swimming && !climbing && !gliding
-                && !isOrderedSitPlaying && !isVariantPlaying;
-
-        this.isVariantActive = isVariantPlaying;
-        this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
-        this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
-
-        // --- Glide ---
-        this.glideState.animateWhen(gliding && this.isAlive(), this.tickCount);
-
-        this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP && isVariantPlaying, this.tickCount);
-        this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
-        this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
-
-        if (v == IdleVariant.SIT && isVariantPlaying) {
-            this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
-            this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
-            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount);
-        } else {
-            this.idleSitStartingState.stop();
-            this.idleSitState.stop();
-            this.idleSitEndingState.stop();
-        }
-
-        if (v == IdleVariant.LAY && isVariantPlaying) {
-            this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
-            this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
-            this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
-        } else {
-            this.idleLayStartingState.stop();
-            this.idleLayState.stop();
-            this.idleLayEndingState.stop();
-        }
-
-        if (isCleanPlaying) {
-            this.cleanStartingState.animateWhen(isCleanStarting, this.tickCount);
-            this.cleanIdleState.animateWhen(isCleanIdle, this.tickCount);
-            this.cleanEndingState.animateWhen(isCleanEnding, this.tickCount);
-        } else {
-            this.cleanStartingState.stop();
-            this.cleanIdleState.stop();
-            this.cleanEndingState.stop();
-        }
-
-        if (isDrinkPlaying) {
-            this.drinkStartingState.animateWhen(isDrinkStarting, this.tickCount);
-            this.drinkIdleState.animateWhen(isDrinkIdle, this.tickCount);
-            this.drinkEndingState.animateWhen(isDrinkEnding, this.tickCount);
-        } else {
-            this.drinkStartingState.stop();
-            this.drinkIdleState.stop();
-            this.drinkEndingState.stop();
-        }
-
-        if (isEatPlaying) {
-            this.eatPlantStartingState.animateWhen(isEatStarting, this.tickCount);
-            this.eatPlantIdleState.animateWhen(isEatIdle, this.tickCount);
-            this.eatPlantEndingState.animateWhen(isEatEnding, this.tickCount);
-        } else {
-            this.eatPlantStartingState.stop();
-            this.eatPlantIdleState.stop();
-            this.eatPlantEndingState.stop();
-        }
-
-        boolean climbUp   = this.isClimbingUp();
-        boolean climbDown = this.isClimbingDown();
-        boolean climbHang = this.isHanging();
-        this.climbingUpState.animateWhen(climbUp, this.tickCount);
-        this.climbingDownState.animateWhen(climbDown, this.tickCount);
-        this.climbIdleState.animateWhen(climbHang, this.tickCount);
-    }
+    /**
+     * Lo único que queda del camino viejo: el idle que dibuja {@code SquirrelBabyModel}. Todo lo del
+     * modelo adulto —locomoción, actividades, variantes de reposo, trepada, planeo, natación y
+     * dormir— vive ya en la capa 0 del {@code MobAnimator}, y con ello desaparecieron ~120 líneas de
+     * booleanos mutuamente excluyentes y los contadores {@code clientXxxTick} que duplicaban a mano
+     * las duraciones de los clips.
+     */
 
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
@@ -593,6 +600,19 @@ public class SquirrelEntity extends DiverseCritter {
                         itemstack.shrink(1);
                     }
                 }
+                // Alimentar es alimentar, aunque sea una toma de domesticacion. Sin esto, el biberon
+                // gastaba durabilidad y no tocaba el hambre: la barra solo se rellenaba una vez el
+                // bicho ya era tuyo, porque ese codigo vive en DiverseCritter.mobInteract y esta rama
+                // devuelve antes de llegar. Efecto practico: dar el biberon a un huerfano salvaje NO
+                // lo salvaba de morir de hambre, que es justo para lo que existe.
+                //
+                // La domesticacion sigue costando las 3-5 tomas de siempre; lo que cambia es que cada
+                // una llena la barra.
+                if (isNurserBottle) {
+                    this.setHunger(this.maxHunger());
+                    this.setThirst(this.maxThirst());
+                }
+
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
@@ -629,16 +649,17 @@ public class SquirrelEntity extends DiverseCritter {
         return super.mobInteract(pPlayer, pHand);
     }
 
+    /**
+     * Ya no hace falta: {@link CritterEatItemChainGoal} escanea en cada evaluación de {@code canUse()}
+     * y su fase APPROACH es la dueña de la navegación.
+     *
+     * <p>Lo que hacía antes —{@code navigation.stop()} + {@code moveTo()} desde fuera de todo goal,
+     * con un 20% de probabilidad por tick, o sea unas cinco veces por segundo mientras hubiera
+     * comida en el suelo— destrozaba la ruta continuamente. Con las condiciones de idle/walk
+     * mirando el estado de navegación, eso se veía como parpadeo de animaciones.
+     */
     private void triggerFoodSearch() {
-        if (this.isNewborn()) return;
-        if (this.forFoodGoal != null) {
-            this.forFoodGoal.trigger();
-        } else {
-            this.navigation.stop();
-            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.SQUIRREL_FOOD);
-            List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), predicate);
-            if (!list.isEmpty()) this.navigation.moveTo(list.get(0), 1.1);
-        }
+        // intencionadamente vacío
     }
 
     @Override
@@ -661,8 +682,12 @@ public class SquirrelEntity extends DiverseCritter {
     @Override public int maxThirst() { return 4000; }
     @Override public int maxEnrichment() { return 4000; }
     @Override public int maxHygiene() { return 4000; }
-    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
-    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
+    // Ticks de juego, y exactamente la longitud del clip: SquirrelAnims 2.0 s = 40 ticks en el
+    // adulto, SquirrelBabyAnims 1.0 s = 20 en el recién nacido. Pasarse deja al animal congelado
+    // en el último frame (la definición no es looping, así que KeyframeBlender clampa); quedarse
+    // corto corta el gesto a media pose.
+    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 40;}
+    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 40;}
     @Override protected boolean getDefaultDiurnal() { return false; }
     @Override protected double getHungerLossPerSecond()     { return 3.33; }
     @Override protected double getThirstLossPerSecond()     { return 5.0;  }
@@ -1036,7 +1061,12 @@ public class SquirrelEntity extends DiverseCritter {
 
     @Override
     public boolean isDoingSpecialActivity() {
-        return isGliding() || isEatingPlant();
+        // isClimbing() añadido en la fase 3: sin él, CritterCleanGoal y CritterMotherCleanBabyGoal
+        // (prioridad 8 y 9) le robaban MOVE a SquirrelClimbGoal (16) y el acicalado arrancaba
+        // colgando de un tronco; el stop() del climb goal llamaba a tryStartGlide() y la ardilla
+        // planeaba acicalándose. Los otros cuatro goals que consultan este método ya comprobaban
+        // isClimbing() por su cuenta, así que ampliarlo sólo los vuelve redundantes.
+        return isGliding() || isEatingPlant() || isClimbing();
     }
 
     @Override
@@ -1051,42 +1081,6 @@ public class SquirrelEntity extends DiverseCritter {
         setEatingItem(net.minecraft.world.item.ItemStack.EMPTY);
     }
 
-    private void handleCryingAnimationClient() {
-        boolean isCrying = this.isCrying();
-
-        if (isCrying) {
-            this.stoppingCryState.stop();
-            this.stopCryTimer = 0;
-            this.wasCryingClient = true;
-
-            if (this.cryTimer < 10) {
-                this.preparingCryState.startIfStopped(this.tickCount);
-                this.cryingState.stop();
-            } else {
-                this.preparingCryState.stop();
-                this.cryingState.startIfStopped(this.tickCount);
-            }
-            this.cryTimer++;
-
-        } else {
-            this.preparingCryState.stop();
-            this.cryingState.stop();
-            this.cryTimer = 0;
-
-            if (this.wasCryingClient) {
-                if (this.stopCryTimer < 10) {
-                    this.stoppingCryState.startIfStopped(this.tickCount);
-                } else {
-                    this.stoppingCryState.stop();
-                    this.wasCryingClient = false;
-                }
-                this.stopCryTimer++;
-            } else {
-                this.stoppingCryState.stop();
-                this.stopCryTimer = 0;
-            }
-        }
-    }
 
     @Override
     public float getVoicePitch() {

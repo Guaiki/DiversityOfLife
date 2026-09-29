@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
 import com.evirapo.diversityofcritters.common.humidity.HumiditySystem;
 import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
@@ -13,6 +14,13 @@ import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
+import net.darkblade.deluxelib.anim.AnimSource;
+import net.darkblade.deluxelib.anim.Animatable;
+import net.darkblade.deluxelib.anim.Loop;
+import net.darkblade.deluxelib.anim.StandardAnimation;
+import net.darkblade.deluxelib.anim.MobAnimator;
+import net.darkblade.deluxelib.entity.MovementHysteresis;
+import net.darkblade.deluxelib.entity.ai.goal.AnimationLockGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -42,9 +50,12 @@ import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
-public abstract class DiverseCritter extends TamableAnimal implements ContainerListener, IAnimatedAttacker, ILocomotionSubject {
+public abstract class DiverseCritter extends TamableAnimal
+        implements ContainerListener, IAnimatedAttacker, Animatable<DiverseCritter>, ILocomotionSubject {
 
     public enum SleepState {
         AWAKE(0), PREPARING(1), SLEEPING(2), AWAKENING(3);
@@ -56,8 +67,19 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         }
     }
 
-    public enum IdleVariant { NONE, STAND_UP, SNIFF_LEFT, SNIFF_RIGHT, SIT, LAY }
+    /**
+     * Florituras de reposo. {@code STRETCH} es un clip suelto (estirarse) y {@code STAND_UP} es una
+     * cadena de tres fases (erguirse sobre las patas traseras, aguantar, bajar).
+     *
+     * <p>Los nombres estuvieron cruzados hasta 2026-08-10: el export de Blockbench llamaba "Lay" a
+     * lo que en realidad es erguirse, y "Stand up" a lo que es estirarse. Los bytes de
+     * {@code toIdleByte} se mantuvieron al corregirlo, así que los mundos guardados siguen válidos.
+     */
+    public enum IdleVariant { NONE, STRETCH, SNIFF_LEFT, SNIFF_RIGHT, SIT, STAND_UP }
 
+    /** Sincronizado porque las playCondition de idle/walk/run se evalúan en servidor pero el cliente
+     *  necesita el mismo valor: deltaMovement no se sincroniza para mobs. Ver {@link #isMoving()}. */
+    private static final EntityDataAccessor<Boolean> IS_MOVING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_MALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_FLAGS_ID = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> IS_JUVENILE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
@@ -80,6 +102,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     protected static final EntityDataAccessor<Boolean> WANDERING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_CRYING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> IDLE_VARIANT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Boolean> IS_ALERT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> IS_FLEEING = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> TEMP_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
@@ -119,6 +143,44 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int breedCooldown = 0;
     public static final int PREGNANCY_TIME_TICKS = 48000;
 
+    /**
+     * Cada cuantos ticks se regenera medio corazon. Un corazon son 2 HP, asi que medio corazon es
+     * {@code heal(1.0F)} y no {@code 0.5F}.
+     */
+    private static final int HEAL_INTERVAL_TICKS = 1200;
+
+    /**
+     * A partir de que distancia una cuidadora deja de contar como presente.
+     *
+     * <p><b>Este mismo radio se usa en los dos lados</b> —la cria buscando a su cuidadora y la
+     * cuidadora comprobando si ya tiene cria— y tiene que seguir siendo asi. Si se separan aparece una
+     * banda de distancias en la que la madre se cree libre mientras la cria la sigue considerando
+     * suya, y acaba con dos crias. No da error de compilacion: desde fuera solo se ve una hembra con
+     * dos bebes y ninguna explicacion.
+     */
+    public static final double CAREGIVER_RANGE = 32.0D;
+
+    /** Cuanto aguanta una cria sin ver a su cuidadora antes de declararse huerfana. 1200 = 60 s. */
+    public static final int ORPHAN_TIMEOUT_TICKS = 1200;
+
+    /** Cada cuantos ticks la cria comprueba si su cuidadora sigue cerca. */
+    private static final int CAREGIVER_CHECK_INTERVAL = 20;
+
+    /**
+     * Quien cuida de esta cria. Solo significativo en recien nacidos; en un adulto es siempre null.
+     *
+     * <p>Solo servidor y persistido en NBT. No se sincroniza al cliente porque nada se dibuja a partir
+     * de el.
+     *
+     * <p>El vinculo vive SOLO aqui, y no tambien en la cuidadora, a proposito: dos copias del mismo
+     * hecho se desincronizan en cuanto una de las dos entidades se descarga, muere o se serializa a
+     * medias.
+     */
+    private @Nullable UUID caregiverUUID;
+
+    /** Tick en que se vio por ultima vez a la cuidadora. Ver {@link #readAdditionalSaveData}. */
+    private int lastCaregiverSeenTick;
+
     public final AnimationState preparingSleepState = new AnimationState();
     public final AnimationState sleepState = new AnimationState();
     public final AnimationState awakeningState = new AnimationState();
@@ -132,6 +194,159 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public int clientOrderedSitEndingTick = 0;
 
     private SleepState prevSleepState = SleepState.AWAKE;
+
+    // --- ANIMACIONES (DeluxeLib) ---
+    private final MobAnimator<DiverseCritter> animator = new MobAnimator<>(this);
+    /** Suaviza el "se está moviendo" para que el umbral crudo no parpadee entre idle y walk. */
+    private final MovementHysteresis movingHysteresis = new MovementHysteresis();
+
+    /**
+     * Deteccion de amenazas y maquina de alerta/huida. Vive aqui y no en un goal porque el sueno
+     * necesita consultarla mientras es EL quien retiene al bicho; ver el javadoc de la clase.
+     */
+    private final ThreatSensor threatSensor = new ThreatSensor(this);
+
+    public ThreatSensor sensor() { return this.threatSensor; }
+
+    @Override
+    public @javax.annotation.Nonnull MobAnimator<DiverseCritter> animator() {
+        return this.animator;
+    }
+
+    /**
+     * La llama DeluxeLib en EntityJoinLevelEvent, en ambos lados. Vacío por defecto: cada especie
+     * registra las suyas. Las que no lo hagan simplemente no tienen animator con contenido.
+     */
+    @Override
+    public void registerAnimations() {
+    }
+
+    // Prioridades de la capa 0. Número más bajo gana: si la especie planea, trepa, nada o duerme,
+    // eso manda sobre cualquier actividad, y las actividades mandan sobre la locomoción.
+    protected static final int P_GLIDE = 0;
+    protected static final int P_CLIMB = 1;
+    protected static final int P_SWIM = 2;
+    protected static final int P_SLEEP = 3;
+    protected static final int P_ATTACK = 4;
+    /**
+     * Misma que {@link #P_ATTACK} a proposito. No chocan: {@code CritterAlertGoal} esta en prioridad
+     * de goal 2 y desaloja al goal de ataque (7), asi que dejan de producirse impactos y con ellos
+     * los clips de ataque.
+     */
+    protected static final int P_ALERT = 4;
+    protected static final int P_ORDERED_SIT = 5;
+    protected static final int P_ACTIVITY = 6;
+    protected static final int P_IDLE_VARIANT = 7;
+    protected static final int P_WALK = 8;
+    protected static final int P_IDLE = 9;
+
+    /**
+     * Registra una cadena {@code <nombre>_enter/_loop/_exit} en la capa 0, las tres con la misma
+     * prioridad. Devuelve el bucle porque **siempre** hay que ponerle una {@code playCondition}: sin
+     * ella {@code MobAnimator} lo auto-arrancaría solo, y al tener mejor prioridad que idle se
+     * quedaría pegado para siempre.
+     *
+     * <p>Que las tres compartan prioridad es lo que impide que el bucle pise a su propia entrada:
+     * el guard del auto-arranque es {@code current.getPriority() <= base.getPriority()}.
+     *
+     * <p>La salida lleva {@code locksMovement()}, así que {@code AnimationLockGoal} clava al critter
+     * mientras suena y no se desliza con la pose de settle a medias.
+     */
+    protected final StandardAnimation registerChain(String name,
+                                                    Supplier<Object> enter, float enterSecs,
+                                                    Supplier<Object> loop, float loopSecs,
+                                                    Supplier<Object> exit, float exitSecs, int priority) {
+        return this.registerChain(name, enter, enterSecs, loop, loopSecs, exit, exitSecs, priority, LAYER_ADULT);
+    }
+
+    /**
+     * Capa 0: el modelo adulto. Capa 1: el de bebé, que tiene una jerarquía de huesos completamente
+     * distinta —la raíz de {@code SquirrelBabyModel} se llama {@code Bandedpalmcivetkit}— así que sus
+     * clips no pueden convivir con los del adulto: cada modelo lee sólo su capa y no hay
+     * contaminación cruzada ni que repetir un gate {@code isNewborn()} en veinte condiciones.
+     */
+    protected static final int LAYER_ADULT = 0;
+    protected static final int LAYER_BABY = 1;
+
+    /** @see #registerChain(String, Supplier, float, Supplier, float, Supplier, float, int) */
+    protected final StandardAnimation registerChain(String name,
+                                                    Supplier<Object> enter, float enterSecs,
+                                                    Supplier<Object> loop, float loopSecs,
+                                                    Supplier<Object> exit, float exitSecs,
+                                                    int priority, int layer) {
+        StandardAnimation e = new StandardAnimation(name + "_enter",
+                new AnimSource(enter), Loop.PLAY_ONCE, layer, priority, enterSecs);
+        StandardAnimation l = new StandardAnimation(name + "_loop",
+                new AnimSource(loop), Loop.REPEATING, layer, priority, loopSecs);
+        StandardAnimation x = new StandardAnimation(name + "_exit",
+                new AnimSource(exit), Loop.PLAY_ONCE, layer, priority, exitSecs);
+
+        e.blendInMs(150).blendOutMs(120).setNextAnimation(name + "_loop");
+        l.blendInMs(120).blendOutMs(150);
+        x.blendInMs(120).blendOutMs(200).locksMovement();
+
+        this.animator().register(e, l, x);
+        return l;
+    }
+
+    /**
+     * Gesto o estado de un solo clip: se registra como {@code <nombre>_loop}.
+     *
+     * <p>{@code PLAY_ONCE} cuando es un gesto que debe sonar una vez y ceder (lo usa
+     * {@code CritterIdleGestureGoal}, que cierra el goal cuando el animator dice que terminó), y
+     * {@code REPEATING} cuando es un estado continuo como nadar o trepar.
+     */
+    protected final StandardAnimation registerSingle(String name, Supplier<Object> clip,
+                                                     float seconds, Loop loop, int priority) {
+        return this.registerSingle(name, clip, seconds, loop, priority, LAYER_ADULT);
+    }
+
+    /** @see #registerSingle(String, Supplier, float, Loop, int) */
+    protected final StandardAnimation registerSingle(String name, Supplier<Object> clip,
+                                                     float seconds, Loop loop, int priority, int layer) {
+        StandardAnimation a = new StandardAnimation(name + "_loop",
+                new AnimSource(clip), loop, layer, priority, seconds);
+        a.blendInMs(150).blendOutMs(200);
+        this.animator().register(a);
+        return a;
+    }
+
+    /**
+     * Congela al critter mientras suene un clip marcado con {@code locksMovement()} — los de salida
+     * de las cadenas de actividad. Va a prioridad 0 para ganarle MOVE/LOOK a la locomoción, y no
+     * reclama JUMP, así que {@code CustomFloatGoal} sigue flotando en el agua.
+     *
+     * <p>Las subclases llaman a {@code super.registerGoals()} antes de registrar los suyos, así que
+     * lo heredan las tres especies sin tocarlas.
+     */
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(0, new AnimationLockGoal(this));
+    }
+
+    /** Con histéresis y sincronizado — ver {@link #IS_MOVING}. Lo usan las playCondition de
+     *  idle/walk/run. */
+    public boolean isMoving() {
+        return this.entityData.get(IS_MOVING);
+    }
+
+    /**
+     * True mientras el critter está metido en una actividad con animación propia: beber, acicalarse,
+     * sentarse por orden, una variante de reposo, o cualquier clip que esté clavando el movimiento.
+     *
+     * <p>Sirve para que un gesto cosmético no se apile encima de una acción en curso. No se puede
+     * resolver sólo con {@code isMovementLocked()}: un gesto es precisamente algo que NO clava el
+     * movimiento, así que las actividades que están en su fase de bucle no aparecerían ahí.
+     */
+    public boolean isPerformingActivity() {
+        return this.IsDrinking()
+                || this.isCleaning()
+                || this.isOrderedToSit()
+                || this.isIdleLocked()
+                || this.isDoingSpecialActivity()
+                || this.animator().isMovementLocked();
+    }
 
     protected DiverseCritter(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
@@ -165,6 +380,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
+        this.entityData.define(IS_MOVING, false);
         this.entityData.define(IS_MALE, true);
         this.entityData.define(HUNGER, maxHunger());
         this.entityData.define(THIRST, maxThirst());
@@ -183,6 +399,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(IS_PREGNANT, false);
         this.entityData.define(CAN_BREED, true);
         this.entityData.define(IDLE_VARIANT, (byte) 0);
+        this.entityData.define(IS_ALERT, false);
+        this.entityData.define(IS_FLEEING, false);
         this.entityData.define(TEMP_TIER, TemperatureTier.MODERATE.ordinal());
         this.entityData.define(TEMP_COMFORT, 100);
         this.entityData.define(HUMIDITY_TIER, HumidityTier.MODERATE.ordinal());
@@ -260,6 +478,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         pCompound.putInt("Enrichment", this.getEnrichment());
         pCompound.putInt("Hygiene", this.getHygiene());
         pCompound.putBoolean("Cleaning", this.isCleaning());
+        if (this.caregiverUUID != null) {
+            pCompound.putUUID("Caregiver", this.caregiverUUID);
+        }
         pCompound.putInt("SleepState", this.getSleepState().getId());
         pCompound.putBoolean("Diurnal", this.isDiurnal());
         pCompound.putBoolean("Wandering", this.isWandering());
@@ -341,6 +562,14 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
         if (pCompound.contains("TempComfort")) this.setTemperatureComfort(pCompound.getInt("TempComfort"));
         if (pCompound.contains("HumidityComfort")) this.setHumidityComfort(pCompound.getInt("HumidityComfort"));
+
+        // El contador NO se persiste a proposito. tickCount vuelve a 0 al cargar del disco, asi que
+        // guardar el valor viejo daria una resta negativa enorme y la cria no se declararia huerfana
+        // jamas. Arrancando a cero vuelve del disco con sus 60 s completos para reencontrar a su
+        // madre: recargar un mundo no huerfana a nadie, ni perpetua un vinculo con una madre que ya no
+        // existe.
+        this.lastCaregiverSeenTick = this.tickCount;
+        this.caregiverUUID = pCompound.hasUUID("Caregiver") ? pCompound.getUUID("Caregiver") : null;
     }
 
     public Boolean getIsMale() { return this.entityData.get(IS_MALE); }
@@ -400,18 +629,43 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public boolean isDiurnal() { return this.entityData.get(DIURNAL); }
     public void setDiurnal(boolean value) { this.entityData.set(DIURNAL, value); }
 
+    /**
+     * Cambia el cronotipo por acción del jugador (botones sol/luna de la ficha).
+     *
+     * <p>Aparte de mover el flag deja marcado que el ciclo de sueño debe re-evaluarse en el acto.
+     * Sin esto el cambio se nota pero tarda: dormirse tiene un retardo repartido de hasta medio
+     * minuto, y entre siesta y siesta hay una espera de 30 a 90 s, así que pulsar el botón parecía
+     * no hacer nada. Sólo lo pone esta vía, no {@link #setDiurnal}, para que restaurar el flag
+     * desde NBT al cargar el mundo no dispare una siesta inmediata en todo lo que se cargue.
+     *
+     * @see com.evirapo.diversityofcritters.common.entity.ai.SleepBehaviorGoal#canUse()
+     */
+    public void setDiurnalByPlayer(boolean value) {
+        this.setDiurnal(value);
+        this.scheduleChanged = true;
+    }
+
+    /** Servidor. Lo consume {@code SleepBehaviorGoal}; devolverlo lo desarma. */
+    public boolean consumeScheduleChanged() {
+        boolean changed = this.scheduleChanged;
+        this.scheduleChanged = false;
+        return changed;
+    }
+
+    private boolean scheduleChanged;
+
     public void clearStates() { this.setSleepState(SleepState.AWAKE); this.setCleaning(false); }
 
     private static byte toIdleByte(IdleVariant v) {
         return switch (v) {
-            case NONE -> 0; case STAND_UP -> 1; case SNIFF_LEFT -> 2;
-            case SNIFF_RIGHT -> 3; case SIT -> 4; case LAY -> 5;
+            case NONE -> 0; case STRETCH -> 1; case SNIFF_LEFT -> 2;
+            case SNIFF_RIGHT -> 3; case SIT -> 4; case STAND_UP -> 5;
         };
     }
     private static IdleVariant idleFromByte(byte b) {
         return switch (b) {
-            case 1 -> IdleVariant.STAND_UP; case 2 -> IdleVariant.SNIFF_LEFT;
-            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.LAY;
+            case 1 -> IdleVariant.STRETCH; case 2 -> IdleVariant.SNIFF_LEFT;
+            case 3 -> IdleVariant.SNIFF_RIGHT; case 4 -> IdleVariant.SIT; case 5 -> IdleVariant.STAND_UP;
             default -> IdleVariant.NONE;
         };
     }
@@ -613,6 +867,9 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
 
             if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){ this.starve(); }
 
+            this.tickPassiveHealing();
+            this.tickCaregiverPresence();
+
             if (this.idleVariantCooldown > 0) this.idleVariantCooldown--;
         }
 
@@ -635,6 +892,13 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (baby != null) {
             baby.setBaby(true);
             baby.moveTo(this.getX(), this.getY(), this.getZ(), 0.0F, 0.0F);
+
+            // giveBirth() corre sobre la madre, asi que this es ella. Una cria invocada con /summon o
+            // con huevo no pasa por aqui: nace sin cuidadora, huerfana y adoptable, que es el
+            // comportamiento correcto por defecto.
+            if (baby instanceof DiverseCritter cria) {
+                cria.setCaregiver(this.getUUID());
+            }
 
             serverLevel.addFreshEntityWithPassengers(baby);
 
@@ -881,6 +1145,28 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     public void aiStep() {
         if (getSleepState() != SleepState.AWAKE) setTarget(null);
         super.aiStep();
+        if (!this.level().isClientSide) {
+            // Como GuardingMeleeEntity (DeluxeLib). El orden importa: se mide DESPUES de
+            // super.aiStep(), que es donde corre el move control y travel() aplica la velocidad de
+            // este tick. Medirlo antes lee el estado previo al movimiento.
+            //
+            // Se añade "tiene camino pendiente" a la ENTRADA de la histéresis en vez de consultarlo
+            // desde las playCondition. Athenian lo hace en la condición porque nada le recrea la
+            // ruta desde fuera; aquí sí: triggerFoodSearch() llama a stop()+moveTo() hasta cinco
+            // veces por segundo mientras haya comida en el suelo, así que isDone() parpadea y las
+            // animaciones parpadeaban con él. Pasando por la histéresis, esos seis ticks de
+            // retención absorben el vaivén y el flag sale estable.
+            boolean movingNow = this.getDeltaMovement().horizontalDistanceSqr() > 2.5E-7
+                    || !this.getNavigation().isDone();
+            boolean moving = this.movingHysteresis.tick(movingNow);
+            if (moving != this.entityData.get(IS_MOVING)) {
+                this.entityData.set(IS_MOVING, moving);
+            }
+
+            // Despues de la histeresis a proposito: el sensor no la usa hoy, pero cualquier condicion
+            // que anadamos a isThreat() o al estado vera el flag de movimiento ya asentado.
+            this.threatSensor.tick();
+        }
     }
 
     @Override
@@ -966,5 +1252,189 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         if (pForced) {
             super.ageUp(pAmount, true);
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  WARINESS & FLIGHT
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Los escribe {@code ThreatSensor} en servidor; el cliente los lee para las playCondition, y el
+     * comando {@code /doc_wariness} para introspeccion.
+     *
+     * <p><b>{@code IS_FLEEING} no dibuja nada.</b> El galope sale de {@link #isMoving()} y
+     * {@code isSprinting()}, que ya viajan sincronizados. Existe para que otro goal pueda preguntar
+     * "esta huyendo?" sin hablar con el sensor, que es solo de servidor.
+     */
+    public boolean isAlert() { return this.entityData.get(IS_ALERT); }
+    public void setAlert(boolean value) { this.entityData.set(IS_ALERT, value); }
+
+    public boolean isFleeing() { return this.entityData.get(IS_FLEEING); }
+    public void setFleeing(boolean value) { this.entityData.set(IS_FLEEING, value); }
+
+    /**
+     * Opt-in por especie del sistema de wariness.
+     *
+     * <p><b>Falso por defecto a proposito.</b> La ardilla y la sifaka no tienen clips de alerta, y
+     * encenderlas las dejaria congeladas cuatro segundos con la pose de idle puesta, que se lee como
+     * un bug y no como miedo. Cuando lleguen sus clips se suman sobrescribiendo esto y registrando
+     * {@code alert_enter} / {@code alert_loop}.
+     */
+    public boolean isWary() { return false; }
+
+    /**
+     * Que cuenta como amenaza. Por defecto cualquier jugador en supervivencia o aventura.
+     *
+     * <p><b>Creativo y espectador quedan fuera.</b> En creativo estas construyendo el recinto, y que
+     * los animales salgan corriendo cada vez que te acercas hace el modo inservible para eso. El
+     * precio es que el sistema de wariness no se puede probar volando: hay que estar en
+     * supervivencia.
+     *
+     * <p><b>Deuda declarada:</b> anadir depredadores exige tocar dos sitios — sobrescribir esto y
+     * ampliar la consulta de {@code ThreatSensor.scan()}, que hoy pide solo {@code Player.class}
+     * porque es lo barato y va indexado por chunk. Hoy ningun mob del juego caza a estos critters,
+     * asi que esa rama seria codigo sin nada que la dispare.
+     */
+    public boolean isThreat(LivingEntity other) {
+        return other instanceof Player player && !player.isSpectator() && !player.isCreative();
+    }
+
+    /** Zona roja: huida inmediata. */
+    public double innerThreatRadius() { return 4.0D; }
+
+    /** Zona amarilla: alerta y arranque del temporizador. */
+    public double outerThreatRadius() { return 10.0D; }
+
+    /** Cuanto aguanta alertado antes de salir corriendo. 80 ticks = 4 s. */
+    public int alertDwellTicks() { return 80; }
+
+    /** Multiplicador de velocidad al huir. */
+    public double fleeSpeed() { return 1.6D; }
+
+    /**
+     * Distancia a la que deja de huir. <b>Invariante: mayor que {@link #outerThreatRadius()}.</b>
+     *
+     * <p>Es el anti-loop: al terminar la huida la amenaza ya esta fuera de la zona amarilla, asi que
+     * no puede re-alertarse en el acto. {@code ThreatSensor} loguea y clampa si se configura mal —
+     * no lo comprueba con {@code assert}, que Java desactiva en runtime.
+     */
+    public double safeDistance() { return 16.0D; }
+
+    /** Techo de la huida, para el acorralado que nunca alcanzaria safeDistance. 200 ticks = 10 s. */
+    public int maxFleeTicks() { return 200; }
+
+    /** Espera sin amenazas antes de volver a dormirse. 6000 ticks = 5 min. */
+    public int reSleepCooldownTicks() { return 6000; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  CURADO PASIVO
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Medio corazon por minuto, solo si esta bien alimentado.
+     *
+     * <p>Los umbrales son relativos porque cada especie tiene su escala: la civeta tiene 4000 de
+     * hambre maxima y las demas otra cosa.
+     *
+     * <p>El intervalo se escalona con {@code getId()} para que veinte critters no se curen todos en el
+     * mismo tick.
+     *
+     * <p>No trata distinto a los recien nacidos, no se apaga durmiendo y no consulta el sistema de
+     * wariness. Cada condicion extra seria un sitio mas donde el curado se queda mudo sin que se
+     * entienda por que; el vinculo con la comida y el agua ya cumple el objetivo de diseno.
+     */
+    private void tickPassiveHealing() {
+        if ((this.tickCount + this.getId()) % HEAL_INTERVAL_TICKS != 0) return;
+        if (this.getHealth() >= this.getMaxHealth()) return;
+        if (this.getHunger() <= this.maxHunger() / 2) return;
+        if (this.getThirst() <= this.maxThirst() / 2) return;
+
+        this.heal(1.0F);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  VINCULO MADRE-CRIA
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public @Nullable UUID getCaregiver() { return this.caregiverUUID; }
+
+    /** Vincula esta cria a una cuidadora y reinicia el contador de ausencia. */
+    public void setCaregiver(@Nullable UUID uuid) {
+        this.caregiverUUID = uuid;
+        this.lastCaregiverSeenTick = this.tickCount;
+    }
+
+    public void clearCaregiver() {
+        this.caregiverUUID = null;
+    }
+
+    /**
+     * Una cria sin cuidadora, y por tanto adoptable. Un adulto nunca lo es: el vinculo solo significa
+     * algo mientras es recien nacido, y devolver true para todos los adultos haria que el goal los
+     * tratara como candidatos a adopcion.
+     */
+    public boolean isOrphan() {
+        return this.isNewborn() && this.caregiverUUID == null;
+    }
+
+    public int ticksSinceCaregiverSeen() {
+        return this.tickCount - this.lastCaregiverSeenTick;
+    }
+
+    /**
+     * Mantiene vivo el vinculo mientras la cuidadora este cerca, y lo corta cuando lleva demasiado
+     * tiempo sin aparecer.
+     *
+     * <p>Usa {@code ServerLevel.getEntity(UUID)}, que es una busqueda en mapa y no un escaneo por
+     * area. Si la madre esta en un chunk descargado devuelve null y cuenta como ausencia — correcto,
+     * porque desde el punto de vista de la cria lo es.
+     *
+     * <p>Esta es la regla que cubre los dos casos del encargo con un solo mecanismo: para la cria,
+     * "mi madre murio" y "se la llevaron" son el mismo hecho.
+     */
+    private void tickCaregiverPresence() {
+        if (this.caregiverUUID == null) return;
+        if (!this.isNewborn()) {
+            // Ha crecido: el vinculo deja de significar nada y se suelta para no arrastrarlo en NBT ni
+            // ensuciar el comando de depuracion.
+            this.clearCaregiver();
+            return;
+        }
+        if (this.tickCount % CAREGIVER_CHECK_INTERVAL != 0) return;
+
+        Entity caregiver = ((ServerLevel) this.level()).getEntity(this.caregiverUUID);
+        if (caregiver instanceof DiverseCritter mother
+                && mother.isAlive()
+                && this.distanceTo(mother) <= CAREGIVER_RANGE) {
+            this.lastCaregiverSeenTick = this.tickCount;
+        }
+
+        if (this.ticksSinceCaregiverSeen() > ORPHAN_TIMEOUT_TICKS) {
+            this.clearCaregiver();
+        }
+    }
+
+    /**
+     * Al morir, corta el vinculo con su cria para que quede adoptable <b>en el acto</b> y no dentro de
+     * 60 s.
+     *
+     * <p>Hace falta este camino porque al morir la entidad desaparece del mundo, y desde la cria eso
+     * es indistinguible de "chunk descargado": el temporizador no puede saber que la madre no va a
+     * volver. Se resuelve desde el otro lado, que si lo sabe.
+     *
+     * <p>El temporizador sigue siendo la red para todo lo demas: que se la lleven, que muera lejos de
+     * la cria, o que cambie de dimension.
+     */
+    @Override
+    public void die(DamageSource pDamageSource) {
+        if (!this.level().isClientSide) {
+            for (DiverseCritter ward : this.level().getEntitiesOfClass(
+                    DiverseCritter.class,
+                    this.getBoundingBox().inflate(CAREGIVER_RANGE),
+                    other -> other.isNewborn() && this.getUUID().equals(other.getCaregiver()))) {
+                ward.clearCaregiver();
+            }
+        }
+        super.die(pDamageSource);
     }
 }

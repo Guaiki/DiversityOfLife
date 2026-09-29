@@ -5,8 +5,19 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.entity.custom.base.IDiggingCritter;
+import com.evirapo.diversityofcritters.common.entity.custom.base.IScratchingCritter;
+import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
+import com.evirapo.diversityofcritters.client.animations.CivetAnims;
+import com.evirapo.diversityofcritters.client.animations.CivetBabyAnims;
+import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
+import net.darkblade.deluxelib.anim.AnimSource;
+import net.darkblade.deluxelib.entity.ai.goal.AnimatableMeleeAttackGoal;
+import net.darkblade.deluxelib.anim.Loop;
+import net.darkblade.deluxelib.anim.StandardAnimation;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
@@ -53,58 +64,26 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.function.Predicate;
 
-public class CivetEntity extends DiverseCritter {
+public class CivetEntity extends DiverseCritter
+        implements IDiggingCritter, IScratchingCritter {
 
-    // Civeta de palma bandeada: tropical del sudeste asiático
     @Override
-    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+    public TemperatureTier comfortTierMin() {
+        return TemperatureTier.WARM;
     }
     @Override
-    public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.HOT;
-    }
-
-    // Selva tropical húmeda del sudeste asiático
-    @Override
-    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
-    }
-    @Override
-    public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.WET;
+    public TemperatureTier comfortTierMax() {
+        return TemperatureTier.HOT;
     }
 
-    public final AnimationState idleAnimationState = new AnimationState();
-    public final AnimationState idleStandUpState   = new AnimationState();
-    public final AnimationState idleSniffLeftState = new AnimationState();
-    public final AnimationState idleSniffRightState= new AnimationState();
-    public final AnimationState idleSitStartingState = new AnimationState();
-    public final AnimationState idleSitState         = new AnimationState();
-    public final AnimationState idleSitEndingState   = new AnimationState();
-    public final AnimationState idleLayStartingState = new AnimationState();
-    public final AnimationState idleLayState         = new AnimationState();
-    public final AnimationState idleLayEndingState   = new AnimationState();
-    public final AnimationState climbIdleState      = new AnimationState();
-    public final AnimationState climbingUpState     = new AnimationState();
-    public final AnimationState climbingDownState   = new AnimationState();
-    public final AnimationState attackAnimationState = new AnimationState();
-    public final AnimationState drinkStartingState = new AnimationState();
-    public final AnimationState drinkIdleState     = new AnimationState();
-    public final AnimationState drinkEndingState   = new AnimationState();
-    public final AnimationState digStartingState = new AnimationState();
-    public final AnimationState digIdleState     = new AnimationState();
-    public final AnimationState digEndingState   = new AnimationState();
-    public final AnimationState cleanStartingState = new AnimationState();
-    public final AnimationState cleanIdleState     = new AnimationState();
-    public final AnimationState cleanEndingState   = new AnimationState();
-    public final AnimationState preparingCryState = new AnimationState();
-    public final AnimationState cryingState = new AnimationState();
-    public final AnimationState stoppingCryState = new AnimationState();
-    public final AnimationState scratchStartingState = new AnimationState();
-    public final AnimationState scratchIdleState     = new AnimationState();
-    public final AnimationState scratchEndingState   = new AnimationState();
-    public final AnimationState swimAnimationState   = new AnimationState();
+    @Override
+    public HumidityTier comfortHumidityMin() {
+        return HumidityTier.HUMID;
+    }
+    @Override
+    public HumidityTier comfortHumidityMax() {
+        return HumidityTier.WET;
+    }
 
     private static final EntityDataAccessor<Byte> CLIMB_STATE = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float> CLIMB_FACING_YAW = SynchedEntityData.defineId(CivetEntity.class, EntityDataSerializers.FLOAT);
@@ -119,37 +98,8 @@ public class CivetEntity extends DiverseCritter {
     // --- VARIABLES ---
     private LookForFoodItems forFoodGoal;
     private int tamingFeedsLeft = 0;
-    private int cryTimer = 0;
-    private int stopCryTimer = 0;
-    private boolean wasCryingClient = false;
-
-    private IdleVariant prevClientVariant = IdleVariant.NONE;
-    private int clientIdleTick = 0;
-
-    private boolean prevScratchingClient = false;
-    private int clientScratchTick = 0;
-
-    private boolean prevCleaningClient = false;
-    private int clientCleanTick = 0;
-    private int clientCleanEndingTick = 0;
-
-    private boolean prevDrinkingClient = false;
-    private int clientDrinkTick = 0;
-    private int clientDrinkEndingTick = 0;
-
-    private boolean prevDiggingClient = false;
-    private int clientDigTick = 0;
-    private int clientDigEndingTick = 0;
-
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
-
-    /** Progreso de sprint (0 = walk, 1 = run), interpolado en el cliente. */
-    public float sprintProgress = 0.0F;
-
-    /** True mientras una variante idle (STAND_UP, SNIFF, SIT, LAY) esté activa.
-     *  Expuesto al modelo para suprimir el blend de idle base. */
-    public boolean isVariantActive = false;
 
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
@@ -160,7 +110,6 @@ public class CivetEntity extends DiverseCritter {
         this.setMaxUpStep(1);
         this.mantle = new MantleController(this, MantleProfile.CIVET);
         this.moveControl = new CivetMoveControl(this);
-        this.idleAnimationState.start(0);
     }
 
     // --- SETUP ---
@@ -193,34 +142,55 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
 
-        this.goalSelector.addGoal(2, new BabyCryGoal(this));
+        // Antes de los goals de llanto aunque comparta prioridad: el GoalSelector recorre la lista en
+        // orden de insercion para repartir flags libres, asi que quien va primero gana el empate. La
+        // prioridad igual solo significa que ninguno DESALOJA al otro ya arrancado.
+        this.goalSelector.addGoal(2, new CritterAlertGoal(this));
+        this.goalSelector.addGoal(2, new CritterFleeGoal(this));
+
+        this.goalSelector.addGoal(2, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
-        this.goalSelector.addGoal(3, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(3, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(4, new NaturalMateGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false));
+        // Solo domesticados: en un salvaje pelearia con la alerta por el flag MOVE, tirando del bicho
+        // HACIA la amenaza de la que el otro sistema lo aparta, y dos goals con intenciones opuestas
+        // dan tembleque, no comportamiento. Gateado por isTame() no llegan a coexistir nunca: el
+        // sistema de wariness se apaga entero al domesticar.
+        //
+        // Sigue valiendo para llamar con comida a una mascota en modo wandering, donde FollowOwnerGoal
+        // no corre. Y deja el sigilo como canal para domesticar: agachado se congela el temporizador
+        // de alerta y el critter se queda vigilandote mientras te acercas.
+        this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(Items.BEEF), false) {
+            @Override public boolean canUse() { return isTame() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isTame() && super.canContinueToUse(); }
+        });
 
         this.goalSelector.addGoal(6, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(7, new AnimatedAttackGoal(this, 1.25D, true, 7, 3));
+        this.goalSelector.addGoal(7, new AnimatableMeleeAttackGoal(this, 1.25D, true)
+                .onAttack((target, anim) -> {
+                    this.doHurtTarget(target);
+                    this.animator().play(this.animator().getByName("attack"));
+                }));
 
-        this.goalSelector.addGoal(8, new CritterCleanGoal(this));
+        this.goalSelector.addGoal(8, new CritterCleanChainGoal(this));
         this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, CivetEntity.class, 1.2D, 16.0D));
         this.forFoodGoal = new LookForFoodItems(this, DoCTags.Items.MEATS);
         this.goalSelector.addGoal(10, this.forFoodGoal);
 
         this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
+        this.goalSelector.addGoal(13, new CritterDrinkChainGoal(this));
         this.goalSelector.addGoal(14, new FindDigBoxGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(15, new ScratchLogGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(16, new DigDirtGoal(this));
+        this.goalSelector.addGoal(15, new CritterScratchLogChainGoal(this, 1.1D, 16));
+        this.goalSelector.addGoal(16, new CritterDigDirtChainGoal(this));
         this.goalSelector.addGoal(16, new CivetClimbGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(17, new CritterIdleGoal(this));
+        this.goalSelector.addGoal(17, new CritterIdleVariantGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
         this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
@@ -232,8 +202,186 @@ public class CivetEntity extends DiverseCritter {
         this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
 
+        this.goalSelector.addGoal(22, new CritterIdleGestureGoal(this, 120, 120)
+                .add(IdleVariant.STRETCH, "stretch", 20)
+                .add(IdleVariant.SNIFF_LEFT, "sniff_left", 25)
+                .add(IdleVariant.SNIFF_RIGHT, "sniff_right", 25)
+                .condition(c -> !this.isClimbing()));
+
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
         this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
+    }
+
+    // --- ANIMACIONES ---
+
+
+    @Override
+    public void registerAnimations() {
+        StandardAnimation idle = new StandardAnimation("idle",
+                new AnimSource(() -> CivetAnims.IDLE), Loop.REPEATING, 0, 9, 2.0F);
+        StandardAnimation walk = new StandardAnimation("walk",
+                new AnimSource(() -> CivetAnims.WALK), Loop.REPEATING, 0, 8, 0.9662F);
+        StandardAnimation run = new StandardAnimation("run",
+                new AnimSource(() -> CivetAnims.RUN), Loop.REPEATING, 0, 7, 0.6667F);
+
+        idle.blendInMs(250).blendOutMs(150);
+        walk.blendInMs(150).blendOutMs(150);
+        run.blendInMs(150).blendOutMs(150);
+
+        idle.setPlayCondition(a -> groundLocomotionAllowed() && !this.isMoving());
+        walk.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && !this.isSprinting());
+        run.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && this.isSprinting());
+
+
+        StandardAnimation sitEnter = new StandardAnimation("ordered_sit_enter",
+                new AnimSource(() -> CivetAnims.SIT_STARTING), Loop.PLAY_ONCE, 0, P_ORDERED_SIT, 0.5F);
+        StandardAnimation sitLoop = new StandardAnimation("ordered_sit_loop",
+                new AnimSource(() -> CivetAnims.SIT_IDLE), Loop.REPEATING, 0, P_ORDERED_SIT, 4.0F);
+        StandardAnimation sitExit = new StandardAnimation("ordered_sit_exit",
+                new AnimSource(() -> CivetAnims.SIT_ENDING), Loop.PLAY_ONCE, 0, P_ORDERED_SIT, 1.0F);
+
+        sitEnter.blendInMs(150).blendOutMs(120).setNextAnimation("ordered_sit_loop");
+        sitLoop.blendInMs(120).blendOutMs(150);
+        sitLoop.setPlayCondition(a -> this.isOrderedToSit());
+        sitExit.blendInMs(120).blendOutMs(200).locksMovement();
+
+        this.animator().register(idle, walk, run, sitEnter, sitLoop, sitExit);
+
+        registerChain("drink", () -> CivetAnims.DRINK_STARTING, 0.25F,
+                () -> CivetAnims.DRINK_IDLE, 1.0F,
+                () -> CivetAnims.DRINK_ENDING, 0.25F, P_ACTIVITY)
+                .setPlayCondition(a -> this.IsDrinking());
+
+        registerChain("clean", () -> CivetAnims.GROOMING_STARTING, 0.5F,
+                () -> CivetAnims.GROOMING_IDLE, 0.5F,
+                () -> CivetAnims.GROOMING_ENDING, 0.5F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isCleaning());
+
+        registerChain("dig", () -> CivetAnims.DIGGING_STARTING, 0.5F,
+                () -> CivetAnims.DIGGING_IDLE, 0.5F,
+                () -> CivetAnims.DIGGING_ENDING, 0.5F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isDigging());
+
+        registerChain("scratch", () -> CivetAnims.SCRATCHING_STARTING, 0.5F,
+                () -> CivetAnims.SCRATCHING_IDLE, 0.5F,
+                () -> CivetAnims.SCRATCHING_ENDING, 0.5F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isScratching());
+
+        registerSingle("stretch", () -> CivetAnims.STAND_UP, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STRETCH);
+        registerSingle("sniff_left", () -> CivetAnims.SNIFF_LEFT, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_LEFT);
+        registerSingle("sniff_right", () -> CivetAnims.SNIFF_RIGHT, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_RIGHT);
+
+        registerChain("idle_sit", () -> CivetAnims.SIT_STARTING, 0.5F,
+                () -> CivetAnims.SIT_IDLE, 4.0F,
+                () -> CivetAnims.SIT_ENDING, 1.0F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SIT);
+
+        registerChain("idle_stand_up", () -> CivetAnims.LAY_STARTING, 1.0F,
+                () -> CivetAnims.LAY_IDLE, 4.0F,
+                () -> CivetAnims.LAY_ENDING, 1.0F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STAND_UP);
+
+        StandardAnimation climbUp = new StandardAnimation("climb_up",
+                new AnimSource(() -> CivetAnims.CLIMBING_UP), Loop.REPEATING, 0, P_CLIMB, 1.0F);
+        StandardAnimation climbDown = new StandardAnimation("climb_down",
+                new AnimSource(() -> CivetAnims.CLIMBING_DOWN), Loop.REPEATING, 0, P_CLIMB, 1.0F);
+        StandardAnimation climbHang = new StandardAnimation("climb_hang",
+                new AnimSource(() -> CivetAnims.CLIMB_IDLE), Loop.REPEATING, 0, P_CLIMB, 4.0F);
+        StandardAnimation swim = new StandardAnimation("swim",
+                new AnimSource(() -> CivetAnims.SWIM), Loop.REPEATING, 0, P_SWIM, 2.0F);
+
+        StandardAnimation attack = new StandardAnimation("attack",
+                new AnimSource(() -> CivetAnims.ATTACK), Loop.PLAY_ONCE, 0, P_ATTACK, 0.5F);
+        StandardAnimation sleepEnter = new StandardAnimation("sleep_enter",
+                new AnimSource(() -> CivetAnims.PREPARING_SLEEP), Loop.REPEATING, 0, P_SLEEP, 2.0F);
+        StandardAnimation sleepLoop = new StandardAnimation("sleep_loop",
+                new AnimSource(() -> CivetAnims.SLEEP), Loop.REPEATING, 0, P_SLEEP, 4.0F);
+        StandardAnimation sleepExit = new StandardAnimation("sleep_exit",
+                new AnimSource(() -> CivetAnims.AWAKENING), Loop.REPEATING, 0, P_SLEEP, 2.0F);
+
+        // Alerta: entrada de un disparo mas bucle, sin salida. No hace falta: al caer isAlert() el
+        // bucle se para e idle entra por su blendOutMs, igual que nadar o trepar.
+        StandardAnimation alertEnter = new StandardAnimation("alert_enter",
+                new AnimSource(() -> CivetAnims.ALERT_STARTING), Loop.PLAY_ONCE, 0, P_ALERT, 0.5F);
+        StandardAnimation alertLoop = new StandardAnimation("alert_loop",
+                new AnimSource(() -> CivetAnims.ALERT), Loop.REPEATING, 0, P_ALERT, 0.5F);
+
+
+        climbUp.blendInMs(100).blendOutMs(100);
+        climbDown.blendInMs(100).blendOutMs(100);
+
+        climbHang.blendInMs(150).blendOutMs(150);
+
+        swim.blendInMs(200).blendOutMs(200).playbackSpeed(1.5F);
+
+        attack.blendInMs(80).blendOutMs(120);
+        sleepEnter.blendInMs(200).blendOutMs(200);
+        sleepLoop.blendInMs(300).blendOutMs(300);
+        sleepExit.blendInMs(200).blendOutMs(200);
+
+        alertEnter.blendInMs(120).blendOutMs(150).setNextAnimation("alert_loop");
+        alertLoop.blendInMs(120).blendOutMs(200);
+
+        climbUp.setPlayCondition(a -> this.isClimbingUp());
+        climbDown.setPlayCondition(a -> this.isClimbingDown());
+        climbHang.setPlayCondition(a -> this.isHanging());
+        swim.setPlayCondition(a -> this.isInWaterOrBubble() && this.isAlive());
+        sleepEnter.setPlayCondition(a -> this.getSleepState() == SleepState.PREPARING);
+        sleepLoop.setPlayCondition(a -> this.getSleepState() == SleepState.SLEEPING);
+        sleepExit.setPlayCondition(a -> this.getSleepState() == SleepState.AWAKENING);
+        // Solo el bucle lleva condicion: la entrada la lanza CritterAlertGoal a mano, porque el
+        // animator tickea antes que aiStep() y en el tick en que se alerta aun no veria el flag.
+        alertLoop.setPlayCondition(a -> this.isAlert());
+
+        this.animator().register(climbUp, climbDown, climbHang, swim, attack,
+                sleepEnter, sleepLoop, sleepExit, alertEnter, alertLoop);
+
+        this.registerBabyAnimations();
+    }
+
+
+    private void registerBabyAnimations() {
+        StandardAnimation babyIdle = registerSingle("baby_idle",
+                () -> CivetBabyAnims.idle, 4.0F, Loop.REPEATING, P_IDLE, LAYER_BABY);
+        StandardAnimation babyCrawl = registerSingle("baby_crawl",
+                () -> CivetBabyAnims.move, 4.0F, Loop.REPEATING, P_WALK, LAYER_BABY);
+
+        babyIdle.setPlayCondition(a -> this.isNewborn() && !this.isMoving());
+        babyCrawl.setPlayCondition(a -> this.isNewborn() && this.isMoving());
+
+        registerSingle("baby_sleep_enter", () -> CivetBabyAnims.preparing_sleep,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.PREPARING);
+        registerSingle("baby_sleep_loop", () -> CivetBabyAnims.sleep,
+                4.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.SLEEPING);
+        registerSingle("baby_sleep_exit", () -> CivetBabyAnims.awakening,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.AWAKENING);
+
+        registerChain("cry",
+                () -> CivetBabyAnims.preparing_cry, 0.5F,
+                () -> CivetBabyAnims.cry, 4.0F,
+                () -> CivetBabyAnims.stopping_cry, 0.5F, P_ACTIVITY, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.isCrying());
+    }
+
+    @Override
+    public boolean isOrderedSitPlaying() {
+        return this.animator().isPlaying("ordered_sit_enter")
+                || this.animator().isPlaying("ordered_sit_loop")
+                || this.animator().isPlaying("ordered_sit_exit");
+    }
+
+    private boolean groundLocomotionAllowed() {
+        return this.isAlive()
+                && !this.isNewborn()
+                && this.getSleepState() == SleepState.AWAKE
+                && !this.isClimbing()
+                && !this.isInWaterOrBubble();
     }
 
     @Override
@@ -287,92 +435,6 @@ public class CivetEntity extends DiverseCritter {
             }
         }
 
-        if (this.level().isClientSide) {
-            IdleVariant currentVariant = getIdleVariant();
-
-            if (currentVariant != prevClientVariant) {
-                this.clientIdleTick = 0;
-                this.prevClientVariant = currentVariant;
-            }
-
-            if (currentVariant != IdleVariant.NONE) {
-                this.clientIdleTick++;
-            }
-
-            boolean currentScratch = isScratching();
-            if (currentScratch != prevScratchingClient) {
-                this.clientScratchTick = 0;
-                this.prevScratchingClient = currentScratch;
-            }
-            if (currentScratch) {
-                this.clientScratchTick++;
-            }
-
-            boolean currentCleaning = isCleaning();
-            if (currentCleaning && !prevCleaningClient) {
-                this.clientCleanTick = 0;
-                this.clientCleanEndingTick = 0;
-            } else if (!currentCleaning && prevCleaningClient) {
-                this.clientCleanEndingTick = 1;
-                this.clientCleanTick = 0;
-            }
-            if (currentCleaning) {
-                this.clientCleanTick++;
-            } else if (this.clientCleanEndingTick > 0) {
-                this.clientCleanEndingTick++;
-                if (this.clientCleanEndingTick > 10) this.clientCleanEndingTick = 0;
-            }
-            this.prevCleaningClient = currentCleaning;
-
-            boolean currentDrinking = IsDrinking();
-
-            if (currentDrinking && !prevDrinkingClient) {
-                this.clientDrinkTick = 0;
-                this.clientDrinkEndingTick = 0;
-            } else if (!currentDrinking && prevDrinkingClient) {
-                this.clientDrinkEndingTick = 1;
-                this.clientDrinkTick = 0;
-            }
-
-            if (currentDrinking) {
-                this.clientDrinkTick++;
-            } else if (this.clientDrinkEndingTick > 0) {
-                this.clientDrinkEndingTick++;
-                if (this.clientDrinkEndingTick > 6) {
-                    this.clientDrinkEndingTick = 0;
-                }
-            }
-            this.prevDrinkingClient = currentDrinking;
-
-            boolean currentDigging = isDigging();
-
-            if (currentDigging && !prevDiggingClient) {
-                this.clientDigTick = 0;
-                this.clientDigEndingTick = 0;
-            } else if (!currentDigging && prevDiggingClient) {
-                this.clientDigEndingTick = 1;
-                this.clientDigTick = 0;
-            }
-
-            if (currentDigging) {
-                this.clientDigTick++;
-            } else if (this.clientDigEndingTick > 0) {
-                this.clientDigEndingTick++;
-                if (this.clientDigEndingTick > 11) {
-                    this.clientDigEndingTick = 0;
-                }
-            }
-            this.prevDiggingClient = currentDigging;
-
-            if (this.isSprinting()) {
-                this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
-            } else {
-                this.sprintProgress = Math.max(0.0F, this.sprintProgress - 0.1F);
-            }
-
-            setupAnimationStatesClient();
-            handleCryingAnimationClient();
-        }
     }
 
     @Override
@@ -453,151 +515,6 @@ public class CivetEntity extends DiverseCritter {
         self().setDeltaMovement(self().getDeltaMovement().add(0.0D, -0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get())/6, 0.0D));
     }
 
-    private void setupAnimationStatesClient() {
-        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
-        boolean swimming     = this.isInWaterOrBubble();
-        boolean climbing     = this.isClimbing();
-
-        IdleVariant v = getIdleVariant();
-        int ticksActive = this.clientIdleTick;
-
-        int sitStarting = 10;
-        int sitIdle     = 80;
-        int sitEnding   = 20;
-        int sitTotal    = sitStarting + sitIdle + sitEnding;
-
-        int layStarting = 20;
-        int layIdle     = 80;
-        int layEnding   = 20;
-        int layTotal    = layStarting + layIdle + layEnding;
-
-        boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
-
-        boolean isVariantPlaying = false;
-        if (!isOrderedSitPlaying) {
-            if (v == IdleVariant.STAND_UP && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_LEFT && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SIT && ticksActive <= sitTotal) isVariantPlaying = true;
-            else if (v == IdleVariant.LAY && ticksActive <= layTotal) isVariantPlaying = true;
-        }
-
-        boolean scratching = isScratching();
-        int scratchActive = this.clientScratchTick;
-        int scratchStart = 10;
-        int scratchLoop  = 80;
-        int scratchEnd   = 10;
-        int scratchTotal = scratchStart + scratchLoop + scratchEnd;
-
-        boolean isScratchPlaying = scratching && scratchActive <= scratchTotal && !isOrderedSitPlaying;
-
-        boolean cleaning        = isCleaning();
-        boolean isCleanStarting = cleaning && this.clientCleanTick <= 10;
-        boolean isCleanIdle     = cleaning && this.clientCleanTick > 10;
-        boolean isCleanEnding   = !cleaning && this.clientCleanEndingTick > 0;
-        boolean isCleanPlaying  = (isCleanStarting || isCleanIdle || isCleanEnding) && !isOrderedSitPlaying;
-
-        boolean drinking = IsDrinking();
-        boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
-        boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
-        boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
-
-        boolean isDrinkPlaying  = (isDrinkStarting || isDrinkIdle || isDrinkEnding) && !isOrderedSitPlaying;
-
-        boolean digging = isDigging();
-        boolean isDigStarting = digging && this.clientDigTick <= 10;
-        boolean isDigIdle     = digging && this.clientDigTick > 10;
-        boolean isDigEnding   = !digging && this.clientDigEndingTick > 0;
-
-        boolean isDigPlaying  = (isDigStarting || isDigIdle || isDigEnding) && !isOrderedSitPlaying;
-
-        boolean groundLocomotion = this.isAlive()
-                && !sleepingLike && !swimming && !climbing
-                && !isOrderedSitPlaying && !isVariantPlaying;
-
-        this.isVariantActive = isVariantPlaying;
-        this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
-        this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
-
-        this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP && isVariantPlaying, this.tickCount);
-        this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT && isVariantPlaying, this.tickCount);
-        this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
-
-        if (v == IdleVariant.SIT && isVariantPlaying) {
-            this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
-            this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
-            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount);
-        } else {
-            this.idleSitStartingState.stop();
-            this.idleSitState.stop();
-            this.idleSitEndingState.stop();
-        }
-
-        if (v == IdleVariant.LAY && isVariantPlaying) {
-            this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
-            this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
-            this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
-        } else {
-            this.idleLayStartingState.stop();
-            this.idleLayState.stop();
-            this.idleLayEndingState.stop();
-        }
-
-        if (isScratchPlaying) {
-            this.scratchStartingState.animateWhen(scratchActive <= scratchStart, this.tickCount);
-            this.scratchIdleState.animateWhen(scratchActive > scratchStart && scratchActive <= scratchStart + scratchLoop, this.tickCount);
-            this.scratchEndingState.animateWhen(scratchActive > scratchStart + scratchLoop, this.tickCount);
-        } else {
-            this.scratchStartingState.stop();
-            this.scratchIdleState.stop();
-            this.scratchEndingState.stop();
-        }
-
-        if (isCleanPlaying) {
-            this.cleanStartingState.animateWhen(isCleanStarting, this.tickCount);
-            this.cleanIdleState.animateWhen(isCleanIdle, this.tickCount);
-            this.cleanEndingState.animateWhen(isCleanEnding, this.tickCount);
-        } else {
-            this.cleanStartingState.stop();
-            this.cleanIdleState.stop();
-            this.cleanEndingState.stop();
-        }
-
-        if (isDrinkPlaying) {
-            this.drinkStartingState.animateWhen(isDrinkStarting, this.tickCount);
-            this.drinkIdleState.animateWhen(isDrinkIdle, this.tickCount);
-            this.drinkEndingState.animateWhen(isDrinkEnding, this.tickCount);
-        } else {
-            this.drinkStartingState.stop();
-            this.drinkIdleState.stop();
-            this.drinkEndingState.stop();
-        }
-
-        if (isDigPlaying) {
-            this.digStartingState.animateWhen(isDigStarting, this.tickCount);
-            this.digIdleState.animateWhen(isDigIdle, this.tickCount);
-            this.digEndingState.animateWhen(isDigEnding, this.tickCount);
-        } else {
-            this.digStartingState.stop();
-            this.digIdleState.stop();
-            this.digEndingState.stop();
-        }
-
-        boolean climbUp   = this.isClimbingUp();
-        boolean climbDown = this.isClimbingDown();
-        boolean climbHang = this.isHanging();
-        this.climbingUpState.animateWhen(climbUp, this.tickCount);
-        this.climbingDownState.animateWhen(climbDown, this.tickCount);
-        this.climbIdleState.animateWhen(climbHang, this.tickCount);
-
-        if (this.isAttacking() && this.attackAnimationTimeout <= 0) {
-            this.attackAnimationTimeout = 10;
-            attackAnimationState.start(this.tickCount);
-        } else {
-            --this.attackAnimationTimeout;
-        }
-    }
-
     @Override
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
@@ -625,6 +542,19 @@ public class CivetEntity extends DiverseCritter {
                         itemstack.shrink(1);
                     }
                 }
+                // Alimentar es alimentar, aunque sea una toma de domesticacion. Sin esto, el biberon
+                // gastaba durabilidad y no tocaba el hambre: la barra solo se rellenaba una vez el
+                // bicho ya era tuyo, porque ese codigo vive en DiverseCritter.mobInteract y esta rama
+                // devuelve antes de llegar. Efecto practico: dar el biberon a un huerfano salvaje NO
+                // lo salvaba de morir de hambre, que es justo para lo que existe.
+                //
+                // La domesticacion sigue costando las 3-5 tomas de siempre; lo que cambia es que cada
+                // una llena la barra.
+                if (isNurserBottle) {
+                    this.setHunger(this.maxHunger());
+                    this.setThirst(this.maxThirst());
+                }
+
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
@@ -695,12 +625,19 @@ public class CivetEntity extends DiverseCritter {
     }
 
     // --- HELPERS & CONFIG ---
+    /**
+     * La civeta es la primera especie con clips de alerta, asi que es la unica que enciende el
+     * sistema de wariness. La ardilla y la sifaka lo heredan cableado y apagado hasta que tengan
+     * los suyos: entonces es esta linea mas registrar alert_enter / alert_loop.
+     */
+    @Override public boolean isWary() { return true; }
+
     @Override public int maxHunger() { return 4000; }
     @Override public int maxThirst() { return 4000; }
     @Override public int maxEnrichment() { return 4000; }
     @Override public int maxHygiene() { return 4000; }
-    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 25;}
-    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 24;}
+    @Override public int getPreparingSleepDuration() {return this.isNewborn() ? 20 : 40;}
+    @Override public int getAwakeningDuration() {return this.isNewborn() ? 20 : 40;}
     @Override protected boolean getDefaultDiurnal() { return false; }
     @Override protected double getHungerLossPerSecond()     { return 3.33; }
     @Override protected double getThirstLossPerSecond()     { return 5.0;  }
@@ -868,11 +805,26 @@ public class CivetEntity extends DiverseCritter {
         this.setYHeadRot(wallYaw);
     }
 
-    public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
-    public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
 
-    public boolean isScratching() { return this.entityData.get(IS_SCRATCHING); }
-    public void setScratching(boolean isScratching) { this.entityData.set(IS_SCRATCHING, isScratching); }
+    @Override
+    public boolean isDoingSpecialActivity() {
+        return isClimbing() || isDigging() || isScratching();
+    }
+
+    private @Nullable BlockPos digTarget;
+    private @Nullable BlockPos scratchTarget;
+
+    @Override public @Nullable BlockPos getDigTarget() { return this.digTarget; }
+    @Override public void setDigTarget(@Nullable BlockPos pos) { this.digTarget = pos; }
+
+    @Override public @Nullable BlockPos getScratchTarget() { return this.scratchTarget; }
+    @Override public void setScratchTarget(@Nullable BlockPos pos) { this.scratchTarget = pos; }
+
+    @Override public boolean isDigging() {return this.entityData.get(IS_DIGGING);}
+    @Override public void setDigging(boolean isDigging) {this.entityData.set(IS_DIGGING, isDigging);}
+
+    @Override public boolean isScratching() { return this.entityData.get(IS_SCRATCHING); }
+    @Override public void setScratching(boolean isScratching) { this.entityData.set(IS_SCRATCHING, isScratching); }
 
     @Override
     public boolean isLocomotionSuspended() {
@@ -917,44 +869,6 @@ public class CivetEntity extends DiverseCritter {
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
     }
 
-    private void handleCryingAnimationClient() {
-        boolean isCrying = this.isCrying();
-
-        if (isCrying) {
-            this.stoppingCryState.stop();
-            this.stopCryTimer = 0;
-            this.wasCryingClient = true;
-
-            if (this.cryTimer < 10) {
-                this.preparingCryState.startIfStopped(this.tickCount);
-                this.cryingState.stop();
-            } else {
-                this.preparingCryState.stop();
-                this.cryingState.startIfStopped(this.tickCount);
-            }
-            this.cryTimer++;
-
-        } else {
-            this.preparingCryState.stop();
-            this.cryingState.stop();
-            this.cryTimer = 0;
-
-            if (this.wasCryingClient) {
-                if (this.stopCryTimer < 10) {
-                    this.stoppingCryState.startIfStopped(this.tickCount);
-                } else {
-                    this.stoppingCryState.stop();
-                    this.wasCryingClient = false;
-                }
-                this.stopCryTimer++;
-            } else {
-                this.stoppingCryState.stop();
-                this.stopCryTimer = 0;
-            }
-        }
-    }
-
-    @Nullable
     @Override
     protected SoundEvent getAmbientSound() {
         if (this.isSleeping()) {
@@ -999,6 +913,5 @@ public class CivetEntity extends DiverseCritter {
     private boolean isPrey(Entity entity) {
         return entity instanceof Rabbit || entity instanceof Chicken;
     }
-
 }
 

@@ -20,6 +20,39 @@ public class CritterNavigation extends WallClimberNavigation {
         this.critter = (DiverseCritter) mob;
     }
 
+    /**
+     * Anula el "empujon fantasma" de {@link WallClimberNavigation}.
+     *
+     * <p>Sin ruta activa, su {@code tick()} sigue llamando cada tick a
+     * {@code moveControl.setWantedPosition(pathToPosition, speedModifier)}. En la arana eso se
+     * resuelve solo: su MoveControl la lleva hasta ese punto y el propio {@code tick()} pone el campo
+     * a null al llegar. En los critters no, porque su MoveControl ignora la posicion deseada mientras
+     * la navegacion este terminada — asi que no llegan nunca y el empujon no caduca. Y
+     * {@code pathToPosition} es privado y <b>no lo limpia {@code stop()}</b>, asi que tampoco se
+     * puede cortar desde fuera.
+     *
+     * <p>Lo unico que conseguia era dejar la operacion del MoveControl en {@code MOVE_TO} con el
+     * ultimo {@code speedModifier}. Y {@code customServerAiStep()} de las tres especies deriva el
+     * sprint de {@code hasWanted()} y de esa velocidad, leyendolos <i>antes</i> de que
+     * {@code moveControl.tick()} los limpie: el critter se quedaba parado con particulas de correr
+     * hasta que otro goal conseguia una ruta de verdad y pisaba el modificador. Se destapo al
+     * terminar una huida, que es lo primero que lo mueve a 1.6 y luego lo para en seco.
+     *
+     * <p>Se replica lo unico que {@code PathNavigation.tick()} hace sin ruta —el contador y la
+     * recomputacion diferida— para no perderlo por el camino.
+     */
+    @Override
+    public void tick() {
+        if (this.isDone()) {
+            ++this.tick;
+            if (this.hasDelayedRecomputation) {
+                this.recomputePath();
+            }
+            return;
+        }
+        super.tick();
+    }
+
     @Override
     protected PathFinder createPathFinder(int pMaxVisitedNodes) {
         this.nodeEvaluator = new CritterNodeEvaluator();

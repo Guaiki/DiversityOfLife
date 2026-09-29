@@ -84,7 +84,24 @@ public class CivetMoveControl extends MoveControl {
             updateClimbDirectionFromPath();
         }
 
-        if (this.operation == Operation.MOVE_TO && !this.civet.getNavigation().isDone()) {
+        if (this.operation == Operation.MOVE_TO) {
+            // Vanilla resetea la operacion en la PRIMERA linea de esta rama y este override la habia
+            // perdido. Sin ella hasWanted() se queda en true para siempre con el ultimo
+            // speedModifier congelado, y customServerAiStep() —que deriva el sprint de esos dos
+            // valores— dejaba a la civeta parada con particulas de correr hasta que otro goal la
+            // movia mas despacio y pisaba el modificador. Se destapo al terminar una huida, que es
+            // lo primero que la mueve a 1.6 y luego la para en seco.
+            //
+            // La navegacion vuelve a poner MOVE_TO cada tick mientras haya ruta, asi que resetear
+            // aqui no interrumpe nada: es lo que convierte hasWanted() en "me estan moviendo ahora"
+            // en vez de "me movieron alguna vez".
+            this.operation = Operation.WAIT;
+
+            if (this.civet.getNavigation().isDone()) {
+                this.civet.setZza(0.0F);
+                return;
+            }
+
             double dx = this.wantedX - this.civet.getX();
             double dy = this.wantedY - this.civet.getY();
             double dz = this.wantedZ - this.civet.getZ();

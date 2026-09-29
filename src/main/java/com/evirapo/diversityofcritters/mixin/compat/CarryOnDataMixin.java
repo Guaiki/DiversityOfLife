@@ -11,7 +11,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import tschipp.carryon.common.carry.CarryOnData;
 
-@Mixin(CarryOnData.class)
+/**
+ * {@code remap = false} a nivel de clase: tanto {@code getEntity} como el campo {@code nbt} son de
+ * CarryOn, no de Minecraft, y no están en la tabla de ofuscación. Sin esto el procesador de
+ * anotaciones aborta con "Unable to locate obfuscation mapping for @Inject target getEntity" y el
+ * jar sale sin refmap, que es lo que hacía crashear el mod en producción.
+ */
+@Mixin(value = CarryOnData.class, remap = false)
 public class CarryOnDataMixin {
 
     @Shadow private CompoundTag nbt;

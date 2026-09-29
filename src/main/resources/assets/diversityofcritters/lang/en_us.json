@@ -43,6 +43,12 @@
   "screen.diversityofcritters.is_baby.false": "Adult",
 
   "screen.diversityofcritters.species": "Species",
+
+  "screen.diversityofcritters.diurnal": "Diurnal - awake by day, sleeps at night",
+  "screen.diversityofcritters.nocturnal": "Nocturnal - awake at night, sleeps by day",
+  "screen.diversityofcritters.release": "Release",
+  "screen.diversityofcritters.toggle_breed": "Toggle breeding",
+
   "container.diversityofcritters.bowl": "Bowl",
   "block.diversityofcritters.dig_box": "Dig Box",
   "block.diversityofcritters.air_conditioner": "Air Conditioner",

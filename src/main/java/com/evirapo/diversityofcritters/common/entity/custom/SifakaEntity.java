@@ -185,7 +185,18 @@ public class SifakaEntity extends DiverseCritter {
         this.goalSelector.addGoal(3, new SitWhenOrderedToGoal(this));
         this.goalSelector.addGoal(4, new NaturalMateGoal(this, 1.0D));
 
-        this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SIFAKA_FOOD), false));
+        // Solo domesticados: en un salvaje pelearia con la alerta por el flag MOVE, tirando del bicho
+        // HACIA la amenaza de la que el otro sistema lo aparta, y dos goals con intenciones opuestas
+        // dan tembleque, no comportamiento. Gateado por isTame() no llegan a coexistir nunca: el
+        // sistema de wariness se apaga entero al domesticar.
+        //
+        // Sigue valiendo para llamar con comida a una mascota en modo wandering, donde FollowOwnerGoal
+        // no corre. Y deja el sigilo como canal para domesticar: agachado se congela el temporizador
+        // de alerta y el critter se queda vigilandote mientras te acercas.
+        this.goalSelector.addGoal(5, new TemptGoal(this, 1.15D, Ingredient.of(DoCTags.Items.SIFAKA_FOOD), false) {
+            @Override public boolean canUse() { return isTame() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isTame() && super.canContinueToUse(); }
+        });
 
         this.goalSelector.addGoal(6, new FollowOwnerGoal(this, 1.2D, 8.0F, 2.0F, false) {
             @Override public boolean canUse() { return isFollowing() && super.canUse(); }
@@ -469,11 +480,11 @@ public class SifakaEntity extends DiverseCritter {
 
         boolean isVariantPlaying = false;
         if (!isOrderedSitPlaying) {
-            if (v == IdleVariant.STAND_UP  && ticksActive <= 40)       isVariantPlaying = true;
+            if (v == IdleVariant.STRETCH  && ticksActive <= 40)       isVariantPlaying = true;
             else if (v == IdleVariant.SNIFF_LEFT  && ticksActive <= 40) isVariantPlaying = true;
             else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
             else if (v == IdleVariant.SIT  && ticksActive <= sitTotal)  isVariantPlaying = true;
-            else if (v == IdleVariant.LAY  && ticksActive <= layTotal)  isVariantPlaying = true;
+            else if (v == IdleVariant.STAND_UP  && ticksActive <= layTotal)  isVariantPlaying = true;
         }
 
         // MODIFICADO: Ahora el estado de limpieza depende del nuevo sistema de Ticks (Starting / Idle / Ending)
@@ -503,7 +514,7 @@ public class SifakaEntity extends DiverseCritter {
         this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
         this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
 
-        this.idleStandUpState.animateWhen(v == IdleVariant.STAND_UP  && isVariantPlaying, this.tickCount);
+        this.idleStandUpState.animateWhen(v == IdleVariant.STRETCH  && isVariantPlaying, this.tickCount);
         this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT  && isVariantPlaying, this.tickCount);
         this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
 
@@ -517,7 +528,7 @@ public class SifakaEntity extends DiverseCritter {
             this.idleSitEndingState.stop();
         }
 
-        if (v == IdleVariant.LAY && isVariantPlaying) {
+        if (v == IdleVariant.STAND_UP && isVariantPlaying) {
             this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
             this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
             this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
@@ -605,6 +616,19 @@ public class SifakaEntity extends DiverseCritter {
                         itemstack.shrink(1);
                     }
                 }
+                // Alimentar es alimentar, aunque sea una toma de domesticacion. Sin esto, el biberon
+                // gastaba durabilidad y no tocaba el hambre: la barra solo se rellenaba una vez el
+                // bicho ya era tuyo, porque ese codigo vive en DiverseCritter.mobInteract y esta rama
+                // devuelve antes de llegar. Efecto practico: dar el biberon a un huerfano salvaje NO
+                // lo salvaba de morir de hambre, que es justo para lo que existe.
+                //
+                // La domesticacion sigue costando las 3-5 tomas de siempre; lo que cambia es que cada
+                // una llena la barra.
+                if (isNurserBottle) {
+                    this.setHunger(this.maxHunger());
+                    this.setThirst(this.maxThirst());
+                }
+
                 if (this.tamingFeedsLeft <= 0) this.tamingFeedsLeft = 3 + this.random.nextInt(3);
                 this.tamingFeedsLeft--;
                 if (this.tamingFeedsLeft <= 0 && !ForgeEventFactory.onAnimalTame(this, pPlayer)) {
@@ -670,8 +694,10 @@ public class SifakaEntity extends DiverseCritter {
     @Override public int maxThirst()      { return 4000; }
     @Override public int maxEnrichment()  { return 4000; }
     @Override public int maxHygiene()     { return 4000; }
-    @Override public int getPreparingSleepDuration() { return this.isNewborn() ? 20 : 25; }
-    @Override public int getAwakeningDuration()      { return this.isNewborn() ? 20 : 24; }
+    // Ticks de juego, y exactamente la longitud del clip: 2.0 s = 40 en el adulto, 1.0 s = 20 en
+    // el recién nacido. Ver la nota en SleepBehaviorGoal#phaseUntilTick.
+    @Override public int getPreparingSleepDuration() { return this.isNewborn() ? 20 : 40; }
+    @Override public int getAwakeningDuration()      { return this.isNewborn() ? 20 : 40; }
     @Override protected boolean getDefaultDiurnal()  { return true; }
     @Override protected double getHungerLossPerSecond()     { return 3.33; }
     @Override protected double getThirstLossPerSecond()     { return 5.0;  }
