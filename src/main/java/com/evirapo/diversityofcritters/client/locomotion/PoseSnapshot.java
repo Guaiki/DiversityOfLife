@@ -8,18 +8,22 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import java.util.List;
 
 /**
- * Every part's pose under a root, saved so an animation applied on top can be faded back out.
+ * Every part's offset and rotation under a root, saved so an animation applied on top can be
+ * faded back out.
  *
  * <p>Animations that blend on their own, with no weight to hand them, cannot be played at part
  * strength. Keyframes add to the pose, so capturing it just before and lerping back toward it
  * just after is the same as having played them at {@code 1 - amount}. Built once per model; the
  * capture and fade allocate nothing.
+ *
+ * <p>Scale is left alone. Models swap whole parts in and out with scale keyframes (the civet's
+ * spare torso and tails), and fading those back would show every alternative at once.
  */
 @OnlyIn(Dist.CLIENT)
 public final class PoseSnapshot {
 
-    /** Offset, rotation and scale: x, y, z, xRot, yRot, zRot, xScale, yScale, zScale. */
-    private static final int STRIDE = 9;
+    /** Offset and rotation: x, y, z, xRot, yRot, zRot. */
+    private static final int STRIDE = 6;
 
     private final List<ModelPart> parts;
     private final float[] saved;
@@ -38,9 +42,6 @@ public final class PoseSnapshot {
             this.saved[o + 3] = part.xRot;
             this.saved[o + 4] = part.yRot;
             this.saved[o + 5] = part.zRot;
-            this.saved[o + 6] = part.xScale;
-            this.saved[o + 7] = part.yScale;
-            this.saved[o + 8] = part.zScale;
         }
     }
 
@@ -58,9 +59,6 @@ public final class PoseSnapshot {
             part.xRot = Mth.lerp(t, part.xRot, this.saved[o + 3]);
             part.yRot = Mth.lerp(t, part.yRot, this.saved[o + 4]);
             part.zRot = Mth.lerp(t, part.zRot, this.saved[o + 5]);
-            part.xScale = Mth.lerp(t, part.xScale, this.saved[o + 6]);
-            part.yScale = Mth.lerp(t, part.yScale, this.saved[o + 7]);
-            part.zScale = Mth.lerp(t, part.zScale, this.saved[o + 8]);
         }
     }
 }
