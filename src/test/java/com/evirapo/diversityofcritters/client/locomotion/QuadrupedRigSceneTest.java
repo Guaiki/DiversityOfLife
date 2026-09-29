@@ -33,7 +33,7 @@ class QuadrupedRigSceneTest {
     private final float[] ground = new float[4];
 
     QuadrupedRigSceneTest() {
-        final LocomotionRig<CivetEntity> built = QuadrupedRig.builder(this.model).pelvis("root").legs(LEGS).build();
+        final LocomotionRig<CivetEntity> built = QuadrupedRig.builder(this.model).pelvis("BandedPlamCivet").legs(LEGS).build();
         assertFalse(built.isDisabled(), "rig failed to bind to the civet mesh");
         this.rig = (QuadrupedRig<CivetEntity>) built;
     }

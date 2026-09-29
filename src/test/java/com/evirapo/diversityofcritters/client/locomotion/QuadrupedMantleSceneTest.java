@@ -47,7 +47,7 @@ class QuadrupedMantleSceneTest {
     }
 
     private QuadrupedRig<CivetEntity> bind(boolean withMantle) {
-        final QuadrupedRig.Builder<CivetEntity> builder = QuadrupedRig.builder(this.model).pelvis("root").legs(LEGS);
+        final QuadrupedRig.Builder<CivetEntity> builder = QuadrupedRig.builder(this.model).pelvis("BandedPlamCivet").legs(LEGS);
         if (withMantle) {
             builder.mantle(PROFILE);
         }

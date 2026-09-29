@@ -35,7 +35,7 @@ class MantleSmoothnessTest {
 
     final CivetModel<CivetEntity> model = new CivetModel<>(CivetModel.createBodyLayer().bakeRoot());
     final QuadrupedRig<CivetEntity> rig = (QuadrupedRig<CivetEntity>) QuadrupedRig.builder(this.model)
-            .pelvis("root").legs(LEGS)
+            .pelvis("BandedPlamCivet").legs(LEGS)
             .stabilise("Head", 0.6f).lag("Tail", 0.12f, 0.35f, 30.0f)
             .arch("Head", 0.5f).arch("Tail", -0.6f, 0.0f)
             .mantle(PROFILE).build();

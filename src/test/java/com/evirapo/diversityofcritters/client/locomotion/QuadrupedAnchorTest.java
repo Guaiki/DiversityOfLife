@@ -30,9 +30,14 @@ class QuadrupedAnchorTest {
     private float unitsPerBlock;
 
     QuadrupedAnchorTest() {
-        final LocomotionRig<CivetEntity> built = QuadrupedRig.builder(this.model).pelvis("root").legs(LEGS).build();
+        final LocomotionRig<CivetEntity> built = QuadrupedRig.builder(this.model).pelvis("BandedPlamCivet").legs(LEGS).build();
         assertFalse(built.isDisabled(), "rig failed to bind to the civet mesh");
         this.rig = (QuadrupedRig<CivetEntity>) built;
+    }
+
+    /** The bone the legs hang from; the model's root() is a wrapper around it. */
+    private ModelPart pelvis() {
+        return this.model.root().getChild("BandedPlamCivet");
     }
 
     /** A sole's world position, in blocks. */
@@ -112,11 +117,11 @@ class QuadrupedAnchorTest {
         final double[] t = offsetFromRest(-3.0f, 2.0f, 3.0f);
         restingState();
         final double startX = sole(FRONT_LEFT).x;
-        final float pelvisXBefore = this.model.root().x;
+        final float pelvisXBefore = this.pelvis().x;
         scene(t[0], t[1], t[2], 1.0f);
         final Vector3d at = sole(FRONT_LEFT);
         assertEquals(startX, at.x, 0.05 / this.unitsPerBlock, "the paw moved sideways");
-        assertEquals(pelvisXBefore, this.model.root().x, 0.05f, "the body slid sideways");
+        assertEquals(pelvisXBefore, this.pelvis().x, 0.05f, "the body slid sideways");
         final double inPlane = Math.hypot(at.y - t[1], at.z - t[2]) * this.unitsPerBlock;
         assertTrue(inPlane < 0.25, "missed its height and depth by " + inPlane);
     }
@@ -125,10 +130,10 @@ class QuadrupedAnchorTest {
     void anchorCloseIsMetByTheLegSinkingNotTheBodyRising() {
         // 5 units under the hip: shorter than a quarter fold, within what the leg sinks to (4.4).
         final double[] t = offsetFromRest(0.0f, 6.0f, 0.0f);
-        final float pelvisYBefore = this.model.root().y;
+        final float pelvisYBefore = this.pelvis().y;
         final LocomotionState state = scene(t[0], t[1], t[2], 1.0f);
         assertTrue(missUnits(t[0], t[1], t[2]) < 0.25f, "missed by " + missUnits(t[0], t[1], t[2]));
-        assertEquals(pelvisYBefore, this.model.root().y, 0.05f, "the body stayed where it was");
+        assertEquals(pelvisYBefore, this.pelvis().y, 0.05f, "the body stayed where it was");
         assertEquals(0.0f, state.legs()[FRONT_LEFT].anchorShortfall, 1.0e-3f);
     }
 
@@ -136,10 +141,10 @@ class QuadrupedAnchorTest {
     void anchorTooCloseEvenToSinkIntoPushesThePelvisUp() {
         // 3 units under the hip is closer than the leg can fold at all (4.4); the body rises.
         final double[] t = offsetFromRest(0.0f, 8.0f, 0.0f);
-        final float pelvisYBefore = this.model.root().y;
+        final float pelvisYBefore = this.pelvis().y;
         final LocomotionState state = scene(t[0], t[1], t[2], 1.0f);
         assertTrue(missUnits(t[0], t[1], t[2]) < 0.25f, "missed by " + missUnits(t[0], t[1], t[2]));
-        assertTrue(this.model.root().y < pelvisYBefore - 1.0f, "the pelvis rose (model -Y)");
+        assertTrue(this.pelvis().y < pelvisYBefore - 1.0f, "the pelvis rose (model -Y)");
         assertEquals(0.0f, state.legs()[FRONT_LEFT].anchorShortfall, 1.0e-3f);
     }
 
@@ -147,10 +152,10 @@ class QuadrupedAnchorTest {
     void anchorALittleOutOfReachPullsThePelvis() {
         // 14 units forward and down is past the stretched leg (13.75); the pelvis leans toward it.
         final double[] t = offsetFromRest(0.0f, -1.0f, 8.0f);
-        final float pelvisZBefore = this.model.root().z;
+        final float pelvisZBefore = this.pelvis().z;
         final LocomotionState state = scene(t[0], t[1], t[2], 1.0f);
         assertTrue(missUnits(t[0], t[1], t[2]) < 0.25f, "missed by " + missUnits(t[0], t[1], t[2]));
-        assertTrue(this.model.root().z < pelvisZBefore - 0.2f, "the pelvis moved forward (model -Z)");
+        assertTrue(this.pelvis().z < pelvisZBefore - 0.2f, "the pelvis moved forward (model -Z)");
         assertEquals(0.0f, state.legs()[FRONT_LEFT].anchorShortfall, 1.0e-3f);
     }
 

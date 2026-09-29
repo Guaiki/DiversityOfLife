@@ -793,7 +793,7 @@ public abstract class DiverseCritter extends TamableAnimal
         final IdleVariant idle = this.getIdleVariant();
         return this.getSleepState() != SleepState.AWAKE
                 || this.isOrderedToSit() || this.isOrderedSitPlaying()
-                || idle == IdleVariant.SIT || idle == IdleVariant.LAY || idle == IdleVariant.STAND_UP
+                || idle == IdleVariant.SIT || idle == IdleVariant.STAND_UP || idle == IdleVariant.STRETCH
                 || this.isCleaning() || this.IsDrinking()
                 || this.isClimbing()
                 || this.isInWaterOrBubble()
