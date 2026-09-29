@@ -6,6 +6,7 @@ import com.evirapo.diversityofcritters.common.locomotion.LedgeSample;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -28,11 +29,33 @@ public class CivetDebugCommand {
             mantle.then(Commands.literal(direction.getName())
                     .executes(context -> mantle(context.getSource(), direction)));
         }
+        // Slow motion for the ledge climb alone: /civet_debug mantle_speed 0.2 plays mantles at a
+        // fifth of their pace; the critter walks, eats and turns at the game's as usual.
+        var mantleSpeed = Commands.literal("mantle_speed")
+                .executes(context -> mantleSpeed(context.getSource()))
+                .then(Commands.argument("speed", FloatArgumentType.floatArg(
+                                MantleController.MIN_TIME_SCALE, MantleController.MAX_TIME_SCALE))
+                        .executes(context -> setMantleSpeed(context.getSource(),
+                                FloatArgumentType.getFloat(context, "speed"))));
         dispatcher.register(Commands.literal("civet_debug")
                 .requires(source -> source.hasPermission(2))
                 .executes(context -> run(context.getSource()))
                 .then(mantle)
+                .then(mantleSpeed)
         );
+    }
+
+    private static int mantleSpeed(CommandSourceStack source) {
+        send(source, String.format(Locale.ROOT, "§a[CivetDebug] Mantle speed %.2f (1 = normal, down to %.2f)",
+                MantleController.debugTimeScale(), MantleController.MIN_TIME_SCALE));
+        return 1;
+    }
+
+    private static int setMantleSpeed(CommandSourceStack source, float speed) {
+        final float set = MantleController.setDebugTimeScale(speed);
+        send(source, String.format(Locale.ROOT,
+                "§a[CivetDebug] Mantle speed %.2f: applies to mantles that start from now on", set));
+        return 1;
     }
 
     /** The civet nearest the command's source, within 10 blocks, or null (after saying so). */

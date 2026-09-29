@@ -109,6 +109,37 @@ class MantleMotionTest {
     }
 
     @Test
+    void slowMotionPlaysTheSameManoeuvreSlower() {
+        // As MantleController does it: mantle time runs at the pace, and so does each tick's move.
+        final float pace = 0.25f;
+        final Run normal = simulate(65.0, -0.5, false);
+        final MantleProgress progress = new MantleProgress();
+        final MantleMotion motion = new MantleMotion();
+        double y = START_Y;
+        double pastFace = -0.5;
+        double highest = y;
+        int tick = 0;
+        for (; tick <= PROFILE.maxTicks / pace; tick++) {
+            MantleProgress.of(y, START_Y, 65.0, tick * pace, pastFace, HALF_WIDTH, PROFILE, progress);
+            MantleMotion.plan(progress, y, START_Y, 65.0, pastFace, HALF_WIDTH, false, PROFILE, motion);
+            if (motion.done) {
+                break;
+            }
+            pastFace += motion.along * pace;
+            if (motion.holdsVertical) {
+                y += motion.upAt(pace, y, 65.0);
+            }
+            highest = Math.max(highest, y);
+            assertFalse(y < 65.0 - 1.0e-9 && pastFace + HALF_WIDTH > 1.0e-9, "entered the wall at tick " + tick);
+        }
+        assertEquals(MantlePhase.RECOVER, progress.phase);
+        assertEquals(65.0, y, 1.0e-9);
+        assertTrue(highest <= 65.0 + 1.0e-9, "overshot: " + highest);
+        assertTrue(Math.abs(tick - normal.ticks() / pace) <= 4 / pace,
+                "took " + tick + " ticks, about " + normal.ticks() / pace + " expected");
+    }
+
+    @Test
     void interruptedHighUpCompletes() {
         assertTrue(MantleMotion.completesWhenInterrupted(0.9f));
         assertFalse(MantleMotion.completesWhenInterrupted(0.5f));

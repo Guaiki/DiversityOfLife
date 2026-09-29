@@ -20,7 +20,13 @@ public final class MantleState {
     public double startY;
     /** Game time the mantle started at. */
     public long startTick;
+    /**
+     * How fast this mantle plays against the game, 1 normally; below 1 it runs in slow motion
+     * (a debug setting). Counting mantle time is {@code (gameTime - startTick) × timeScale}.
+     */
+    public float timeScale = 1.0f;
 
+    /** Sets everything but the time scale, which starts at 1. */
     public MantleState set(int lipX, int lipBlockY, int lipZ, double lipY, Direction facing, double startY, long startTick) {
         this.lipX = lipX;
         this.lipBlockY = lipBlockY;
@@ -29,7 +35,13 @@ public final class MantleState {
         this.facing = facing;
         this.startY = startY;
         this.startTick = startTick;
+        this.timeScale = 1.0f;
         return this;
+    }
+
+    /** Mantle time elapsed at {@code gameTime}, in ticks at the mantle's own pace. */
+    public double elapsed(double gameTime) {
+        return (gameTime - this.startTick) * this.timeScale;
     }
 
     /** World X (facing east/west) or Z (north/south) of the face: the lip block's near side. */

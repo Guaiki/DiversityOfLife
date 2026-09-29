@@ -127,7 +127,7 @@ public final class MantleDriver {
                 this.begin(state, mantle, legs, x, z, bodyHalfWidth);
             }
             final MantleProgress progress = MantleProgress.of(y, mantle.startY, mantle.lipY,
-                    gameTime - mantle.startTick, mantle.pastFace(x, z), bodyHalfWidth, this.profile,
+                    mantle.elapsed(gameTime), mantle.pastFace(x, z), bodyHalfWidth, this.profile,
                     state.mantleProgress);
             // Nose up is a negative xRot.
             state.mantlePitch = (float) -Math.toRadians(

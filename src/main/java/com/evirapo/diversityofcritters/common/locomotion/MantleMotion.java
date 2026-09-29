@@ -82,6 +82,17 @@ public final class MantleMotion {
         return out;
     }
 
+    /**
+     * This tick's rise at a slower pace ({@code timeScale} below 1, debug slow motion). The plan's
+     * last step up is whatever is left to the lip; scaling that too would leave the body forever a
+     * hair under the top, and walking on it would run into the lip's edge. So the last step is
+     * taken whole.
+     */
+    public double upAt(float timeScale, double y, double lipY) {
+        final double toLip = Math.max(lipY - y, 0.0);
+        return this.up >= toLip - 1.0e-9 ? toLip : this.up * timeScale;
+    }
+
     /** Whether a body drawn at {@code growthScale} needs a hop to reach a lip {@code lipHeight} up. */
     public static boolean needsHop(double lipHeight, float growthScale, MantleProfile profile) {
         return lipHeight > profile.reach * growthScale;

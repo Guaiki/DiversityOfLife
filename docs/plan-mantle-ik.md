@@ -595,6 +595,17 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   - Resultado: ninguna fase por encima de 1.9 u/frame² (un swing normal pica en 1–2); CREST rms 0.51, RECOVER
     máx 0.81. El test falla si cualquier suela pasa de 2.5 o el pitch de 1°/frame².
 
+- Las traseras se iban de lado: un pie capturado mientras el cuerpo aún giraba hacia la pared quedaba al
+  costado de la cadera al enderezarse. Ahora una pata anclada sólo se mueve en su plano vertical (el desvío
+  lateral del objetivo se descarta, también para el desplazamiento de pelvis), y se pliega hasta el 40 % de su
+  largo antes de empujar el cuerpo ("se hunde en el torso"). Opciones del builder: `sidewaysAnchors`,
+  `anchorCompressLimit`.
+- Cámara lenta del mantle: `/civet_debug mantle_speed [0.05–1]` (sin valor, muestra la actual). Afecta sólo a
+  los mantles que empiezan después; el resto del animal sigue a velocidad normal. El servidor escala el reloj
+  del mantle (REACH y timeout) y cada paso de movimiento; la escala viaja con el mantle
+  (`MANTLE_TIME_SCALE`) para que el cliente mida REACH igual. El último paso hasta el labio se da entero
+  (`MantleMotion.upAt`): escalado, el cuerpo quedaba un pelo bajo la cima y chocaba con el borde al avanzar.
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

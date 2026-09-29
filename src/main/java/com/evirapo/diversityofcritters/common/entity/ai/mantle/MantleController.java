@@ -41,6 +41,26 @@ public final class MantleController {
     /** Where an interrupted, nearly finished mantle drops the body: this far onto the top. */
     private static final double COMPLETE_ONTO_TOP = 0.05;
 
+    /** Slowest and fastest pace {@link #setDebugTimeScale} accepts. */
+    public static final float MIN_TIME_SCALE = 0.05f;
+    public static final float MAX_TIME_SCALE = 1.0f;
+    /**
+     * Pace for mantles that start from now on, 1 normally: a debug slow motion for the manoeuvre
+     * alone, the rest of the critter keeps the game's pace. Each mantle keeps the pace it started
+     * with, and its clients get it with the rest of the mantle.
+     */
+    private static volatile float debugTimeScale = 1.0f;
+
+    public static float debugTimeScale() {
+        return debugTimeScale;
+    }
+
+    /** @return the pace actually set, within {@link #MIN_TIME_SCALE} and {@link #MAX_TIME_SCALE} */
+    public static float setDebugTimeScale(float scale) {
+        debugTimeScale = Mth.clamp(scale, MIN_TIME_SCALE, MAX_TIME_SCALE);
+        return debugTimeScale;
+    }
+
     private final DiverseCritter critter;
     private final MantleProfile profile;
     private final LedgeSample sample = new LedgeSample();
@@ -52,6 +72,7 @@ public final class MantleController {
     private boolean fromPath;
     private boolean holdsGravity;
     private boolean hop;
+    private float timeScale = 1.0f;
     private long startTick;
     private double startY;
     private double lipY;
@@ -108,11 +129,12 @@ public final class MantleController {
         this.facing = s.facing;
         this.lip.set(s.lipX, s.lipBlockY, s.lipZ);
         this.hop = MantleMotion.needsHop(s.lipHeight, this.critter.growthScale(), this.profile);
+        this.timeScale = debugTimeScale;
 
         // Vanilla would otherwise step the body straight up the block and leave the pose behind.
         this.critter.setMaxUpStep(0.0f);
         this.critter.setMantleData(this.lip.immutable(), this.facing, (int) this.startTick,
-                (float) this.startY, (float) this.lipY);
+                (float) this.startY, (float) this.lipY, this.timeScale);
         this.lockRotation();
         LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}{}", this.critter, this.lip, this.facing,
                 String.format("%.2f", s.lipHeight), this.hop ? ", with a hop" : "");
@@ -157,11 +179,13 @@ public final class MantleController {
             return false;
         }
         final long ticks = this.critter.level().getGameTime() - this.startTick;
+        // Mantle time runs at the mantle's own pace: slower in debug slow motion.
+        final double mantleTicks = ticks * (double) this.timeScale;
         final double pastFace = this.pastFace();
-        MantleProgress.of(this.critter.getY(), this.startY, this.lipY, ticks, pastFace,
+        MantleProgress.of(this.critter.getY(), this.startY, this.lipY, mantleTicks, pastFace,
                 this.critter.getBbWidth() * 0.5, this.profile, this.progress);
 
-        final String exit = this.exitReason(ticks);
+        final String exit = this.exitReason(ticks, mantleTicks);
         if (exit != null) {
             this.interrupt(exit);
             return false;
@@ -180,10 +204,12 @@ public final class MantleController {
         this.critter.setZza(0.0f);
 
         this.holdGravity(this.motion.holdsVertical);
+        // The plan is per tick at full pace; slow motion covers less of it each tick.
         final Vec3 current = this.critter.getDeltaMovement();
-        final double vy = this.motion.holdsVertical ? this.motion.up : current.y;
-        this.critter.setDeltaMovement(this.facing.getStepX() * this.motion.along, vy,
-                this.facing.getStepZ() * this.motion.along);
+        final double along = this.motion.along * this.timeScale;
+        final double vy = this.motion.holdsVertical
+                ? this.motion.upAt(this.timeScale, this.critter.getY(), this.lipY) : current.y;
+        this.critter.setDeltaMovement(this.facing.getStepX() * along, vy, this.facing.getStepZ() * along);
         return true;
     }
 
@@ -219,11 +245,15 @@ public final class MantleController {
         LOGGER.debug("[Mantle] {} ends: {}", this.critter, reason);
     }
 
-    private String exitReason(long ticks) {
+    /**
+     * @param ticks       game ticks since the start
+     * @param mantleTicks the same at the mantle's own pace, which is what the timeout counts
+     */
+    private String exitReason(long ticks, double mantleTicks) {
         if (this.critter.isRemoved()) {
             return "removed";
         }
-        if (ticks > this.profile.maxTicks) {
+        if (mantleTicks > this.profile.maxTicks) {
             return "timed out";
         }
         if (this.critter.hurtTime > 0) {

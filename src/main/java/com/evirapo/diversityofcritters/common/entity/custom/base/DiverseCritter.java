@@ -92,6 +92,8 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     private static final EntityDataAccessor<Integer> MANTLE_START = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> MANTLE_START_Y = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> MANTLE_LIP_Y = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
+    /** The mantle's pace, 1 normally; lower for slow motion (/civet_debug mantle_speed). */
+    private static final EntityDataAccessor<Float> MANTLE_TIME_SCALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
 
     /** Species that can climb a ledge set this in their constructor. Server side only acts on it. */
     @Nullable
@@ -190,6 +192,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         this.entityData.define(MANTLE_START, 0);
         this.entityData.define(MANTLE_START_Y, 0.0F);
         this.entityData.define(MANTLE_LIP_Y, 0.0F);
+        this.entityData.define(MANTLE_TIME_SCALE, 1.0F);
     }
 
     // --- MANTLE ---
@@ -213,11 +216,12 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
     }
 
     /** Publishes a mantle to the clients. Only {@link MantleController} calls this. */
-    public void setMantleData(BlockPos lip, Direction facing, int startTick, float startY, float lipY) {
+    public void setMantleData(BlockPos lip, Direction facing, int startTick, float startY, float lipY, float timeScale) {
         this.entityData.set(MANTLE_FACING, (byte) facing.get2DDataValue());
         this.entityData.set(MANTLE_START, startTick);
         this.entityData.set(MANTLE_START_Y, startY);
         this.entityData.set(MANTLE_LIP_Y, lipY);
+        this.entityData.set(MANTLE_TIME_SCALE, timeScale);
         // Last: clients treat the lip as the switch, so everything else is in place when it flips.
         this.entityData.set(MANTLE_LIP, Optional.of(lip));
     }
@@ -239,6 +243,7 @@ public abstract class DiverseCritter extends TamableAnimal implements ContainerL
         out.set(pos.getX(), pos.getY(), pos.getZ(), this.entityData.get(MANTLE_LIP_Y),
                 Direction.from2DDataValue(this.entityData.get(MANTLE_FACING)),
                 this.entityData.get(MANTLE_START_Y), startTick);
+        out.timeScale = this.entityData.get(MANTLE_TIME_SCALE);
         return true;
     }
 
