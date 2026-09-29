@@ -73,6 +73,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
     private final Quaternionf aimShare = new Quaternionf();
     private final Vector3f aimAxis = new Vector3f();
     private final float anchorStretchLimit;
+    private final float anchorCompressLimit;
+    private final boolean sidewaysAnchors;
     private final float maxAnchorShift;
     /** Legs behind the body's middle (model +Z): the ones a mantle pivots on. */
     private final boolean[] rear;
@@ -94,6 +96,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
                 (float) Math.toRadians(builder.maxPitchDeg), (float) Math.toRadians(builder.maxRollDeg),
                 builder.stretchLimit, builder.maxDropFraction, legs.get(0).soleOffset());
         this.anchorStretchLimit = builder.anchorStretchLimit;
+        this.anchorCompressLimit = builder.anchorCompressLimit;
+        this.sidewaysAnchors = builder.sidewaysAnchors;
         this.maxAnchorShift = builder.maxAnchorShiftFraction * legs.get(0).soleOffset();
         this.rear = new boolean[legs.size()];
         final float[] side = new float[legs.size()];
@@ -412,16 +416,30 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         hip.yScale = Mth.lerp(w, hip.yScale, reach / length);
     }
 
-    /** Hip to anchor in the pelvis frame, left in {@link #target}; returns its length. */
+    /**
+     * Hip to anchor in the pelvis frame, left in {@link #target}; returns its length.
+     *
+     * <p>With {@link Builder#sidewaysAnchors} off (the default), only the part of the anchor in the
+     * leg's own vertical plane counts: a leg swings forward, back, up and down, never out to the
+     * side. Whatever sideways offset a target has (a foot captured while the body was still turning
+     * to the wall, say) is dropped rather than bending the leg out or sliding the body over.
+     */
     private float hipToAnchor(ModelPart hip, LocomotionState.LegState leg) {
         this.space.worldToFrame(this.worldToPelvis, leg.anchorX, leg.anchorY, leg.anchorZ, this.target);
         this.target.sub(hip.x, hip.y, hip.z);
+        if (!this.sidewaysAnchors) {
+            this.target.x = 0.0f;
+        }
         return this.target.length();
     }
 
-    /** The nearest length to {@code distance} a leg of {@code length} can take. */
+    /**
+     * The nearest length to {@code distance} a leg of {@code length} can take. A leg folds further
+     * than it stretches: an anchor too close is met by the leg sinking into the body rather than
+     * by the body being pushed away.
+     */
     private float reachable(float distance, float length) {
-        return Mth.clamp(distance, length * (1.0f - this.anchorStretchLimit),
+        return Mth.clamp(distance, length * (1.0f - this.anchorCompressLimit),
                 length * (1.0f + this.anchorStretchLimit));
     }
 
@@ -484,6 +502,8 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         private float stretchLimit = 0.15f;
         private float maxDropFraction = 0.5f;
         private float anchorStretchLimit = 0.25f;
+        private float anchorCompressLimit = 0.6f;
+        private boolean sidewaysAnchors = false;
         private float maxAnchorShiftFraction = 0.5f;
         private MantleProfile mantleProfile;
         private final SpineRules.Declarations spine = new SpineRules.Declarations();
@@ -527,9 +547,27 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
             return this;
         }
 
-        /** How far an anchored leg may lengthen or shorten, as a fraction of its length. */
+        /** How far an anchored leg may lengthen, as a fraction of its length. */
         public Builder<T> anchorStretchLimit(float fraction) {
             this.anchorStretchLimit = fraction;
+            return this;
+        }
+
+        /**
+         * How far an anchored leg may shorten, as a fraction of its length: past what it can fold,
+         * a close anchor pushes the body away instead.
+         */
+        public Builder<T> anchorCompressLimit(float fraction) {
+            this.anchorCompressLimit = fraction;
+            return this;
+        }
+
+        /**
+         * Whether anchored legs may reach out to the side for their targets. Off by default: legs
+         * move only in their own vertical plane, and a target's sideways offset is dropped.
+         */
+        public Builder<T> sidewaysAnchors(boolean allowed) {
+            this.sidewaysAnchors = allowed;
             return this;
         }
 
