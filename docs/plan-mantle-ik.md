@@ -649,6 +649,22 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
     en el agua ni sin gravedad.
   - Test: `FootSupportTest`.
 
+- Las mismas reglas, para las losas:
+  - Empujado contra una losa ya no sube: `DiverseCritter.getStepHeight()` (Forge la pide en cada `move`)
+    devuelve el paso normal salvo cuando el movimiento choca con algo; entonces
+    `MantleController.ledgeInTheWay(dx, dz)` sondea en cada eje en que se mueve (una losa de lado o sesgada
+    también cuenta) y, si hay un labio (`found`) por debajo del paso, el paso queda justo bajo él. Escaleras
+    (`STEPPED`) se suben andando; newborn pisa como siempre. Por el path, la losa es mantle; si no puede
+    (`found` pero sin confianza ni de frente), `shouldJumpInstead` salta también ante una losa.
+  - Borde de una losa: `FootSupport` ya no da por apoyada cualquier pata con suelo a ≤ 0.52. El cuerpo sólo
+    cabecea: delanteras media losa más bajas que traseras es una escalera y se sostiene. De lado no se
+    inclina: en cada par (0-1 delanteras, 2-3 traseras) la pata más de `ROLL_DROP` (0.25) por debajo de su
+    compañera cuelga. Y si ninguna pata toca suelo a la altura del cuerpo (todas abajo, la caja apoyada en la
+    losa), cuelgan todas. El contorno de la caja cuenta sólo el suelo a la altura del cuerpo.
+  - Nada de esto en escaleras: si alguna pata o el centro pisa un bloque `#stairs`, sólo cuelga la pata sin
+    suelo a su alcance (0.52); cruzarlas de lado o en una esquina lo resuelve el rig. `ledgeInTheWay` tampoco
+    frena el paso ante un escalón de escalera visto de lado.
+
 **Prueba en juego pendiente (bordes y paso)**:
 1. Empujar un civet contra un bloque: no sube. Contra una losa: sube (vanilla).
 2. Path hacia un bloque abordado de lado: si no arranca mantle, salta; nunca se queda clavado. Escaleras y
@@ -656,6 +672,9 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
 3. Empujarlo hacia el borde de un bloque: con una pata fuera se queda; con dos, resbala y cae.
 4. Bajar un bloque por path: cae de forma natural al sacar las delanteras.
 5. Al terminar un mantle, queda encima sin resbalar (las traseras quedan ~0.17 pasada la cara).
+6. Empujarlo contra una losa, de frente y en diagonal: no sube. Contra una escalera: sube.
+7. En una losa, empujarlo de lado hasta el borde: resbala y cae. De frente, con las delanteras abajo: se
+   queda como en una escalera. Subir y bajar escaleras andando: sin resbalar.
 
 **Prueba en juego pendiente (losas)** — civet y squirrel adultos, con F6:
 1. Losa suelta: `/civet_debug mantle <dirección>` y por path (comida encima): maniobra más baja y corta que

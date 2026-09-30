@@ -132,11 +132,38 @@ public abstract class DiverseCritter extends TamableAnimal
     protected FootSupport feet;
 
     /**
-     * How high a critter walks straight up, as vanilla mobs do: slabs and stairs. A full block is
-     * a mantle, or a jump when none can start; stepping it would lift the body a whole block in
-     * one tick, which is what being pushed against one used to do.
+     * How high a critter walks straight up, as vanilla mobs do: stairs, and anything low. A full
+     * block is a mantle, or a jump when none can start; stepping it would lift the body a whole
+     * block in one tick, which is what being pushed against one used to do. A slab is under this
+     * but is a ledge too: {@link #getStepHeight} keeps the body from stepping it.
      */
     public static final float WALK_STEP = 0.6F;
+    /** How far under a ledge's height the step is held while the body runs into it. */
+    private static final double UNDER_LEDGE = 1.0 / 64.0;
+
+    /**
+     * Vanilla steps a body up anything within its step height the moment it walks into it. A ledge
+     * the critter mantles (a slab) is not stepped: walked or pushed into, the body stops at it,
+     * and a path climbs it with a mantle, or a jump when none can start. Stairs are stepped as
+     * usual. Newborns, which never mantle, step as usual too.
+     *
+     * <p>Asked on every move; the ledge is only probed when the move runs into something.
+     */
+    @Override
+    public float getStepHeight() {
+        final float step = super.getStepHeight();
+        if (this.mantle == null || this.isNewborn() || step < this.mantle.profile().minMantleHeight
+                || !this.onGround()) {
+            return step;
+        }
+        final Vec3 motion = this.getDeltaMovement();
+        if (motion.x * motion.x + motion.z * motion.z < 1.0e-8
+                || this.level().noCollision(this, this.getBoundingBox().move(motion.x, 0.0D, motion.z))) {
+            return step;
+        }
+        final double ledge = this.mantle.ledgeInTheWay(motion.x, motion.z);
+        return ledge <= step ? (float) Math.max(ledge - UNDER_LEDGE, 0.0) : step;
+    }
 
     int prevHunger;
     int prevThirst;

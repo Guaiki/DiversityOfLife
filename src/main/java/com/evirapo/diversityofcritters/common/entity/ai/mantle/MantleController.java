@@ -10,6 +10,7 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
@@ -66,6 +67,9 @@ public final class MantleController {
     /** The profile scaled to the lip of the mantle in progress ({@link MantleProfile#forLip}). */
     private MantleProfile lipProfile;
     private final LedgeSample sample = new LedgeSample();
+    /** For {@link #ledgeInTheWay}, which runs inside the entity's move and must not touch {@link #sample}. */
+    private final LedgeSample stepSample = new LedgeSample();
+    private final BlockPos.MutableBlockPos stepLip = new BlockPos.MutableBlockPos();
     private final MantleProgress progress = new MantleProgress();
     private final MantleMotion motion = new MantleMotion();
     private final BlockPos.MutableBlockPos lip = new BlockPos.MutableBlockPos();
@@ -190,8 +194,9 @@ public final class MantleController {
     /**
      * Whether the body has to jump the rise ahead instead: this tick's probe met a wall no mantle
      * could take even square on (the lip under too little of the body, no room on top, ...), and
-     * it is higher than the body walks up but no higher than it could mantle. Stairs and slabs are
-     * walked; a climbable wall that carries on up is climbed.
+     * the body cannot walk up it: higher than its step, or a ledge, which it never steps (see
+     * {@link #ledgeInTheWay}). No higher than it could mantle. Stairs are walked; a climbable wall
+     * that carries on up is climbed.
      */
     public boolean shouldJumpInstead() {
         final LedgeSample s = this.sample;
@@ -199,13 +204,44 @@ public final class MantleController {
                 && this.probedTick == this.critter.level().getGameTime()
                 && s.hasWall()
                 && !s.continuesUp
-                && s.lipHeight > this.critter.maxUpStep()
+                && (s.found || s.lipHeight > this.critter.maxUpStep())
                 && s.lipHeight <= this.profile.maxMantleHeight;
         if (jump) {
             LOGGER.debug("[Mantle] {} jumps instead: {}, confidence {}, lip +{}", this.critter, s.reason,
                     String.format("%.2f", s.confidence), String.format("%.2f", s.lipHeight));
         }
         return jump;
+    }
+
+    /**
+     * The lowest ledge the body runs into moving by (dx, dz), as a height above its feet, or
+     * infinity. Probed along each horizontal axis it moves on, so a slab met at a slant or side on
+     * counts too; stairs are not ledges, from any side. A ledge is climbed by a mantle, never
+     * stepped: pushed into a slab, the body stops at it, as it does at a block.
+     */
+    public double ledgeInTheWay(double dx, double dz) {
+        double lowest = Double.POSITIVE_INFINITY;
+        if (Math.abs(dx) > MOVING) {
+            lowest = Math.min(lowest, this.ledgeAlong(dx > 0.0 ? Direction.EAST : Direction.WEST));
+        }
+        if (Math.abs(dz) > MOVING) {
+            lowest = Math.min(lowest, this.ledgeAlong(dz > 0.0 ? Direction.SOUTH : Direction.NORTH));
+        }
+        return lowest;
+    }
+
+    /** Below this, blocks per tick, the body is not moving along an axis. */
+    private static final double MOVING = 1.0e-4;
+
+    private double ledgeAlong(Direction direction) {
+        LedgeSampler.sample(this.critter.level(), this.critter.position(), direction.toYRot(),
+                this.critter.getBbWidth() * 0.5f, this.critter.getBbHeight(), this.profile, this.stepSample);
+        final LedgeSample s = this.stepSample;
+        if (!s.found || this.critter.level().getBlockState(this.stepLip.set(s.lipX, s.lipBlockY, s.lipZ))
+                .is(BlockTags.STAIRS)) {
+            return Double.POSITIVE_INFINITY;
+        }
+        return s.lipHeight;
     }
 
     /**
