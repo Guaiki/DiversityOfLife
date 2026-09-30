@@ -15,7 +15,10 @@ public final class LedgeSample {
         NONE,
         /** Nothing high enough within reach. */
         NO_WALL,
-        /** A step of at most a half block comes first: plain stairs, walked normally. */
+        /**
+         * Plain stairs, walked normally: a step comes before the wall, or the top rises again where
+         * the body would walk onto it.
+         */
         STEPPED,
         /** The wall rises past what the species can mantle (fence, wall, two blocks). */
         TOO_HIGH,

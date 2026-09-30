@@ -40,7 +40,7 @@ class MantleClearanceTest {
             .stabilise("Head", 0.6f).lag("Tail", 0.12f, 0.35f, 30.0f)
             .arch("Head", 0.5f).arch("Tail", -0.6f, 0.0f)
             .mantle(MantleProfile.CIVET).build();
-    private final MantleState mantle = new MantleState().set(0, 0, 1, 1.0, Direction.SOUTH, 0.0, 0L);
+    private final MantleState mantle = new MantleState();
     private final LocomotionState state = new LocomotionState();
     private final ModelSpace space = new ModelSpace();
 
@@ -81,6 +81,17 @@ class MantleClearanceTest {
 
     @Test
     void frontLegsStayOutOfTheHeadThroughAWholeMantle() {
+        assertClear(1.0);
+    }
+
+    @Test
+    void frontLegsStayOutOfTheHeadUpASlab() {
+        assertClear(0.5);
+    }
+
+    /** Mantles a lip {@code lip} high and fails if either front leg enters the head on the way. */
+    private void assertClear(double lip) {
+        this.mantle.set(0, 0, 1, lip, Direction.SOUTH, 0.0, 0L);
         this.state.ensureLegs(4);
         final ModelPart head = this.model.getAnyDescendantWithName("Head").orElseThrow();
         final List<ModelPart> headChain = ModelParts.chain(this.model.root(), head);
@@ -93,7 +104,7 @@ class MantleClearanceTest {
         // Standing through the reach, then rising and cresting by height, a few frames a step.
         for (int step = 0; step <= 60; step++) {
             final double ticks = step < 12 ? step * 0.5 : 20.0;
-            final double y = step < 12 ? 0.0 : Math.min((step - 12) / 48.0, 1.0);
+            final double y = step < 12 ? 0.0 : Math.min((step - 12) / 48.0, 1.0) * lip;
             for (int f = 0; f < 4; f++) {
                 frame(y, ticks);
             }

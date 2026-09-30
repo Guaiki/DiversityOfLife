@@ -127,29 +127,53 @@ class LedgeSamplerTest {
     }
 
     @Test
-    void bottomSlabIsAStep() {
+    void bottomSlabIsALedge() {
         final LedgeSample s = probe(new Grid().place(0, 64, 1, BOTTOM_SLAB));
+        assertTrue(s.found);
+        assertEquals(LedgeSample.Reason.NONE, s.reason);
+        assertEquals(1.0, s.wallCoord, 1.0e-3);
+        assertEquals(64.5, s.lipY, 1.0e-9);
+        assertEquals(0.5, s.lipHeight, 1.0e-9);
+        assertEquals(64.5, s.topY, 1.0e-9);
+        assertEquals(64, s.lipBlockY);
+        assertEquals(1.0f, s.confidence, 1.0e-6f);
+    }
+
+    @Test
+    void stepLowerThanASlabIsAStep() {
+        // A quarter block, then nothing higher within reach.
+        final LedgeSample s = probe(new Grid().place(0, 64, 1, (x, z) -> new double[]{0.0, 0.25}));
         assertFalse(s.found);
         assertEquals(LedgeSample.Reason.STEPPED, s.reason);
     }
 
     @Test
     void stairsAreSteps() {
+        // The low half reads as a slab, but the top rises again half a block past the face.
         final LedgeSample s = probe(new Grid().place(0, 64, 1, STAIRS_SOUTH));
         assertFalse(s.found);
         assertEquals(LedgeSample.Reason.STEPPED, s.reason);
+        assertEquals(64.5, s.lipY, 1.0e-9);
+    }
+
+    @Test
+    void slabBeforeABlockIsALedge() {
+        // Slab, then a full block behind it: the body walks onto the slab before it meets the block.
+        final LedgeSample s = probe(new Grid().place(0, 64, 1, BOTTOM_SLAB).place(0, 64, 2, FULL));
+        assertTrue(s.found);
+        assertEquals(64.5, s.lipY, 1.0e-9);
     }
 
     @Test
     void stepBeforeAWallIsStillSteps() {
-        // Half-block step, then a wall whose top is a block above the feet.
+        // Half-block step, then a wall whose top is a block above the feet: stairs.
         final Grid grid = new Grid()
                 .place(0, 64, 0, (x, z) -> z >= 0.75 ? new double[]{0.0, 0.5} : null)
                 .place(0, 64, 1, (x, z) -> new double[]{0.0, z < 0.25 ? 0.5 : 1.0});
         final LedgeSample s = probe(grid);
         assertFalse(s.found);
         assertEquals(LedgeSample.Reason.STEPPED, s.reason);
-        assertEquals(65.0, s.lipY, 1.0e-9, "the wall behind the step is still described");
+        assertEquals(64.5, s.lipY, 1.0e-9, "the step is described");
     }
 
     @Test

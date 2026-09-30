@@ -6,7 +6,7 @@ package com.evirapo.diversityofcritters.common.locomotion;
  */
 public final class MantleProfile {
 
-    /** Civet: one full block, but not fences or walls. */
+    /** Civet: from a slab to one full block, but not fences or walls. */
     public static final MantleProfile CIVET = builder().build();
 
     /**
@@ -15,8 +15,16 @@ public final class MantleProfile {
      */
     public static final MantleProfile SQUIRREL = builder().hop(0.95, 0.5, 3.0).build();
 
+    /**
+     * Lip height the pose and the timing are tuned for: a full block. Lower lips get a smaller,
+     * quicker manoeuvre ({@link #forLip}).
+     */
+    public static final double FULL_LIP = 1.0;
+    /** {@link #forLip} keeps one profile per this share of {@link #FULL_LIP}. */
+    static final int LIP_STEPS = 32;
+
     // --- The ledge probe.
-    /** A rise lower than this is an ordinary step, not a ledge. */
+    /** A rise lower than this is an ordinary step, not a ledge; a slab (0.5) is a ledge. */
     public final double minMantleHeight;
     /** A rise higher than this cannot be mantled (fences, walls, two-block walls). */
     public final double maxMantleHeight;
@@ -93,6 +101,11 @@ public final class MantleProfile {
      */
     public final double hindFaceGrip;
 
+    /** The full-block profile this one was scaled from, or null if this is it. */
+    private final MantleProfile base;
+    /** {@link #forLip} results, one per {@link #LIP_STEPS}; filled as lips are met. */
+    private final MantleProfile[] byLip;
+
     private MantleProfile(Builder b) {
         if (!(b.minMantleHeight > 0.0 && b.maxMantleHeight >= b.minMantleHeight && b.probeDistance > 0.0)) {
             throw new IllegalArgumentException("Bad mantle heights: min " + b.minMantleHeight
@@ -149,6 +162,96 @@ public final class MantleProfile {
         this.hindStepLength = b.hindStepLength;
         this.hindStepLift = b.hindStepLift;
         this.hindFaceGrip = b.hindFaceGrip;
+        this.base = b.base;
+        this.byLip = b.base == null ? new MantleProfile[LIP_STEPS] : null;
+    }
+
+    /**
+     * This profile for a lip {@code lipHeight} above the feet. The numbers are tuned for a full
+     * block; a lower lip, such as a slab, needs less of the manoeuvre. The body rears, and the spine
+     * bends, in proportion to the height; the timed phases (reach, rise, crest) shrink with its
+     * square root, as the same accelerations cover less height in less time. Walking onto the top
+     * and everything measured as a share of the lip stay as they are.
+     *
+     * <p>A full block or higher gets the profile itself. Scaled profiles are made once per
+     * {@link #LIP_STEPS} of a block and kept, so calling this every frame allocates nothing.
+     */
+    public MantleProfile forLip(double lipHeight) {
+        if (this.base != null) {
+            return this.base.forLip(lipHeight);
+        }
+        final int step = (int) Math.round(Math.max(lipHeight, 0.0) / FULL_LIP * LIP_STEPS);
+        if (step >= LIP_STEPS) {
+            return this;
+        }
+        final int index = Math.max(step, 1);
+        MantleProfile scaled = this.byLip[index];
+        if (scaled == null) {
+            // Racing threads build equal profiles; either one will do.
+            scaled = this.scaled(index / (double) LIP_STEPS);
+            this.byLip[index] = scaled;
+        }
+        return scaled;
+    }
+
+    /** Whether this profile was scaled down for a lip lower than a full block. */
+    public boolean isScaled() {
+        return this.base != null;
+    }
+
+    private MantleProfile scaled(double share) {
+        final float angle = (float) share;
+        final double time = Math.sqrt(share);
+        final Builder b = this.toBuilder();
+        b.base = this;
+        b.reachPitch *= angle;
+        b.risePitch *= angle;
+        b.crestPitch *= angle;
+        b.archDegrees *= angle;
+        b.rearArchDegrees *= angle;
+        b.reachTicks = scaledTicks(this.reachTicks, time);
+        b.riseTicks = scaledTicks(this.riseTicks, time);
+        b.crestTicks = scaledTicks(this.crestTicks, time);
+        return b.build();
+    }
+
+    private static int scaledTicks(int ticks, double share) {
+        return Math.max((int) Math.round(ticks * share), 1);
+    }
+
+    private Builder toBuilder() {
+        final Builder b = new Builder();
+        b.minMantleHeight = this.minMantleHeight;
+        b.maxMantleHeight = this.maxMantleHeight;
+        b.probeDistance = this.probeDistance;
+        b.reachTicks = this.reachTicks;
+        b.crestStart = this.crestStart;
+        b.recoverDistance = this.recoverDistance;
+        b.riseTicks = this.riseTicks;
+        b.crestTicks = this.crestTicks;
+        b.recoverTicks = this.recoverTicks;
+        b.maxTicks = this.maxTicks;
+        b.minConfidence = this.minConfidence;
+        b.reach = this.reach;
+        b.hopFrom = this.hopFrom;
+        b.hopBoost = this.hopBoost;
+        b.reachPitch = this.reachPitch;
+        b.risePitch = this.risePitch;
+        b.crestPitch = this.crestPitch;
+        b.archDegrees = this.archDegrees;
+        b.rearArchDegrees = this.rearArchDegrees;
+        b.lipInset = this.lipInset;
+        b.plantDepth = this.plantDepth;
+        b.gripsPerHand = this.gripsPerHand;
+        b.firstGripHigh = this.firstGripHigh;
+        b.firstGripLow = this.firstGripLow;
+        b.swingOut = this.swingOut;
+        b.crestTuck = this.crestTuck;
+        b.hindSteps = this.hindSteps;
+        b.hindStepLength = this.hindStepLength;
+        b.hindStepLift = this.hindStepLift;
+        b.hindFaceGrip = this.hindFaceGrip;
+        return b;
     }
 
     /** Starts from the civet's numbers. */
@@ -157,7 +260,8 @@ public final class MantleProfile {
     }
 
     public static final class Builder {
-        private double minMantleHeight = 0.6;
+        // Just under a slab, so a slab's 0.5 reads as a ledge whatever the rounding.
+        private double minMantleHeight = 0.45;
         private double maxMantleHeight = 1.0625;
         private double probeDistance = 0.5;
         private int reachTicks = 8;
@@ -189,6 +293,7 @@ public final class MantleProfile {
         private double hindStepLength = 0.06;
         private double hindStepLift = 0.06;
         private double hindFaceGrip = 0.45;
+        private MantleProfile base;
 
         private Builder() {
         }

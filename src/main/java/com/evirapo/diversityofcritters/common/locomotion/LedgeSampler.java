@@ -11,7 +11,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Looks ahead of a body for a ledge it could mantle: a wall between {@link MantleProfile#minMantleHeight}
- * and {@link MantleProfile#maxMantleHeight} high, with room on top.
+ * and {@link MantleProfile#maxMantleHeight} high (a slab up to a full block), with room on top and
+ * level where the body walks onto it (stairs are not ledges).
  *
  * <p>Runs on both sides: the server decides whether to start a mantle, the client shapes the pose
  * around the lip. The same code on both is half of keeping them in agreement.
@@ -159,6 +160,11 @@ public final class LedgeSampler {
         }
         out.headroom = headroom;
 
+        // Stairs: the top rises again where the body would walk onto it. A slab is a ledge; the
+        // low half of a stair block is a step with the next one right behind it.
+        final boolean risesAgain = risesAgain(world, span, feetX, feetZ, ax, az, hit, out.lipY,
+                bodyHeight, profile);
+
         // Climbable wall still ahead once the body has risen as far as it can mantle.
         final int aboveReach = Mth.floor(Math.min(out.lipY, feetY + profile.maxMantleHeight) + 1.0e-3);
         out.continuesUp = world.isClimbable(out.lipX, aboveReach, out.lipZ);
@@ -169,6 +175,9 @@ public final class LedgeSampler {
             out.reason = LedgeSample.Reason.TOO_HIGH;
         } else if (headroom < bodyHeight) {
             out.reason = LedgeSample.Reason.NO_HEADROOM;
+        } else if (risesAgain) {
+            // After headroom: a low ceiling over the top also reads as rising again.
+            out.reason = LedgeSample.Reason.STEPPED;
         } else if (world.isHazard(out.lipX, out.lipBlockY + 1, out.lipZ)) {
             out.reason = LedgeSample.Reason.HAZARD;
         } else {
@@ -219,6 +228,26 @@ public final class LedgeSampler {
         }
         span[2] = topBlock;
         return top;
+    }
+
+    /**
+     * Whether something rises more than {@link #FLAT} over the lip within
+     * {@link MantleProfile#recoverDistance} past the face: where the front of the body goes as it
+     * walks onto the top, so it would run into it before the mantle is over.
+     */
+    static boolean risesAgain(World world, double[] span, double feetX, double feetZ, int ax, int az,
+                              double face, double lipY, float bodyHeight, MantleProfile profile) {
+        final double end = profile.recoverDistance - INSIDE;
+        for (int i = 1; ; i++) {
+            final double past = Math.min(i * STEP, end);
+            final double d = face + past;
+            if (obstacleTop(world, span, feetX + ax * d, feetZ + az * d, lipY, bodyHeight, profile) - lipY > FLAT) {
+                return true;
+            }
+            if (past >= end) {
+                return false;
+            }
+        }
     }
 
     /** Highest surface at (x, z) that starts at or below {@code fromY}. */

@@ -606,6 +606,30 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   (`MANTLE_TIME_SCALE`) para que el cliente mida REACH igual. El último paso hasta el labio se da entero
   (`MantleMotion.upAt`): escalado, el cuerpo quedaba un pelo bajo la cima y chocaba con el borde al avanzar.
 
+- Mantle también sobre losas (labio a 0.5):
+  - Sonda: `minMantleHeight` 0.6 → 0.45, así una losa inferior es labio. Para que las escaleras sigan
+    caminándose normal, nueva regla: si la cima vuelve a subir (> `FLAT`) dentro de `recoverDistance` pasada
+    la cara —donde el cuerpo tiene que andar para terminar— es `STEPPED`. Una escalera (el medio escalón alto
+    está a 0.5 de la cara) se rechaza; una losa con un bloque detrás (a 1.0) sí se mantlea. Se evalúa después
+    de `NO_HEADROOM`: un techo bajo sobre la cima también "sube".
+  - El disparo por path no cambia: vanilla ya pone el nodo de una losa en el bloque de encima (la losa no es
+    transitable para `LAND`), así que el siguiente nodo está un bloque más arriba.
+  - Maniobra escalada a la altura del labio: `MantleProfile.forLip(altura)` (cacheado por 1/32 de bloque, sin
+    asignar por frame). Los ángulos (pitch de las tres fases y los dos arcos) se multiplican por
+    `altura / 1.0`; las fases cronometradas (`reachTicks`, `riseTicks`, `crestTicks`) por `√altura`. Losa:
+    pitch 25/40/10°, arcos 12.5/35°, 6/7/4 ticks. Lo que ya es fracción del labio (agarres) o no depende de la
+    altura (recover, `crestTuck`, alcance) queda igual. Un bloque completo o más usa el perfil tal cual: nada
+    cambia para él. Lo usan igual el `MantleController` (servidor) y el `MantleDriver` (cliente).
+  - Tests: `MantleProfileTest`; losa, escalera y losa + bloque en `LedgeSamplerTest`; losa en
+    `MantleMotionTest`, `MantleSmoothnessTest` y `MantleClearanceTest`.
+
+**Prueba en juego pendiente (losas)** — civet y squirrel adultos, con F6:
+1. Losa suelta: `/civet_debug mantle <dirección>` y por path (comida encima): maniobra más baja y corta que
+   con un bloque; manos sobre la losa, sin atravesar cabeza ni esquina.
+2. Escaleras (de bloque de escalera): el comando dice `STEPPED`; el path las sube como siempre.
+3. Losa con bloque detrás: dos mantles seguidos (losa, luego bloque).
+4. Techo bajo sobre la losa: `NO_HEADROOM`.
+
 **Prueba en juego pendiente (6.3)** — con F6 sobre un squirrel adulto:
 1. Suelo plano, escaleras, losas: patas apoyadas como en el civet; F9 alterna sin salto.
 2. La hoja en la boca/pata (capa `SquirrelLeafLayer`) sigue a la pata.

@@ -126,26 +126,28 @@ public final class MantleDriver {
             if (!state.mantleActive || state.mantleStartTick != mantle.startTick) {
                 this.begin(state, mantle, legs, x, z, bodyHalfWidth);
             }
+            final double lipHeight = mantle.lipY - mantle.startY;
+            // A lower lip than a full block (a slab) gets a smaller, quicker manoeuvre.
+            final MantleProfile profile = this.profile.forLip(lipHeight);
             final MantleProgress progress = MantleProgress.of(y, mantle.startY, mantle.lipY,
-                    mantle.elapsed(gameTime), mantle.pastFace(x, z), bodyHalfWidth, this.profile,
+                    mantle.elapsed(gameTime), mantle.pastFace(x, z), bodyHalfWidth, profile,
                     state.mantleProgress);
             // Nose up is a negative xRot.
             state.mantlePitch = (float) -Math.toRadians(
-                    MantleProgress.pitchDegrees(progress.phase, progress.t, this.profile));
+                    MantleProgress.pitchDegrees(progress.phase, progress.t, profile));
             state.mantleLock = lock(progress);
             state.mantleCycleHold = progress.phase == MantlePhase.RECOVER
                     ? 1.0f - MantleProgress.smoothstep(progress.t) : 1.0f;
             state.mantleArch = (float) Math.toRadians(
-                    MantleProgress.archDegrees(progress.phase, progress.t, this.profile));
+                    MantleProgress.archDegrees(progress.phase, progress.t, profile));
 
-            final double lipHeight = mantle.lipY - mantle.startY;
-            GripPlanner.plan(progress.phase, progress.t, lipHeight, this.profile, this.leading, this.trailing);
+            GripPlanner.plan(progress.phase, progress.t, lipHeight, profile, this.leading, this.trailing);
             GripPlanner.planHind(progress.phase, progress.t, lipHeight,
                     baseDepth(legs, this.leadHind, mantle), baseDepth(legs, this.otherHind, mantle),
                     state.mantleApproach,
                     this.hindFaceHeight(legs, this.leadHind, mantle, lipHeight, unitsPerBlock),
                     this.hindFaceHeight(legs, this.otherHind, mantle, lipHeight, unitsPerBlock),
-                    this.profile, this.leadingHind, this.trailingHind);
+                    profile, this.leadingHind, this.trailingHind);
             place(legs, this.leadFront, progress.phase, this.leading, mantle, false);
             place(legs, this.otherFront, progress.phase, this.trailing, mantle, false);
             place(legs, this.leadHind, progress.phase, this.leadingHind, mantle, true);

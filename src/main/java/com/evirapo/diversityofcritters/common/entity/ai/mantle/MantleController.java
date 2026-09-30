@@ -63,6 +63,8 @@ public final class MantleController {
 
     private final DiverseCritter critter;
     private final MantleProfile profile;
+    /** The profile scaled to the lip of the mantle in progress ({@link MantleProfile#forLip}). */
+    private MantleProfile lipProfile;
     private final LedgeSample sample = new LedgeSample();
     private final MantleProgress progress = new MantleProgress();
     private final MantleMotion motion = new MantleMotion();
@@ -82,6 +84,7 @@ public final class MantleController {
     public MantleController(DiverseCritter critter, MantleProfile profile) {
         this.critter = critter;
         this.profile = profile;
+        this.lipProfile = profile;
     }
 
     public MantleProfile profile() {
@@ -128,6 +131,7 @@ public final class MantleController {
         this.wallCoord = s.wallCoord;
         this.facing = s.facing;
         this.lip.set(s.lipX, s.lipBlockY, s.lipZ);
+        this.lipProfile = this.profile.forLip(s.lipHeight);
         this.hop = MantleMotion.needsHop(s.lipHeight, this.critter.growthScale(), this.profile);
         this.timeScale = debugTimeScale;
 
@@ -142,8 +146,9 @@ public final class MantleController {
     }
 
     /**
-     * Starts a mantle when the path's next node is one block up and near: the probe then decides
-     * whether there is a ledge to climb, or a step, stairs or a wall to climb instead. Call before
+     * Starts a mantle when the path's next node is one block up and near (a slab too: vanilla puts
+     * the node for standing on a slab in the block above it): the probe then decides whether there
+     * is a ledge to climb, or a step, stairs or a wall to climb instead. Call before
      * the species' own climb logic, while vanilla would still step the body straight up the block.
      * Newborns never mantle.
      */
@@ -183,7 +188,7 @@ public final class MantleController {
         final double mantleTicks = ticks * (double) this.timeScale;
         final double pastFace = this.pastFace();
         MantleProgress.of(this.critter.getY(), this.startY, this.lipY, mantleTicks, pastFace,
-                this.critter.getBbWidth() * 0.5, this.profile, this.progress);
+                this.critter.getBbWidth() * 0.5, this.lipProfile, this.progress);
 
         final String exit = this.exitReason(ticks, mantleTicks);
         if (exit != null) {
@@ -192,7 +197,7 @@ public final class MantleController {
         }
 
         MantleMotion.plan(this.progress, this.critter.getY(), this.startY, this.lipY, pastFace,
-                this.critter.getBbWidth() * 0.5, this.hop, this.profile, this.motion);
+                this.critter.getBbWidth() * 0.5, this.hop, this.lipProfile, this.motion);
         if (this.motion.done) {
             this.end("done");
             return false;
@@ -253,7 +258,7 @@ public final class MantleController {
         if (this.critter.isRemoved()) {
             return "removed";
         }
-        if (mantleTicks > this.profile.maxTicks) {
+        if (mantleTicks > this.lipProfile.maxTicks) {
             return "timed out";
         }
         if (this.critter.hurtTime > 0) {

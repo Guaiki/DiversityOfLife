@@ -26,7 +26,9 @@ class MantleMotionTest {
         return simulate(lipY, startPastFace, false);
     }
 
+    /** As MantleController does it: with the profile scaled to the lip. */
     private static Run simulate(double lipY, double startPastFace, boolean hop) {
+        final MantleProfile profile = PROFILE.forLip(lipY - START_Y);
         final MantleProgress progress = new MantleProgress();
         final MantleMotion motion = new MantleMotion();
         double y = START_Y;
@@ -34,9 +36,9 @@ class MantleMotionTest {
         double highest = y;
         boolean enteredWall = false;
         int tick = 0;
-        for (; tick <= PROFILE.maxTicks; tick++) {
-            MantleProgress.of(y, START_Y, lipY, tick, pastFace, HALF_WIDTH, PROFILE, progress);
-            MantleMotion.plan(progress, y, START_Y, lipY, pastFace, HALF_WIDTH, hop, PROFILE, motion);
+        for (; tick <= profile.maxTicks; tick++) {
+            MantleProgress.of(y, START_Y, lipY, tick, pastFace, HALF_WIDTH, profile, progress);
+            MantleMotion.plan(progress, y, START_Y, lipY, pastFace, HALF_WIDTH, hop, profile, motion);
             if (motion.done) {
                 break;
             }
@@ -63,8 +65,18 @@ class MantleMotionTest {
     }
 
     @Test
+    void slabEndsOnTopSoonerThanABlock() {
+        final Run slab = simulate(64.5, -0.6);
+        final Run block = simulate(65.0, -0.6);
+        assertEquals(MantlePhase.RECOVER, slab.lastPhase());
+        assertEquals(64.5, slab.y(), 1.0e-9);
+        assertTrue(slab.pastFace() >= -HALF_WIDTH + PROFILE.recoverDistance - 1.0e-9, "on top: " + slab.pastFace());
+        assertTrue(slab.ticks() < block.ticks(), slab.ticks() + " vs " + block.ticks());
+    }
+
+    @Test
     void neverPassesTheLipNorEntersTheWall() {
-        for (double lip : new double[]{64.6, 64.8, 65.0, 65.0625}) {
+        for (double lip : new double[]{64.5, 64.6, 64.8, 65.0, 65.0625}) {
             final Run run = simulate(lip, -0.5);
             assertTrue(run.highestY() <= lip + 1.0e-9, "overshot lip " + lip + ": " + run.highestY());
             assertFalse(run.enteredWall(), "entered the wall under lip " + lip);

@@ -41,8 +41,13 @@ class MantleSmoothnessTest {
             .mantle(PROFILE).build();
     final ModelSpace space = new ModelSpace();
 
-    /** Server positions per tick: y and distance past the face, and whether the mantle is on. */
-    static List<double[]> serverTicks(double startPastFace) {
+    /**
+     * Server positions per tick, up a lip {@code lip} high: y and distance past the face, and
+     * whether the mantle is on.
+     */
+    static List<double[]> serverTicks(double startPastFace, double lip) {
+        // As MantleController does it: with the profile scaled to the lip.
+        final MantleProfile profile = PROFILE.forLip(lip);
         final List<double[]> ticks = new ArrayList<>();
         final MantleProgress progress = new MantleProgress();
         final MantleMotion motion = new MantleMotion();
@@ -52,9 +57,9 @@ class MantleSmoothnessTest {
         for (int i = 0; i < 6; i++) {
             ticks.add(new double[]{y, past - 0.1 * (6 - i), 0});
         }
-        for (int tick = 0; tick <= PROFILE.maxTicks; tick++) {
-            MantleProgress.of(y, 0.0, 1.0, tick, past, HALF_WIDTH, PROFILE, progress);
-            MantleMotion.plan(progress, y, 0.0, 1.0, past, HALF_WIDTH, false, PROFILE, motion);
+        for (int tick = 0; tick <= profile.maxTicks; tick++) {
+            MantleProgress.of(y, 0.0, lip, tick, past, HALF_WIDTH, profile, progress);
+            MantleMotion.plan(progress, y, 0.0, lip, past, HALF_WIDTH, false, profile, motion);
             if (motion.done) {
                 break;
             }
@@ -72,8 +77,8 @@ class MantleSmoothnessTest {
         return ticks;
     }
 
-    List<Frame> play(double startPastFace) {
-        final List<double[]> server = serverTicks(startPastFace);
+    List<Frame> play(double startPastFace, double lip) {
+        final List<double[]> server = serverTicks(startPastFace, lip);
         final LocomotionState state = new LocomotionState();
         state.ensureLegs(4);
         final List<Frame> frames = new ArrayList<>();
@@ -112,14 +117,15 @@ class MantleSmoothnessTest {
                 final double y = prevY + (cy - prevY) * partial;
                 final double past = prevP + (cp - prevP) * partial;
                 final double z = 1.0 + past;
-                frames.add(frame(state, mantling ? mantle.set(0, 0, 1, 1.0, Direction.SOUTH, 0.0, startTick) : null,
-                        y, z, tick + partial, frames.size(), w));
+                frames.add(frame(state, mantling ? mantle.set(0, 0, 1, lip, Direction.SOUTH, 0.0, startTick) : null,
+                        y, z, lip, tick + partial, frames.size(), w));
             }
         }
         return frames;
     }
 
-    Frame frame(LocomotionState state, MantleState mantle, double y, double z, double gameTime, int index, Vector3d w) {
+    Frame frame(LocomotionState state, MantleState mantle, double y, double z, double lip, double gameTime, int index,
+                Vector3d w) {
         this.model.root().getAllParts().forEach(ModelPart::resetPose);
         final QuadrupedSolver solver = this.rig.solver();
         this.space.begin(0.5, y, z, 0.0f, 1.0f, this.model);
@@ -132,7 +138,7 @@ class MantleSmoothnessTest {
             leg.soleY = w.y;
             leg.soleZ = w.z;
             // Ground under each foot: the top past the face, the floor before it.
-            leg.groundY = w.z >= 1.0 ? 1.0 : 0.0;
+            leg.groundY = w.z >= 1.0 ? lip : 0.0;
             leg.plantWeight = 1.0f;
             solver.hipX[i] = chain.hip().x;
             solver.hipZ[i] = chain.hip().z;
@@ -189,7 +195,15 @@ class MantleSmoothnessTest {
 
     @Test
     void aWholeMantlePlaysSmoothly() {
-        final List<Frame> frames = play(-0.5);
+        assertSmooth(play(-0.5, 1.0));
+    }
+
+    @Test
+    void aSlabPlaysSmoothly() {
+        assertSmooth(play(-0.5, 0.5));
+    }
+
+    static void assertSmooth(List<Frame> frames) {
         final double[][] jerk = soleJerks(frames);
         for (int n = 2; n < frames.size(); n++) {
             final Frame f = frames.get(n);
