@@ -71,6 +71,8 @@ public final class MantleController {
     private final BlockPos.MutableBlockPos lip = new BlockPos.MutableBlockPos();
 
     private boolean active;
+    /** Game time of the last probe, so {@link #shouldJumpInstead} only answers for this tick's. */
+    private long probedTick = Long.MIN_VALUE;
     private boolean fromPath;
     private boolean holdsGravity;
     private boolean hop;
@@ -118,6 +120,7 @@ public final class MantleController {
         }
         LedgeSampler.sample(this.critter.level(), this.critter.position(), headingYaw,
                 this.critter.getBbWidth() * 0.5f, this.critter.getBbHeight(), this.profile, this.sample);
+        this.probedTick = this.critter.level().getGameTime();
         final LedgeSample s = this.sample;
         if (!s.found || s.continuesUp || s.confidence < this.profile.minConfidence) {
             return false;
@@ -171,6 +174,22 @@ public final class MantleController {
         }
         final float headingYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
         return this.tryStart(headingYaw, true);
+    }
+
+    /**
+     * Whether the body has to jump the rise ahead instead: this tick's probe met a wall and no
+     * mantle started (faced at a slant, say), and it is higher than the body walks up but no
+     * higher than it could mantle. Stairs and slabs are walked; a climbable wall that carries on
+     * up is climbed.
+     */
+    public boolean shouldJumpInstead() {
+        final LedgeSample s = this.sample;
+        return !this.active
+                && this.probedTick == this.critter.level().getGameTime()
+                && s.hasWall()
+                && !s.continuesUp
+                && s.lipHeight > this.critter.maxUpStep()
+                && s.lipHeight <= this.profile.maxMantleHeight;
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
 import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
+import com.evirapo.diversityofcritters.common.locomotion.FootSupport;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
@@ -107,8 +108,9 @@ public class CivetEntity extends DiverseCritter
 
     public CivetEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
-        this.setMaxUpStep(1);
+        this.setMaxUpStep(WALK_STEP);
         this.mantle = new MantleController(this, MantleProfile.CIVET);
+        this.feet = new FootSupport(FootSupport.Layout.CIVET);
         this.moveControl = new CivetMoveControl(this);
     }
 
@@ -394,7 +396,7 @@ public class CivetEntity extends DiverseCritter
             boolean isNewborn = this.isNewborn();
             double desiredSpeed = isNewborn ? 0.095D : 0.2D;
             // A mantle lifts the body itself; vanilla stepping would jump it up the block at once.
-            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : 1.0F);
+            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : WALK_STEP);
 
             if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
                 this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);

@@ -1,5 +1,6 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
+import com.evirapo.diversityofcritters.common.locomotion.FootSupport;
 import com.evirapo.diversityofcritters.common.locomotion.MantleProfile;
 import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
@@ -118,8 +119,9 @@ public class SquirrelEntity extends DiverseCritter {
 
     public SquirrelEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
         super(pEntityType, pLevel);
-        this.setMaxUpStep(1);
+        this.setMaxUpStep(WALK_STEP);
         this.mantle = new MantleController(this, MantleProfile.SQUIRREL);
+        this.feet = new FootSupport(FootSupport.Layout.SQUIRREL);
         this.moveControl = new SquirrelMoveControl(this);
     }
 
@@ -230,7 +232,7 @@ public class SquirrelEntity extends DiverseCritter {
             boolean isNewborn = this.isNewborn();
             double desiredSpeed = isNewborn ? 0.1D : 0.25D;
             // A mantle lifts the body itself; vanilla stepping would jump it up the block at once.
-            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : 1.0F);
+            float desiredStep   = this.isMantling() ? 0.0F : (isNewborn ? 0.5F : WALK_STEP);
 
             if (this.getAttribute(Attributes.MOVEMENT_SPEED).getBaseValue() != desiredSpeed) {
                 this.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(desiredSpeed);

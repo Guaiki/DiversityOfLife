@@ -15,8 +15,6 @@ public class CivetMoveControl extends MoveControl {
     private final CivetEntity civet;
 
     private static final double CLIMB_SPEED = 0.16D;
-    private static final double STEP_UP_IMPULSE = 0.02D;
-    private static final double STEP_UP_HORIZONTAL_DAMPING = 0.02D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
     private static final int LOOKAHEAD_NODES = 5;
@@ -117,16 +115,11 @@ public class CivetMoveControl extends MoveControl {
             this.civet.setYBodyRot(this.civet.getYRot());
             this.civet.setSpeed((float)(this.speedModifier * this.civet.getAttributeValue(Attributes.MOVEMENT_SPEED)));
 
-            if (dy > (double)this.civet.maxUpStep()
-                    && dx * dx + dz * dz < (double)Math.max(1.0F, this.civet.getBbWidth())) {
-                if (!this.civet.isNewborn()) {
-                    Vec3 motion = this.civet.getDeltaMovement();
-                    this.civet.setDeltaMovement(
-                            motion.x * STEP_UP_HORIZONTAL_DAMPING,
-                            Math.max(motion.y, STEP_UP_IMPULSE),
-                            motion.z * STEP_UP_HORIZONTAL_DAMPING
-                    );
-                }
+            // A block the mantle turned down (approached at a slant, say) is jumped, as a vanilla mob
+            // would. Slabs and stairs are walked up; the path's node over them is a block up too, so
+            // the rise is the probe's, not the node's.
+            if (mantle != null && mantle.shouldJumpInstead()) {
+                this.civet.getJumpControl().jump();
             }
         } else {
             this.civet.setZza(0.0F);

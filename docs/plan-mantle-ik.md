@@ -623,6 +623,35 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
   - Tests: `MantleProfileTest`; losa, escalera y losa + bloque en `LedgeSamplerTest`; losa en
     `MantleMotionTest`, `MantleSmoothnessTest` y `MantleClearanceTest`.
 
+- Empujado contra un bloque subía de golpe: fuera del mantle el paso era `maxUpStep = 1`, y todo lo que no
+  fuera el path (empujones, un mantle que no arranca) lo subía un bloque en un tick.
+  - Paso normal de civet y squirrel adultos: `DiverseCritter.WALK_STEP` = 0.6, el de vanilla (losas y escaleras
+    andando). Un bloque entero sólo se sube con mantle. Newborn sigue con 0.5 (no hace mantle). Una losa
+    empujada sube como con cualquier mob vanilla; por el path es mantle.
+  - El "impulso de step-up" de los move controls (0.02 hacia arriba y frenar el avance ×0.02) comparaba con la
+    Y del nodo, que para losas y escaleras también está un bloque arriba: con paso 0.6 habría clavado al
+    animal delante de cada losa. Se sustituye por `MantleController.shouldJumpInstead()`: si la sonda de este
+    tick vio una pared más alta que el paso (y no más que el mantle) y no arrancó mantle —de lado, por
+    ejemplo—, salto vanilla (`JumpControl`). Escaleras y losas rechazadas miden ≤ 0.5: se andan.
+- Colgado de un borde sin patas en el suelo: vanilla sostiene el cuerpo mientras cualquier esquina de la caja
+  (0.75) toque un bloque, pero las patas del civet ocupan ~0.14 × 0.41 en el centro.
+  - `FootSupport` (común, servidor): por pata, posición de reposo sacada del modelo (`Layout.CIVET`,
+    `Layout.SQUIRREL`), girada con el cuerpo y escalada por edad; apoyada si hay suelo como mucho
+    `REACH_DOWN` (0.52) por debajo, así un escalón de losa o escalera sigue contando. Con **2 o más** patas sin
+    suelo el cuerpo se desliza (≥ `SLIDE_SPEED` 0.08 b/tick) alejándose de lo que lo sostiene (patas
+    apoyadas + contorno de la caja) hasta caer. Una sola pata colgando se sostiene.
+  - En `DiverseCritter.tick` (servidor), al final: también sentado. No durante mantle, trepada, en brazos,
+    en el agua ni sin gravedad.
+  - Test: `FootSupportTest`.
+
+**Prueba en juego pendiente (bordes y paso)**:
+1. Empujar un civet contra un bloque: no sube. Contra una losa: sube (vanilla).
+2. Path hacia un bloque abordado de lado: si no arranca mantle, salta; nunca se queda clavado. Escaleras y
+   losas por path, sin saltos raros.
+3. Empujarlo hacia el borde de un bloque: con una pata fuera se queda; con dos, resbala y cae.
+4. Bajar un bloque por path: cae de forma natural al sacar las delanteras.
+5. Al terminar un mantle, queda encima sin resbalar (las traseras quedan ~0.17 pasada la cara).
+
 **Prueba en juego pendiente (losas)** — civet y squirrel adultos, con F6:
 1. Losa suelta: `/civet_debug mantle <dirección>` y por path (comida encima): maniobra más baja y corta que
    con un bloque; manos sobre la losa, sin atravesar cabeza ni esquina.

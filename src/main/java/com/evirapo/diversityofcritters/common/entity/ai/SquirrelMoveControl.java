@@ -15,8 +15,6 @@ public class SquirrelMoveControl extends MoveControl {
     private final SquirrelEntity squirrel;
 
     private static final double CLIMB_SPEED = 0.16D;
-    private static final double STEP_UP_IMPULSE = 0.02D;
-    private static final double STEP_UP_HORIZONTAL_DAMPING = 0.02D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
     private static final int LOOKAHEAD_NODES = 5;
@@ -124,16 +122,11 @@ public class SquirrelMoveControl extends MoveControl {
             this.squirrel.setYBodyRot(this.squirrel.getYRot());
             this.squirrel.setSpeed((float)(this.speedModifier * this.squirrel.getAttributeValue(Attributes.MOVEMENT_SPEED)));
 
-            if (dy > (double)this.squirrel.maxUpStep()
-                    && dx * dx + dz * dz < (double)Math.max(1.0F, this.squirrel.getBbWidth())) {
-                if (!this.squirrel.isNewborn()) {
-                    Vec3 motion = this.squirrel.getDeltaMovement();
-                    this.squirrel.setDeltaMovement(
-                            motion.x * STEP_UP_HORIZONTAL_DAMPING,
-                            Math.max(motion.y, STEP_UP_IMPULSE),
-                            motion.z * STEP_UP_HORIZONTAL_DAMPING
-                    );
-                }
+            // A block the mantle turned down (approached at a slant, say) is jumped, as a vanilla mob
+            // would. Slabs and stairs are walked up; the path's node over them is a block up too, so
+            // the rise is the probe's, not the node's.
+            if (mantle != null && mantle.shouldJumpInstead()) {
+                this.squirrel.getJumpControl().jump();
             }
         } else {
             this.squirrel.setZza(0.0F);

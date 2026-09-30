@@ -10,6 +10,7 @@ import com.evirapo.diversityofcritters.common.temperature.TemperatureSystem;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
+import com.evirapo.diversityofcritters.common.locomotion.FootSupport;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
@@ -122,6 +123,20 @@ public abstract class DiverseCritter extends TamableAnimal
     /** Species that can climb a ledge set this in their constructor. Server side only acts on it. */
     @Nullable
     protected MantleController mantle;
+
+    /**
+     * Species whose feet are checked at edges set this in their constructor: with two feet over a
+     * drop, the body slides off instead of hanging on by the corner of its collision box.
+     */
+    @Nullable
+    protected FootSupport feet;
+
+    /**
+     * How high a critter walks straight up, as vanilla mobs do: slabs and stairs. A full block is
+     * a mantle, or a jump when none can start; stepping it would lift the body a whole block in
+     * one tick, which is what being pushed against one used to do.
+     */
+    public static final float WALK_STEP = 0.6F;
 
     int prevHunger;
     int prevThirst;
@@ -879,9 +894,36 @@ public abstract class DiverseCritter extends TamableAnimal
             this.setDeltaMovement(0.0D, currentDelta.y, 0.0D);
         }
 
+        if (!this.level().isClientSide()) {
+            // Last: sitting zeroes the horizontal movement above, and must not hold the body on an edge.
+            this.slideOffEdge();
+        }
+
         if (this.level().isClientSide()) {
             updateSitAnimationClient();
             handleSleepAnimationsClient();
+        }
+    }
+
+    /**
+     * Standing on an edge with two feet or more over the drop: slide off toward it, at least at
+     * {@link FootSupport#SLIDE_SPEED}, until nothing holds the body and it falls. Not while the
+     * mantle or a climb places the body, nor while carried, swimming or floating.
+     */
+    private void slideOffEdge() {
+        if (this.feet == null || !this.onGround() || this.isMantling() || this.isClimbing()
+                || this.isPassenger() || this.isInWaterOrBubble() || this.isNoGravity()) {
+            return;
+        }
+        if (!this.feet.check(this.level(), this.getX(), this.getY(), this.getZ(), this.yBodyRot,
+                this.growthScale(), this.getBbWidth() * 0.5F)) {
+            return;
+        }
+        final Vec3 motion = this.getDeltaMovement();
+        final double along = motion.x * this.feet.slideX + motion.z * this.feet.slideZ;
+        if (along < FootSupport.SLIDE_SPEED) {
+            final double push = FootSupport.SLIDE_SPEED - along;
+            this.setDeltaMovement(motion.x + this.feet.slideX * push, motion.y, motion.z + this.feet.slideZ * push);
         }
     }
 
