@@ -107,12 +107,17 @@ public final class QuadrupedSolver {
         final LocomotionState.LegState[] legs = state.legs();
         final boolean smooth = state.initialised;
         final float follow = Spring.blendFactor(WEIGHT_RATE, dt);
+        // A mantle poses the body itself, and leaves the terrain behind while it does: over the crest
+        // the animated hind feet are still over the ground below the wall. Kept lagging, that would
+        // tip the body up on top when the terrain takes back over. So under a mantle the feet
+        // follow the ground as it is, and the terrain starts from where the legs really are.
+        final float footLag = 1.0f - clamp01(this.mantleAuthority);
 
         // 1. What each foot asks for, and whether it is touching.
         for (int i = 0; i < this.legCount; i++) {
             final LocomotionState.LegState leg = legs[i];
             final float lift = this.groundUp[i] - this.soleUp[i];
-            leg.debugLift = smoothFoot(leg.footLift, lift, dt, smooth);
+            leg.debugLift = smoothFoot(leg.footLift, lift, dt, smooth, footLag);
 
             final float contact = state.falling() ? 0.0f : clamp01(leg.footLift.value() / CONTACT_DEPTH);
             leg.contactWeight = smooth ? leg.contactWeight + (contact - leg.contactWeight) * follow : contact;
@@ -142,7 +147,7 @@ public final class QuadrupedSolver {
             this.bodySample[i] = this.groundUp[i] - this.soleUp[reference];
         }
         for (int i = 0; i < this.legCount; i++) {
-            this.bodyLift[i] = smoothFoot(legs[i].bodyLift, this.bodySample[i], dt, smooth);
+            this.bodyLift[i] = smoothFoot(legs[i].bodyLift, this.bodySample[i], dt, smooth, footLag);
         }
 
         // 3. Tilt from the plane, height from the consensus.
@@ -219,14 +224,15 @@ public final class QuadrupedSolver {
         out.set(afterX - out.x, afterY - out.y, afterZ - out.z);
     }
 
-    private static float smoothFoot(Spring spring, float target, float dt, boolean smooth) {
+    /** @param lag share of the usual smoothing, 1 on terrain, 0 (none) under a mantle */
+    private static float smoothFoot(Spring spring, float target, float dt, boolean smooth, float lag) {
         if (!smooth) {
             spring.snap(target);
             return target;
         }
         final float held = spring.value();
         final boolean acquiring = target * held < 0.0f || Math.abs(target) > Math.abs(held);
-        spring.setHalfLife(acquiring ? ACQUIRE_HALF_LIFE : RELEASE_HALF_LIFE);
+        spring.setHalfLife((acquiring ? ACQUIRE_HALF_LIFE : RELEASE_HALF_LIFE) * lag);
         return spring.update(target, dt);
     }
 

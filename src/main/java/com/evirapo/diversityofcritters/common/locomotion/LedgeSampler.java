@@ -33,6 +33,8 @@ public final class LedgeSampler {
     public static final double LANE_SPREAD = 0.6;
     /** A side lane agrees with the centre when its top is within this of the lip. */
     public static final double LIP_TOLERANCE = 0.0625;
+    /** A rise up to this from a stair is one of its steps. */
+    static final double HALF_STEP = 0.5 + LIP_TOLERANCE;
     /** How far past the face the lip is read, so the reading lands inside the wall. */
     static final double INSIDE = 1.0 / 32.0;
     static final int FACE_ITERATIONS = 8;
@@ -52,6 +54,9 @@ public final class LedgeSampler {
 
         /** Nothing should step into this block: liquid or fire. */
         boolean isHazard(int x, int y, int z);
+
+        /** The block is a stair. */
+        boolean isStairs(int x, int y, int z);
     }
 
     /**
@@ -161,9 +166,13 @@ public final class LedgeSampler {
         out.headroom = headroom;
 
         // Stairs: the top rises again where the body would walk onto it. A slab is a ledge; the
-        // low half of a stair block is a step with the next one right behind it.
-        final boolean risesAgain = risesAgain(world, span, feetX, feetZ, ax, az, hit, out.lipY,
-                bodyHeight, profile);
+        // low half of a stair block is a step with the next one right behind it. The last step of
+        // a flight has flat ground behind it, so a stair lip is a step whatever lies past it, and
+        // so is a half step up from a stair: stairs are walked, the terrain rig poses them.
+        final boolean onStairs = world.isStairs(Mth.floor(feetX), Mth.floor(feetY - INSIDE), Mth.floor(feetZ));
+        final boolean risesAgain = world.isStairs(out.lipX, out.lipBlockY, out.lipZ)
+                || onStairs && out.lipHeight <= HALF_STEP
+                || risesAgain(world, span, feetX, feetZ, ax, az, hit, out.lipY, bodyHeight, profile);
 
         // Climbable wall still ahead once the body has risen as far as it can mantle.
         final int aboveReach = Mth.floor(Math.min(out.lipY, feetY + profile.maxMantleHeight) + 1.0e-3);
@@ -321,6 +330,11 @@ public final class LedgeSampler {
         public boolean isHazard(int x, int y, int z) {
             final BlockState state = this.state(x, y, z);
             return !state.getFluidState().isEmpty() || state.is(BlockTags.FIRE);
+        }
+
+        @Override
+        public boolean isStairs(int x, int y, int z) {
+            return this.state(x, y, z).is(BlockTags.STAIRS);
         }
 
         private BlockState state(int x, int y, int z) {

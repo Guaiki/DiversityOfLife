@@ -203,6 +203,41 @@ class MantleSmoothnessTest {
         assertSmooth(play(-0.5, 0.5));
     }
 
+    /**
+     * Once the mantle hands back to the terrain, the body levels out on top and its feet stay on it.
+     * This caught the body tipping up to 16 degrees after the end with the hind feet sunk 5 units
+     * into the top: the planted feet held on as the body walked past them, and the terrain started
+     * from the hind feet still over the ground below the wall.
+     */
+    @Test
+    void bodyLevelsOnTopOnceTheMantleEnds() {
+        for (double lip : new double[]{1.0, 0.5}) {
+            final List<Frame> frames = this.play(-0.5, lip);
+            this.space.begin(0.5, 0.0, 0.0, 0.0f, 1.0f, this.model);
+            final double top = lip * this.space.modelUnitsPerBlock();
+            boolean mantled = false;
+            double previous = Double.MAX_VALUE;
+            for (Frame f : frames) {
+                if (f.phase() != MantlePhase.NONE) {
+                    mantled = true;
+                    continue;
+                }
+                if (!mantled) {
+                    continue;
+                }
+                final double pitch = Math.abs(Math.toDegrees(f.pitch()));
+                org.junit.jupiter.api.Assertions.assertTrue(pitch <= previous + 0.1, String.format(
+                        "lip %.1f: the body tips up again after the mantle, %.1f degrees at frame %d", lip, pitch, f.index()));
+                previous = pitch;
+                for (int leg = 0; leg < 4; leg++) {
+                    org.junit.jupiter.api.Assertions.assertTrue(f.soles()[leg][1] >= top - 1.0, String.format(
+                            "lip %.1f: %s %.1f u into the top at frame %d", lip, LEGS[leg], top - f.soles()[leg][1], f.index()));
+                }
+            }
+            org.junit.jupiter.api.Assertions.assertTrue(mantled, "no mantle played");
+        }
+    }
+
     static void assertSmooth(List<Frame> frames) {
         final double[][] jerk = soleJerks(frames);
         for (int n = 2; n < frames.size(); n++) {

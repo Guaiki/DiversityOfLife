@@ -932,6 +932,36 @@ public abstract class DiverseCritter extends TamableAnimal
         }
     }
 
+    /** Something at least this far ahead of the heading (cosine) is met head on. */
+    private static final double HEAD_ON = 0.5;
+    /** Sideways push per tick while meeting something head on, blocks per tick. */
+    private static final double SIDESTEP = 0.04;
+
+    /**
+     * Walking into something ahead, step to the right. Paths run through the middle of blocks, so
+     * two critters meeting on one line push each other straight back and neither gets by (they
+     * would walk on the spot until one gives up). Each keeping right, they pass.
+     */
+    @Override
+    public void push(Entity other) {
+        super.push(other);
+        if (this.level().isClientSide() || this.zza <= 0.0F || this.isMantling() || this.isClimbing()) {
+            return;
+        }
+        final double dx = other.getX() - this.getX();
+        final double dz = other.getZ() - this.getZ();
+        final double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance < 1.0e-3) {
+            return;
+        }
+        final double yaw = Math.toRadians(this.getYRot());
+        if ((-Math.sin(yaw) * dx + Math.cos(yaw) * dz) / distance < HEAD_ON) {
+            return;
+        }
+        // Right is minus left, and left is (cos, sin) of the yaw.
+        this.push(-Math.cos(yaw) * SIDESTEP, 0.0D, -Math.sin(yaw) * SIDESTEP);
+    }
+
     /**
      * Standing on an edge with two feet or more over the drop: slide off toward it, at least at
      * {@link FootSupport#SLIDE_SPEED}, until nothing holds the body and it falls. Not while the
@@ -945,6 +975,14 @@ public abstract class DiverseCritter extends TamableAnimal
         if (!this.feet.check(this.level(), this.getX(), this.getY(), this.getZ(), this.yBodyRot,
                 this.growthScale(), this.getBbWidth() * 0.5F)) {
             return;
+        }
+        if (this.zza > 0.0F) {
+            // Walking onto what holds it: vanilla lifts the box onto a step as soon as its front edge
+            // is over it, with the feet still on the ground below. That is arriving, not falling off.
+            final double yaw = Math.toRadians(this.getYRot());
+            if (-Math.sin(yaw) * this.feet.slideX + Math.cos(yaw) * this.feet.slideZ < 0.0D) {
+                return;
+            }
         }
         final Vec3 motion = this.getDeltaMovement();
         final double along = motion.x * this.feet.slideX + motion.z * this.feet.slideZ;

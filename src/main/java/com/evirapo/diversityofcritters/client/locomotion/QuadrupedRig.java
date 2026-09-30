@@ -303,18 +303,16 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         // --- Head and tail answer what was done to the body.
         this.spine.write(state, pitch, roll, state.bodyYaw, gate, state.mantleArch * mantle * gate);
 
-        // Where the hind hips ended up: the mantle places the hind feet against the wall from them
-        // next frame.
+        // Where the hips ended up: from them, next frame, the mantle places the hind feet against the
+        // wall and lets a planted foot go once the body has walked on past it.
         if (mantle > 0.0f) {
             for (int i = 0; i < count; i++) {
                 final LocomotionState.LegState leg = legStates[i];
-                leg.mantleHipValid = this.rear[i];
-                if (this.rear[i]) {
-                    this.space.toWorld(this.legs.get(i).fromRoot(), 0.0f, 0.0f, 0.0f, this.world);
-                    leg.mantleHipX = this.world.x;
-                    leg.mantleHipY = this.world.y;
-                    leg.mantleHipZ = this.world.z;
-                }
+                leg.mantleHipValid = true;
+                this.space.toWorld(this.legs.get(i).fromRoot(), 0.0f, 0.0f, 0.0f, this.world);
+                leg.mantleHipX = this.world.x;
+                leg.mantleHipY = this.world.y;
+                leg.mantleHipZ = this.world.z;
             }
         }
     }

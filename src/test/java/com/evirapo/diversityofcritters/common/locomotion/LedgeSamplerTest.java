@@ -44,6 +44,7 @@ class LedgeSamplerTest {
         private final Map<Long, Shape> shapes = new HashMap<>();
         private final Set<Long> climbable = new HashSet<>();
         private final Set<Long> hazards = new HashSet<>();
+        private final Set<Long> stairs = new HashSet<>();
 
         private static long key(int x, int y, int z) {
             return ((long) x & 0x1FFFFF) << 42 | ((long) y & 0xFFFFF) << 21 | ((long) z & 0x1FFFFF);
@@ -62,6 +63,16 @@ class LedgeSamplerTest {
         Grid hazard(int x, int y, int z) {
             this.hazards.add(key(x, y, z));
             return this;
+        }
+
+        Grid stairs(int x, int y, int z, Shape shape) {
+            this.stairs.add(key(x, y, z));
+            return place(x, y, z, shape);
+        }
+
+        @Override
+        public boolean isStairs(int x, int y, int z) {
+            return this.stairs.contains(key(x, y, z));
         }
 
         @Override
@@ -154,6 +165,35 @@ class LedgeSamplerTest {
         assertFalse(s.found);
         assertEquals(LedgeSample.Reason.STEPPED, s.reason);
         assertEquals(64.5, s.lipY, 1.0e-9);
+    }
+
+    @Test
+    void lastStepOfAFlightIsAStep() {
+        // Standing on the low half of the top stair, flat landing behind its high half: nothing rises
+        // again past the lip, but the lip is a stair's.
+        final Grid grid = new Grid().stairs(0, 64, 0, STAIRS_SOUTH).place(0, 64, 1, FULL).place(0, 64, 2, FULL);
+        final LedgeSample s = probe(grid, 0.5, 64.5, 0.115, 0.0f, HEIGHT);
+        assertFalse(s.found);
+        assertEquals(LedgeSample.Reason.STEPPED, s.reason);
+        assertEquals(65.0, s.lipY, 1.0e-9);
+
+        // The same shape, not a stair: a slab-high ledge.
+        final Grid blocks = new Grid().place(0, 64, 0, STAIRS_SOUTH).place(0, 64, 1, FULL).place(0, 64, 2, FULL);
+        assertTrue(probe(blocks, 0.5, 64.5, 0.115, 0.0f, HEIGHT).found);
+    }
+
+    @Test
+    void halfStepUpFromAStairIsAStep() {
+        // On a stair (slab-shaped here), a block whose top is half a block higher: one more step.
+        final Grid grid = new Grid().stairs(0, 64, 0, BOTTOM_SLAB).place(0, 64, 1, FULL);
+        final LedgeSample s = probe(grid, 0.5, 64.5, 0.5, 0.0f, HEIGHT);
+        assertFalse(s.found);
+        assertEquals(LedgeSample.Reason.STEPPED, s.reason);
+
+        // A full block up from a stair is still a ledge.
+        final LedgeSample high = probe(grid.place(0, 65, 1, BOTTOM_SLAB), 0.5, 64.5, 0.5, 0.0f, HEIGHT);
+        assertTrue(high.found);
+        assertEquals(1.0, high.lipHeight, 1.0e-9);
     }
 
     @Test

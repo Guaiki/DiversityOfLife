@@ -80,7 +80,7 @@ minecraft {
             // Descomentar para que DeluxeLib loguee cada START/STOP/BLEND de animación
             // ([DLXANIM] en la consola, con S/C según el lado). Es la forma rápida de ver si una
             // playCondition se está evaluando como esperas. Ruidoso con varios mobs en pantalla.
-            // property 'deluxelib.animDebug', 'true'
+            property 'deluxelib.animDebug', 'true'
 
             mods {
                 "${mod_id}" {
@@ -104,6 +104,8 @@ minecraft {
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', mod_id
+            // Its own folder: the tests must not share logs or saves with a client running from run/.
+            workingDirectory project.file('run-gametest')
         }
 
         data {

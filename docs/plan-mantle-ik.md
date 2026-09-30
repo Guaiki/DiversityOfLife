@@ -662,8 +662,51 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
     compañera cuelga. Y si ninguna pata toca suelo a la altura del cuerpo (todas abajo, la caja apoyada en la
     losa), cuelgan todas. El contorno de la caja cuenta sólo el suelo a la altura del cuerpo.
   - Nada de esto en escaleras: si alguna pata o el centro pisa un bloque `#stairs`, sólo cuelga la pata sin
-    suelo a su alcance (0.52); cruzarlas de lado o en una esquina lo resuelve el rig. `ledgeInTheWay` tampoco
-    frena el paso ante un escalón de escalera visto de lado.
+    suelo a su alcance (0.52); cruzarlas de lado o en una esquina lo resuelve el rig.
+  - En juego, el último escalón de un tramo hacía mantle de losa (log: arranques con `lip +0.50` desde
+    Y ×.50): tras la mitad alta viene el rellano plano, así que no "volvía a subir". Ahora la sonda
+    (`LedgeSampler`) da `STEPPED` si el labio es un bloque `#stairs`, o si los pies están sobre una escalera
+    y el labio no pasa de medio escalón (`HALF_STEP`). En escaleras no hay mantle en ningún punto; sólo el
+    rig. `ledgeInTheWay` hereda la regla (un escalón visto de lado tampoco frena el paso).
+  - En juego, en unas gradas de losa dentro de un hueco la civeta se quedaba andando sin subir: el paso la
+    frenaba ante la losa (`ledgeInTheWay`, sondeo por los ejes del movimiento) pero el disparo por path
+    (sondeo hacia el nodo) no arrancaba mantle ni salto, y sin la regla de la losa vanilla la subía de un
+    paso. Ahora `ledgeInTheWay` recuerda el labio que frenó y hacia dónde; si el path sube (siguiente nodo
+    +1) en esa dirección, `tryStartFromPath` hace el mantle contra ese labio de frente y, si no puede, lo deja
+    para `shouldJumpInstead` (salto). Empujado, sin path, sigue sin subir. Log de debug:
+    `[Mantle] ... ran into a ledge ... on its way up` — dice cuándo el disparo normal no lo cogió.
+
+- Banco de pruebas en juego sin cliente: `gradlew runGameTestServer` (carpeta `run-gametest/`). `MantleGameTests`
+  construye cada escena en una arena vacía (`structures/mantle_arena.nbt`, 12×6×12), quita los goals a los
+  critters (ni duermen ni pasean), los lleva a un destino con su propia navegación y escribe cada tick en el
+  log (`[MantleTest] ...`: posición, suelo, colisión, mantle, paso, siguiente nodo, velocidad). Escenas:
+  mantle fuera de un hueco, gradas de losa, escalón de escalera y tramo de dos escaleras (fallan si hay
+  mantle), civeta y ardilla de frente en el hueco y en llano. Lo que destapó:
+  - Escaleras: vanilla sube la caja al escalón en cuanto su borde delantero lo pisa, con las patas aún abajo;
+    la regla de "flotando sobre la caja" de `FootSupport` lo empujaba atrás (−0.08) y quedaba en bucle. Ahora
+    no se desliza mientras camina hacia lo que lo sostiene (`zza > 0` y el rumbo contra el deslizamiento).
+  - De frente: los paths van por el centro de los bloques, así que dos critters que se cruzan quedan en la
+    misma línea y el empuje de vanilla va recto hacia atrás: ninguno pasa. `DiverseCritter.push(Entity)`:
+    si camina y lo que empuja está delante (±60°), se aparta a su derecha (0.04/tick); los dos a la vez se
+    cruzan.
+  - La ardilla sale del hueco por `ran into a ledge`: vanilla se salta el nodo del fondo y el siguiente queda
+    a 1.7, fuera del alcance del disparo por nodo. El respaldo de `ledgeInTheWay` es lo que la saca.
+
+- Al final de la subida las patas se quedaban plantadas y el cuerpo parecía echarse adelante. Medido
+  volcando el esqueleto por fotograma (caderas, suelas, torso, cabeza, cola) de la maniobra completa y
+  dibujándolo de perfil:
+  - En RECOVER y al desvanecerse el mantle, las anclas seguían fijas en el mundo mientras el cuerpo andaba:
+    faltantes de hasta 30 u que el rig compensaba tirando de la pelvis atrás y abajo. El cliente además acaba
+    el mantle a mitad de RECOVER (t ≈ 0.7: su posición interpolada va unos ticks detrás), con las traseras
+    aún a peso 0.85. Ahora `MantleDriver` suelta el ancla de una pata cuando su cadera la ha adelantado
+    en el rumbo (del 30 % al 80 % del largo de la pata, suave): vuelve a la ruta de suelo bajo la cadera.
+    Por distancia, no por tiempo. `QuadrupedRig` registra ya las cuatro caderas, no sólo las traseras.
+  - Aun sin anclas, tras el final el cuerpo cabeceaba hasta 16° y las traseras se hundían 5 u en la cima: el
+    terreno arrancaba de alturas de suelo suavizadas (semivida 0.15 s) que se habían quedado en el suelo de
+    abajo, donde estaban las suelas animadas de las traseras durante la cresta. Ahora, bajo la autoridad del
+    mantle, `QuadrupedSolver` sigue el suelo real sin retraso (semivida × (1 − autoridad)).
+  - Resultado: tras el final el pitch baja sin rebote (máx. 9° bloque / 5° losa) y ninguna suela se hunde.
+    Test: `MantleSmoothnessTest.bodyLevelsOnTopOnceTheMantleEnds` (sin el arreglo falla: 7.7° de rebote).
 
 **Prueba en juego pendiente (bordes y paso)**:
 1. Empujar un civet contra un bloque: no sube. Contra una losa: sube (vanilla).

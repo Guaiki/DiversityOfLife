@@ -55,6 +55,8 @@ public final class MantleDriver {
     private final GripPlanner.Hand trailingHind = new GripPlanner.Hand();
     /** Hind leg length, hip to sole, model units: how far below the hips the feet can push. */
     private final float hindLength;
+    /** Per leg, hip to sole, model units. */
+    private final float[] length;
 
     /**
      * @param rear per leg, in the rig's order: whether it is a hind leg
@@ -99,6 +101,7 @@ public final class MantleDriver {
             }
         }
         this.hindLength = hindLength;
+        this.length = length.clone();
         this.leadFront = leadFront;
         this.otherFront = otherFront;
         this.leadHind = leadHind;
@@ -173,8 +176,12 @@ public final class MantleDriver {
 
         if (mantle != null || authority > AUTHORITY_EPSILON) {
             state.mantleOwnsAnchors = true;
-            for (LocomotionState.LegState leg : legs) {
-                leg.anchorWeight = leg.mantleWeight * authority;
+            // Walking onto the top, and fading out after it: the body walks on, the planted feet do not.
+            final boolean walkingOn = mantle == null || state.mantleProgress.phase == MantlePhase.RECOVER;
+            for (int i = 0; i < legs.length; i++) {
+                final LocomotionState.LegState leg = legs[i];
+                final float held = walkingOn ? this.heldAfterWalkingOn(leg, i, state.bodyYaw, unitsPerBlock) : 1.0f;
+                leg.anchorWeight = leg.mantleWeight * authority * held;
             }
             state.mantleBodyDrop = (float) ((y - state.mantleStartY) * unitsPerBlock) * state.mantleLock * authority;
             state.mantleTuck = mantle != null
@@ -234,6 +241,30 @@ public final class MantleDriver {
         final double down = Math.sqrt(Math.max(reach * reach - off * off, 0.0));
         return Math.min(Math.max(leg.mantleHipY - mantle.startY - down, lowest), top);
     }
+
+    /**
+     * How much of its anchor a planted foot keeps as the body walks on past it: all of it until its
+     * hip is {@link #LET_GO_FROM} of a leg past the foot along the heading, none by
+     * {@link #LET_GO_BY}. Past that the leg would trail behind the body, and with the anchor still
+     * held the rig pulls the body back and down to reach it: the body pitches up and the hind feet
+     * sink into the top. Let go, the leg goes back under its hip on the ground route and the walk,
+     * resuming, carries it on. By distance, not time: the client ends the mantle a few ticks behind
+     * the server, still part way through walking on.
+     */
+    private float heldAfterWalkingOn(LocomotionState.LegState leg, int index, float bodyYawDeg, float unitsPerBlock) {
+        if (!leg.mantleHipValid) {
+            return 1.0f;
+        }
+        final double yaw = Math.toRadians(bodyYawDeg);
+        final double past = (leg.mantleHipX - leg.anchorX) * -Math.sin(yaw) + (leg.mantleHipZ - leg.anchorZ) * Math.cos(yaw);
+        final double reach = this.length[index] / unitsPerBlock;
+        final double from = LET_GO_FROM * reach;
+        return 1.0f - MantleProgress.smoothstep((float) ((past - from) / (LET_GO_BY * reach - from)));
+    }
+
+    /** Hip past its planted foot, as shares of the leg's length, where the foot starts and ends letting go. */
+    static final double LET_GO_FROM = 0.3;
+    static final double LET_GO_BY = 0.8;
 
     /** Share of a hind leg's length its foot reaches from the hip: a little past straight, within stretch. */
     static final double HIND_REACH = 1.05;

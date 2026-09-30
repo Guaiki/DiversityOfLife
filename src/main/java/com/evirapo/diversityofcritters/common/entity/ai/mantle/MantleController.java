@@ -10,7 +10,6 @@ import com.evirapo.diversityofcritters.common.locomotion.MantleProgress;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
@@ -69,7 +68,9 @@ public final class MantleController {
     private final LedgeSample sample = new LedgeSample();
     /** For {@link #ledgeInTheWay}, which runs inside the entity's move and must not touch {@link #sample}. */
     private final LedgeSample stepSample = new LedgeSample();
-    private final BlockPos.MutableBlockPos stepLip = new BlockPos.MutableBlockPos();
+    /** Game time {@link #ledgeInTheWay} last found a ledge the body ran into, and which way. */
+    private long blockedTick = Long.MIN_VALUE;
+    private Direction blockedToward = Direction.NORTH;
     private final MantleProgress progress = new MantleProgress();
     private final MantleMotion motion = new MantleMotion();
     private final BlockPos.MutableBlockPos lip = new BlockPos.MutableBlockPos();
@@ -156,7 +157,8 @@ public final class MantleController {
     /**
      * Starts a mantle when the path's next node is one block up and near (a slab too: vanilla puts
      * the node for standing on a slab in the block above it): the probe then decides whether there
-     * is a ledge to climb, or a step, stairs or a wall to climb instead. Call before
+     * is a ledge to climb, or a step, stairs or a wall to climb instead. Also when the path goes up
+     * and the body has just run into a ledge on the way ({@link #ledgeInTheWay}). Call before
      * the species' own climb logic, while vanilla would still step the body straight up the block.
      * Newborns never mantle.
      */
@@ -174,7 +176,18 @@ public final class MantleController {
         }
         final double dx = next.x + 0.5D - this.critter.getX();
         final double dz = next.z + 0.5D - this.critter.getZ();
-        if (dx * dx + dz * dz > PATH_NODE_RANGE_SQR) {
+        final boolean near = dx * dx + dz * dz <= PATH_NODE_RANGE_SQR;
+        // The walk up ran into a ledge the body does not step (ledgeInTheWay): climb that one, square
+        // on, whatever the node says. Otherwise nothing takes it and the body walks on the spot.
+        final boolean ranInto = this.critter.level().getGameTime() - this.blockedTick <= 1
+                && dx * this.blockedToward.getStepX() + dz * this.blockedToward.getStepZ() > 0.0D;
+        if (ranInto) {
+            LOGGER.debug("[Mantle] {} ran into a ledge {} on its way up (next node {} away)", this.critter,
+                    this.blockedToward, String.format("%.2f", Math.sqrt(dx * dx + dz * dz)));
+            // Refused, the probe stays for shouldJumpInstead: this ledge is not stepped, so it is jumped.
+            return this.tryStart(this.blockedToward.toYRot(), true);
+        }
+        if (!near) {
             return false;
         }
         final float headingYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
@@ -221,11 +234,27 @@ public final class MantleController {
      */
     public double ledgeInTheWay(double dx, double dz) {
         double lowest = Double.POSITIVE_INFINITY;
+        Direction toward = null;
         if (Math.abs(dx) > MOVING) {
-            lowest = Math.min(lowest, this.ledgeAlong(dx > 0.0 ? Direction.EAST : Direction.WEST));
+            final Direction d = dx > 0.0 ? Direction.EAST : Direction.WEST;
+            final double h = this.ledgeAlong(d);
+            if (h < lowest) {
+                lowest = h;
+                toward = d;
+            }
         }
         if (Math.abs(dz) > MOVING) {
-            lowest = Math.min(lowest, this.ledgeAlong(dz > 0.0 ? Direction.SOUTH : Direction.NORTH));
+            final Direction d = dz > 0.0 ? Direction.SOUTH : Direction.NORTH;
+            final double h = this.ledgeAlong(d);
+            if (h < lowest) {
+                lowest = h;
+                toward = d;
+            }
+        }
+        if (toward != null) {
+            // For tryStartFromPath: a path that runs into it climbs it.
+            this.blockedTick = this.critter.level().getGameTime();
+            this.blockedToward = toward;
         }
         return lowest;
     }
@@ -236,12 +265,7 @@ public final class MantleController {
     private double ledgeAlong(Direction direction) {
         LedgeSampler.sample(this.critter.level(), this.critter.position(), direction.toYRot(),
                 this.critter.getBbWidth() * 0.5f, this.critter.getBbHeight(), this.profile, this.stepSample);
-        final LedgeSample s = this.stepSample;
-        if (!s.found || this.critter.level().getBlockState(this.stepLip.set(s.lipX, s.lipBlockY, s.lipZ))
-                .is(BlockTags.STAIRS)) {
-            return Double.POSITIVE_INFINITY;
-        }
-        return s.lipHeight;
+        return this.stepSample.found ? this.stepSample.lipHeight : Double.POSITIVE_INFINITY;
     }
 
     /**
