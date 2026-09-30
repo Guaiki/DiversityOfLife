@@ -283,6 +283,29 @@ class LedgeSamplerTest {
     }
 
     @Test
+    void holeExitAtASlantIsFoundAndSquareOnIsConfident() {
+        // A one-block hole: blocks all round the body at feet level. The path's way out is diagonal,
+        // so the heading meets the wall at 40 degrees; MantleController then probes square on.
+        final Grid grid = new Grid();
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
+                if (x != 0 || z != 0) {
+                    grid.place(x, 64, z, FULL);
+                }
+            }
+        }
+        final LedgeSample slant = probe(grid, 0.5, 64.0, 0.5, 40.0f, HEIGHT);
+        assertTrue(slant.found);
+        assertEquals(Direction.SOUTH, slant.facing);
+        assertTrue(slant.confidence < PROFILE.minConfidence, "at a slant: " + slant.confidence);
+
+        final LedgeSample square = probe(grid, 0.5, 64.0, 0.5, slant.facing.toYRot(), HEIGHT);
+        assertTrue(square.found);
+        assertEquals(1.0f, square.confidence, 1.0e-6f);
+        assertEquals(slant.wallCoord, square.wallCoord, 1.0e-3);
+    }
+
+    @Test
     void confidenceIsSymmetricAcrossTheAxis() {
         final Grid grid = wideWall();
         assertEquals(probe(grid, 0.5, 64.0, 0.5, 30.0f, HEIGHT).confidence,

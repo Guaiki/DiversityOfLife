@@ -110,6 +110,7 @@ public final class MantleController {
     /**
      * Probes ahead along {@code headingYaw} and starts a mantle if there is a ledge to climb:
      * found, faced squarely enough, and not a climbable wall that carries on up (that is a climb).
+     * The body turns to face the wall square on as it starts.
      *
      * @param fromPath the path asked for it; giving up the path before rising gives up the mantle
      * @return whether a mantle started
@@ -173,23 +174,38 @@ public final class MantleController {
             return false;
         }
         final float headingYaw = (float) (Mth.atan2(dz, dx) * (180.0D / Math.PI)) - 90.0F;
-        return this.tryStart(headingYaw, true);
+        if (this.tryStart(headingYaw, true)) {
+            return true;
+        }
+        // The lip is there but was met at a slant: the next node is diagonal, as when the path cuts
+        // a corner out of a hole. Face the wall square on and climb it that way, rather than jump.
+        final LedgeSample s = this.sample;
+        if (this.probedTick == this.critter.level().getGameTime()
+                && s.found && !s.continuesUp && s.confidence < this.profile.minConfidence) {
+            return this.tryStart(s.facing.toYRot(), true);
+        }
+        return false;
     }
 
     /**
-     * Whether the body has to jump the rise ahead instead: this tick's probe met a wall and no
-     * mantle started (faced at a slant, say), and it is higher than the body walks up but no
-     * higher than it could mantle. Stairs and slabs are walked; a climbable wall that carries on
-     * up is climbed.
+     * Whether the body has to jump the rise ahead instead: this tick's probe met a wall no mantle
+     * could take even square on (the lip under too little of the body, no room on top, ...), and
+     * it is higher than the body walks up but no higher than it could mantle. Stairs and slabs are
+     * walked; a climbable wall that carries on up is climbed.
      */
     public boolean shouldJumpInstead() {
         final LedgeSample s = this.sample;
-        return !this.active
+        final boolean jump = !this.active
                 && this.probedTick == this.critter.level().getGameTime()
                 && s.hasWall()
                 && !s.continuesUp
                 && s.lipHeight > this.critter.maxUpStep()
                 && s.lipHeight <= this.profile.maxMantleHeight;
+        if (jump) {
+            LOGGER.debug("[Mantle] {} jumps instead: {}, confidence {}, lip +{}", this.critter, s.reason,
+                    String.format("%.2f", s.confidence), String.format("%.2f", s.lipHeight));
+        }
+        return jump;
     }
 
     /**

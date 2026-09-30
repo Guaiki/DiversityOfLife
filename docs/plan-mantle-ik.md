@@ -633,6 +633,11 @@ Se hace en paralelo porque una pose generada no se tunea a ciegas: cada constant
     animal delante de cada losa. Se sustituye por `MantleController.shouldJumpInstead()`: si la sonda de este
     tick vio una pared más alta que el paso (y no más que el mantle) y no arrancó mantle —de lado, por
     ejemplo—, salto vanilla (`JumpControl`). Escaleras y losas rechazadas miden ≤ 0.5: se andan.
+  - Al salir de un hueco saltaba primero y hacía el mantle después: el siguiente nodo quedaba en diagonal
+    (el path corta la esquina) y la sonda, midiendo en ese ángulo, daba confianza ~0. Ahora
+    `tryStartFromPath`, si el labio está (`found`) y sólo falla la confianza, vuelve a sondear de frente a
+    esa pared (`facing.toYRot()`) y hace el mantle así; el cuerpo gira de cara al empezar. El salto queda
+    para lo que el mantle no puede ni de frente, y lo registra en debug (`[Mantle] ... jumps instead`).
 - Colgado de un borde sin patas en el suelo: vanilla sostiene el cuerpo mientras cualquier esquina de la caja
   (0.75) toque un bloque, pero las patas del civet ocupan ~0.14 × 0.41 en el centro.
   - `FootSupport` (común, servidor): por pata, posición de reposo sacada del modelo (`Layout.CIVET`,
