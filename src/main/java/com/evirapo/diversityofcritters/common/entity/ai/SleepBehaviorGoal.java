@@ -138,6 +138,13 @@ public class SleepBehaviorGoal extends Goal {
     /** Si el despertar en curso fue forzado en vez de por haber dormido lo suyo. */
     private boolean forcedWake;
 
+    /**
+     * Esta tanda la manda un tranquilizante: dura lo que dure la sedación y no la cortan ni el daño,
+     * ni las amenazas, ni la ventana. Se marca también a mitad de una siesta natural, si la sedación
+     * le llega ya dormido. Ver {@link DiverseCritter#isSedated()}.
+     */
+    private boolean sedatedRun;
+
     public SleepBehaviorGoal(DiverseCritter entity) {
         this.entity = entity;
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.JUMP, Flag.LOOK));
@@ -161,6 +168,13 @@ public class SleepBehaviorGoal extends Goal {
         // AWAKENING => stop()— y ademas con su animacion de despertar.
         if (this.entity.getSleepState() != SleepState.AWAKE) {
             return true;
+        }
+
+        // Tranquilizante: a cualquier hora, sin ventana, sin retardo de asentarse, sin espera entre
+        // siestas ni cooldown de amenaza, y aunque esté sentado por orden. Lo único que lo frena es
+        // el agua, para no tumbarlo a ahogarse; en cuanto sale, la sedación sigue y se acuesta.
+        if (this.entity.isSedated()) {
+            return !this.entity.isInWater();
         }
 
         // Cambio de horario desde la ficha (botones sol/luna). La intencion del jugador se GUARDA en
@@ -228,6 +242,21 @@ public class SleepBehaviorGoal extends Goal {
             return this.entity.tickCount < this.phaseUntilTick;
         }
 
+        // Tanda forzada: sólo la acaba que se pase la sedación, y entonces despierta como siempre,
+        // con su clip y su espera normal antes de la siguiente siesta. El agua la interrumpe igual que
+        // a un sueño natural; canUse() la retoma al salir si queda sedación.
+        if (this.entity.isSedated()) {
+            this.sedatedRun = true;
+        }
+        if (this.sedatedRun) {
+            if (!this.entity.isSedated()) {
+                this.startWaking(false);
+            } else if (this.entity.isInWater()) {
+                this.startWaking(true);
+            }
+            return true;
+        }
+
         // La amenaza despierta igual que el dano o el agua, y por el mismo camino: AWAKENING retiene
         // al bicho hasta que el clip termina, y solo entonces stop() suelta MOVE y CritterFleeGoal
         // (prioridad 2) se lo lleva. La huida "encadenada despues del despertar" sale del reparto de
@@ -251,6 +280,7 @@ public class SleepBehaviorGoal extends Goal {
     public void start() {
         entity.getNavigation().stop();
         this.forcedWake = false;
+        this.sedatedRun = this.entity.isSedated();
         this.sleepUntilTick = this.entity.tickCount + this.randomBetween(MIN_SLEEP_TICKS, MAX_SLEEP_TICKS);
         this.rouseEarly = this.entity.getRandom().nextInt(ROUSE_SPREAD);
 
@@ -274,6 +304,7 @@ public class SleepBehaviorGoal extends Goal {
                 ? FORCED_WAKE_COOLDOWN
                 : this.randomBetween(MIN_AWAKE_TICKS, MAX_AWAKE_TICKS));
         this.forcedWake = false;
+        this.sedatedRun = false;
     }
 
     @Override

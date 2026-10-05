@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
+import com.evirapo.diversityofcritters.common.entity.util.Sedation;
 import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
 import com.evirapo.diversityofcritters.common.humidity.HumiditySystem;
 import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
@@ -249,6 +250,17 @@ public abstract class DiverseCritter extends TamableAnimal
     private final ThreatSensor threatSensor = new ThreatSensor(this);
 
     public ThreatSensor sensor() { return this.threatSensor; }
+
+    /** Tiempos del tranquilizante. Ver {@link Sedation}; quien duerme al bicho es SleepBehaviorGoal. */
+    private final Sedation sedation = new Sedation();
+
+    /** Dormido por un tranquilizante, pase lo que pase con su ciclo natural. Servidor. */
+    public boolean isSedated() { return this.sedation.isSedated(); }
+
+    /** Servidor. Lo llaman el dardo y la píldora, vía {@code TranquilizerHelper}. */
+    public Sedation.DoseResult tryTranquilize() { return this.sedation.dose(); }
+
+    public int tranquilizerCooldownTicks() { return this.sedation.cooldownTicks(); }
 
     @Override
     public @javax.annotation.Nonnull MobAnimator<DiverseCritter> animator() {
@@ -534,6 +546,9 @@ public abstract class DiverseCritter extends TamableAnimal
         pCompound.putInt("TempComfort", this.getTemperatureComfort());
         pCompound.putInt("HumidityComfort", this.getHumidityComfort());
         pCompound.putBoolean("DOCWasReleased", this.wasReleased);
+        pCompound.putInt("TranqDrowsy", this.sedation.drowsyTicks());
+        pCompound.putInt("TranqSedated", this.sedation.sedatedTicks());
+        pCompound.putInt("TranqCooldown", this.sedation.cooldownTicks());
     }
 
     private Integer loadedNbtAge = null;
@@ -604,6 +619,8 @@ public abstract class DiverseCritter extends TamableAnimal
         if (pCompound.contains("BreedCooldown")) this.breedCooldown = pCompound.getInt("BreedCooldown");
         if (pCompound.contains("TempComfort")) this.setTemperatureComfort(pCompound.getInt("TempComfort"));
         if (pCompound.contains("HumidityComfort")) this.setHumidityComfort(pCompound.getInt("HumidityComfort"));
+        this.sedation.restore(pCompound.getInt("TranqDrowsy"), pCompound.getInt("TranqSedated"),
+                pCompound.getInt("TranqCooldown"));
 
         // El contador NO se persiste a proposito. tickCount vuelve a 0 al cargar del disco, asi que
         // guardar el valor viejo daria una resta negativa enorme y la cria no se declararia huerfana
@@ -870,6 +887,8 @@ public abstract class DiverseCritter extends TamableAnimal
                 }
             }
 
+            // Aquí y no en el goal de sueño: tick() corre todos los ticks y los goals en alternos.
+            this.sedation.tick();
             this.tickTemperature();
             this.tickHumidity();
             double tempMultiplier = Math.max(getTemperatureLossMultiplier(), getHumidityLossMultiplier());
