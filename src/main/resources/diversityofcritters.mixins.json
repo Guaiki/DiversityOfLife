@@ -5,6 +5,7 @@
   "plugin": "com.evirapo.diversityofcritters.mixin.DiversityMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "PlayerScopingMixin",
     "compat.CarryOnDataMixin",
     "compat.CarryRenderHelperMixin",
     "compat.SereneSeasonsMeltMixin"

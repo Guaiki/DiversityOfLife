@@ -5,6 +5,7 @@ import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.LionEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.SquirrelEntity;
+import com.evirapo.diversityofcritters.common.entity.custom.TranquilizerDartEntity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -41,6 +42,14 @@ public class DOCEntities {
                     () -> EntityType.Builder.of(SifakaEntity::new, MobCategory.CREATURE)
                             .sized(0.75f, 0.9f)
                             .build(new ResourceLocation(DiversityOfCritters.MODID, "sifaka").toString()));
+
+    public static final RegistryObject<EntityType<TranquilizerDartEntity>> TRANQUILIZER_DART =
+            ENTITY_TYPES.register("tranquilizer_dart",
+                    () -> EntityType.Builder.<TranquilizerDartEntity>of(TranquilizerDartEntity::new, MobCategory.MISC)
+                            .sized(0.25f, 0.25f)
+                            .clientTrackingRange(4)
+                            .updateInterval(10)
+                            .build(new ResourceLocation(DiversityOfCritters.MODID, "tranquilizer_dart").toString()));
 
     public static void register(IEventBus eventBus) {
         ENTITY_TYPES.register(eventBus);

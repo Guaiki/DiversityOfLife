@@ -45,6 +45,9 @@ public class DOCEntitiesCreativeTab {
                         output.accept(DOCItems.EMPTY_NURSER_BOTTLE.get());
                         output.accept(DOCItems.FILLED_NURSER_BOTTLE.get());
                         output.accept(DOCItems.WORM.get());
+                        output.accept(DOCItems.TRANQUILIZER_RIFLE.get());
+                        output.accept(DOCItems.TRANQUILIZER_DART.get());
+                        output.accept(DOCItems.MEDICINE_PILL.get());
 
                     })
                     .build());

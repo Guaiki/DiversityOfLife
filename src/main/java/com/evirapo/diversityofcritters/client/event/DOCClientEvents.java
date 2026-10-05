@@ -7,6 +7,7 @@ import com.evirapo.diversityofcritters.client.renderer.LionRenderer;
 import com.evirapo.diversityofcritters.client.renderer.SifakaRenderer;
 import com.evirapo.diversityofcritters.client.renderer.SquirrelRenderer;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
+import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.EntityRenderersEvent;
@@ -38,5 +39,6 @@ public class DOCClientEvents {
         event.registerEntityRenderer(DOCEntities.CIVET.get(), CivetRenderer::new);
         event.registerEntityRenderer(DOCEntities.SQUIRREL.get(), SquirrelRenderer::new);
         event.registerEntityRenderer(DOCEntities.SIFAKA.get(), SifakaRenderer::new);
+        event.registerEntityRenderer(DOCEntities.TRANQUILIZER_DART.get(), ThrownItemRenderer::new);
     }
 }

@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:sugar" },
+    { "item": "minecraft:slime_ball" },
+    { "item": "minecraft:phantom_membrane" }
+  ],
+  "result": {
+    "item": "diversityofcritters:medicine_pill",
+    "count": 2
+  }
+}

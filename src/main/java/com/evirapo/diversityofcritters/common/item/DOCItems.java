@@ -5,6 +5,8 @@ import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.item.custom.BrushItem;
 import com.evirapo.diversityofcritters.common.item.custom.GauzeBandageItem;
+import com.evirapo.diversityofcritters.common.item.custom.MedicinePillItem;
+import com.evirapo.diversityofcritters.common.item.custom.TranquilizerRifleItem;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -67,6 +69,15 @@ public class DOCItems {
             () -> new Item(new Item.Properties().food(new FoodProperties.Builder()
                     .nutrition(3)
                     .saturationMod(0.1f).build())));
+
+    public static final RegistryObject<Item> TRANQUILIZER_RIFLE = ITEM_TYPES.register("tranquilizer_rifle",
+            () -> new TranquilizerRifleItem(new Item.Properties().stacksTo(1)));
+
+    public static final RegistryObject<Item> TRANQUILIZER_DART = ITEM_TYPES.register("tranquilizer_dart",
+            () -> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> MEDICINE_PILL = ITEM_TYPES.register("medicine_pill",
+            () -> new MedicinePillItem(new Item.Properties().stacksTo(16)));
 
     public static void register(IEventBus eventBus) {
         ITEM_TYPES.register(eventBus);

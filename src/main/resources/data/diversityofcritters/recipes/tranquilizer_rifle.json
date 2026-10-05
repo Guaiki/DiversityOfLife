@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "III",
+    "W  "
+  ],
+  "key": {
+    "G": { "item": "minecraft:spyglass" },
+    "I": { "item": "minecraft:iron_ingot" },
+    "W": { "tag": "minecraft:planks" }
+  },
+  "result": {
+    "item": "diversityofcritters:tranquilizer_rifle",
+    "count": 1
+  }
+}

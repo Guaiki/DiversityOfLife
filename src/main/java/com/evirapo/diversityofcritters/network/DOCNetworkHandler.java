@@ -35,5 +35,8 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, SetHumidifierMsg.class,
                 SetHumidifierMsg::encode, SetHumidifierMsg::decode, SetHumidifierMsg::handle);
+
+        CHANNEL.registerMessage(id++, FireTranquilizerMsg.class,
+                FireTranquilizerMsg::encode, FireTranquilizerMsg::decode, FireTranquilizerMsg::handle);
     }
 }

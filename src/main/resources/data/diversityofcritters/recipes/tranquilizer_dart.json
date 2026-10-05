@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "N",
+    "P",
+    "F"
+  ],
+  "key": {
+    "N": { "item": "minecraft:iron_nugget" },
+    "P": { "item": "diversityofcritters:medicine_pill" },
+    "F": { "item": "minecraft:feather" }
+  },
+  "result": {
+    "item": "diversityofcritters:tranquilizer_dart",
+    "count": 4
+  }
+}
