@@ -141,7 +141,7 @@ crea el dardo, gasta munición, pone el cooldown y reproduce el sonido.
 
 | Item | Receta |
 |---|---|
-| Rifle | con forma: `" G "`, `"III"`, `"W  "` — G catalejo, I lingote de hierro, W tablones (tag) |
+| Rifle | con forma: `" G "`, `"III"`, `" W "` — G catalejo, I lingote de hierro, W tablones (tag) |
 | Medicine Pill ×2 | sin forma: azúcar + bola de slime + membrana de phantom |
 | Dart ×4 | con forma vertical: pepita de hierro / Medicine Pill / pluma |
 
