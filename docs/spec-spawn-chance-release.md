@@ -128,7 +128,7 @@ Jugador pulsa Release en la pantalla de stats
     [spawn.civet]
         enabled = true
         # Probabilidad base de que un intento de spawn sea aceptado (0.0 - 1.0).
-        spawnChance = 0.35
+        spawnChance = 0.45
         groupMin = 2
         groupMax = 4
         minY = 55
