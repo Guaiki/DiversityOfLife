@@ -8,7 +8,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,7 +47,12 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
         if (mob.isNewborn() || !mob.isThirsty()) return false;
         this.waterPos = findWater();
         this.standPos = this.waterPos == null ? null : landNextTo(this.waterPos);
-        return this.standPos != null;
+        // Agua detras de una valla o al pie de un talud: sin camino la aproximacion se aborta y el
+        // goal se pasa el enfriamiento sin haber bebido. Mejor descartarla ya. canReach() y no
+        // "!= null": createPath devuelve un camino parcial hasta el punto mas cercano cuando no llega.
+        if (this.standPos == null) return false;
+        Path path = mob.getNavigation().createPath(this.standPos, 0);
+        return path != null && path.canReach();
     }
 
     @Override
@@ -121,16 +128,35 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
         return best;
     }
 
-    /** Casilla seca y despejada junto a {@code pos}, o {@code null} si no la hay (o no es agua). */
+    /**
+     * Donde ponerse de pie para beber de {@code pos}, o {@code null} si no hay sitio (o no es agua).
+     *
+     * <p>Antes devolvia la casilla de al lado que no tuviera fluido, y en una orilla natural esa
+     * casilla es <b>la propia tierra de la orilla</b>: un bloque solido a la altura del agua. La
+     * aproximacion mandaba al bicho dentro de ese bloque, la navegacion no encontraba camino y la
+     * actividad se abortaba en el acto, asi que de un rio o un lago solo bebia de casualidad. Ahora se
+     * busca una casilla donde quepa de pie: al nivel del agua si la orilla es llana (un cubo vaciado
+     * en el suelo), o un bloque mas arriba si la orilla es un talud.
+     */
     private @Nullable BlockPos landNextTo(BlockPos pos) {
         if (!mob.level().getFluidState(pos).is(FluidTags.WATER)) return null;
         for (Direction dir : HORIZONTALS) {
             BlockPos side = pos.relative(dir);
-            if (mob.level().getFluidState(side).isEmpty()
-                    && mob.level().getFluidState(side.above()).isEmpty()) {
-                return side;
-            }
+            if (canStandAt(side)) return side;
+            if (canStandAt(side.above())) return side.above();
         }
         return null;
+    }
+
+    /** Pies y cabeza en aire seco, y suelo firme debajo. */
+    private boolean canStandAt(BlockPos feet) {
+        Level level = mob.level();
+        BlockPos head = feet.above();
+        BlockPos ground = feet.below();
+        return level.getFluidState(feet).isEmpty()
+                && level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
+                && level.getFluidState(head).isEmpty()
+                && level.getBlockState(head).getCollisionShape(level, head).isEmpty()
+                && level.getBlockState(ground).isFaceSturdy(level, ground, Direction.UP);
     }
 }
