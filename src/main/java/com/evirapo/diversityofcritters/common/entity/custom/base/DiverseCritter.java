@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
+import com.evirapo.diversityofcritters.common.damage.DOCDamageTypes;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.entity.util.Sedation;
 import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
@@ -783,7 +784,8 @@ public abstract class DiverseCritter extends TamableAnimal
 
         if (getTemperatureZone() >= 2 && this.tickCount % TEMP_DANGER_DAMAGE_INTERVAL == 0) {
             boolean tooCold = getTemperatureTier().ordinal() < comfortTierMin().ordinal();
-            DamageSource source = tooCold ? this.damageSources().freeze() : this.damageSources().onFire();
+            DamageSource source = DOCDamageTypes.source(this.level(),
+                    tooCold ? DOCDamageTypes.HYPOTHERMIA : DOCDamageTypes.HEATSTROKE);
             this.hurt(source, TEMP_DANGER_DAMAGE);
         }
     }
@@ -836,7 +838,7 @@ public abstract class DiverseCritter extends TamableAnimal
         }
 
         if (getHumidityZone() >= 2 && this.tickCount % HUMIDITY_DANGER_DAMAGE_INTERVAL == 0) {
-            this.hurt(this.damageSources().dryOut(), HUMIDITY_DANGER_DAMAGE);
+            this.hurt(DOCDamageTypes.source(this.level(), DOCDamageTypes.HUMIDITY), HUMIDITY_DANGER_DAMAGE);
         }
     }
 
@@ -926,7 +928,15 @@ public abstract class DiverseCritter extends TamableAnimal
                 }
             }
 
-            if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8){ this.starve(); }
+            // Hunger and thirst kill through different causes because only starvation counts against
+            // the wild population. With both empty, hunger wins: it is the one that counts.
+            if (random.nextInt(10) > 8) {
+                if (this.getHunger() <= 0) {
+                    this.starve();
+                } else if (this.getThirst() <= 0) {
+                    this.dehydrate();
+                }
+            }
 
             this.tickPassiveHealing();
             this.tickCaregiverPresence();
@@ -1101,7 +1111,8 @@ public abstract class DiverseCritter extends TamableAnimal
         }
     }
 
-    protected void starve() { this.hurt(level().damageSources().starve(), 1); }
+    protected void starve() { this.hurt(DOCDamageTypes.source(this.level(), DOCDamageTypes.STARVATION), 1); }
+    protected void dehydrate() { this.hurt(DOCDamageTypes.source(this.level(), DOCDamageTypes.DEHYDRATION), 1); }
 
     public class CritterLookControl extends LookControl {
         public CritterLookControl() { super(DiverseCritter.this); }

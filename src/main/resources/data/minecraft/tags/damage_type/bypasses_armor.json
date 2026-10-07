@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "diversityofcritters:starvation",
+    "diversityofcritters:dehydration",
+    "diversityofcritters:hypothermia",
+    "diversityofcritters:heatstroke",
+    "diversityofcritters:humidity"
+  ]
+}
