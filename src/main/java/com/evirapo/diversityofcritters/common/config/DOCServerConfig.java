@@ -3,9 +3,11 @@ package com.evirapo.diversityofcritters.common.config;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.Defaults;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.SkyAccess;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.Snapshot;
+import com.evirapo.diversityofcritters.common.spawn.PopulationEvent;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -48,7 +50,14 @@ public final class DOCServerConfig {
     public static final ForgeConfigSpec.IntValue GROUP_CHECK_RADIUS;
     public static final ForgeConfigSpec.BooleanValue RELEASED_CAN_DESPAWN;
 
+    public static final ForgeConfigSpec.IntValue BASE_POPULATION;
+    public static final ForgeConfigSpec.IntValue POPULATION_FLOOR;
+    public static final ForgeConfigSpec.IntValue POPULATION_CAP;
+    public static final ForgeConfigSpec.IntValue ENDANGERED_THRESHOLD;
+    public static final ForgeConfigSpec.DoubleValue WILD_BREEDING_RATE;
+
     private static final Map<String, SpeciesSpawnSettings> SETTINGS = new LinkedHashMap<>();
+    private static final Map<PopulationEvent, ForgeConfigSpec.IntValue> WEIGHTS = new EnumMap<>(PopulationEvent.class);
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -80,6 +89,41 @@ public final class DOCServerConfig {
                          "Does not affect tamed animals nor naturally spawned ones.")
                 .define("releasedCanDespawn", true);
 
+        builder.comment("Wild population model: taming, killing and harsh habitats lower it,",
+                        "releasing and wild births raise it, and the spawn chance follows it.").push("population");
+
+        BASE_POPULATION = builder
+                .comment("Starting population of every species, and the population at which it spawns at",
+                         "exactly its base spawnChance. Each animal is worth 1/basePopulation of the base chance.")
+                .defineInRange("basePopulation", 20, 1, 1000);
+
+        POPULATION_FLOOR = builder
+                .comment("Lowest the population can fall. 0 enables true extinction: at 0 the species stops",
+                         "spawning naturally. Spawn eggs and breeding keep working regardless.")
+                .defineInRange("populationFloor", 5, 0, 1000);
+
+        POPULATION_CAP = builder
+                .comment("Highest the population can climb. With basePopulation = 20 and maxBonus = 2.0,",
+                         "60 is exactly where the spawn bonus saturates.")
+                .defineInRange("populationCap", 60, 1, 100_000);
+
+        ENDANGERED_THRESHOLD = builder
+                .comment("Below this population the species is endangered and every player is warned.")
+                .defineInRange("endangeredThreshold", 10, 0, 1000);
+
+        WILD_BREEDING_RATE = builder
+                .comment("Multiplier on how often wild animals breed. 0 = wild animals never breed.",
+                         "Captive breeding is unaffected.")
+                .defineInRange("wildBreedingRate", 1.0D, 0.0D, 10.0D);
+
+        builder.comment("How far each event moves the population. 0 = the event is not counted.").push("weights");
+        for (PopulationEvent event : PopulationEvent.values()) {
+            WEIGHTS.put(event, builder.defineInRange(event.configKey(), 1, 0, 100));
+        }
+        builder.pop();
+
+        builder.pop();
+
         SETTINGS.put("civet",    new SpeciesSpawnSettings(builder, "civet",    "banded palm civet",   CIVET_DEFAULTS));
         SETTINGS.put("sifaka",   new SpeciesSpawnSettings(builder, "sifaka",   "Verreaux's sifaka",   SIFAKA_DEFAULTS));
         SETTINGS.put("squirrel", new SpeciesSpawnSettings(builder, "squirrel", "giant flying squirrel",  SQUIRREL_DEFAULTS));
@@ -105,7 +149,17 @@ public final class DOCServerConfig {
             "squirrel", SQUIRREL_DEFAULTS.toSnapshot()
     );
 
+    private static final PopulationSettings DEFAULT_POPULATION =
+            new PopulationSettings(20, 5, 60, 10, 1.0D, defaultWeights());
+
+    private static Map<PopulationEvent, Integer> defaultWeights() {
+        Map<PopulationEvent, Integer> weights = new EnumMap<>(PopulationEvent.class);
+        for (PopulationEvent event : PopulationEvent.values()) weights.put(event, 1);
+        return Collections.unmodifiableMap(weights);
+    }
+
     private static volatile Globals globals = DEFAULT_GLOBALS;
+    private static volatile PopulationSettings population = DEFAULT_POPULATION;
     private static volatile Map<String, Snapshot> species = DEFAULT_SPECIES;
 
     /**
@@ -124,12 +178,24 @@ public final class DOCServerConfig {
         Map<String, Snapshot> baked = new LinkedHashMap<>();
         SETTINGS.forEach((key, settings) -> baked.put(key, settings.bake()));
         species = Collections.unmodifiableMap(baked);
+
+        Map<PopulationEvent, Integer> weights = new EnumMap<>(PopulationEvent.class);
+        WEIGHTS.forEach((event, value) -> weights.put(event, value.get()));
+        population = new PopulationSettings(
+                BASE_POPULATION.get(),
+                POPULATION_FLOOR.get(),
+                POPULATION_CAP.get(),
+                ENDANGERED_THRESHOLD.get(),
+                WILD_BREEDING_RATE.get(),
+                Collections.unmodifiableMap(weights)
+        );
     }
 
     /** Falls back to the defaults when a world's config is unloaded. */
     static void unbake() {
         globals = DEFAULT_GLOBALS;
         species = DEFAULT_SPECIES;
+        population = DEFAULT_POPULATION;
     }
 
     // ==============================
@@ -158,6 +224,11 @@ public final class DOCServerConfig {
         return globals.releasedCanDespawn();
     }
 
+    /** {@code [spawn.population]}. Never null: falls back to the defaults outside a world. */
+    public static PopulationSettings population() {
+        return population;
+    }
+
     // ==============================
     //       WRITE ACCESS (commands)
     // ==============================
@@ -174,6 +245,11 @@ public final class DOCServerConfig {
             throw new IllegalArgumentException("Unknown species in the spawn config: " + key);
         }
         return settings;
+    }
+
+    /** An event's weight handle, for {@code /doc_spawn set weights}. Writing only. */
+    public static ForgeConfigSpec.IntValue weightValue(PopulationEvent event) {
+        return WEIGHTS.get(event);
     }
 
     /** False before entering a world: SERVER configs do not exist until a save is open. */
