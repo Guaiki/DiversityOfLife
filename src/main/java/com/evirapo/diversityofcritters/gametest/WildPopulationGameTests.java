@@ -81,6 +81,16 @@ public final class WildPopulationGameTests {
         helper.assertTrue(actual == expected, what + ": expected " + expected + ", got " + actual);
     }
 
+    /**
+     * Clears the arena before passing. A critter left alive wanders off its 10x10 floor into the
+     * neighbouring tests, and the mantle tests are precise enough to fail on a stranger in the way.
+     * Removed by /kill rules, so it does not count against the population.
+     */
+    private static void done(GameTestHelper helper) {
+        helper.killAllEntities();
+        helper.succeed();
+    }
+
     // --- Single-tick tests, all on the civet.
 
     @GameTest(template = ARENA)
@@ -94,7 +104,7 @@ public final class WildPopulationGameTests {
 
         expect(helper, population, DOCSpecies.CIVET, START - 1, "after taming twice");
         helper.assertFalse(civet.isInWild(), "a tamed animal must leave the wild population");
-        helper.succeed();
+        done(helper);
     }
 
     @GameTest(template = ARENA)
@@ -106,7 +116,7 @@ public final class WildPopulationGameTests {
         killWith(helper, civet, DOCDamageTypes.STARVATION);
 
         expect(helper, population, DOCSpecies.CIVET, START, "spawn-egg civet tamed and starved");
-        helper.succeed();
+        done(helper);
     }
 
     @GameTest(template = ARENA)
@@ -119,7 +129,7 @@ public final class WildPopulationGameTests {
         killWith(helper, wildCivet(helper), DOCDamageTypes.HUMIDITY);
 
         expect(helper, population, DOCSpecies.CIVET, START - 4, "starvation, cold, heat and humidity");
-        helper.succeed();
+        done(helper);
     }
 
     @GameTest(template = ARENA)
@@ -134,7 +144,7 @@ public final class WildPopulationGameTests {
         killWith(helper, pet, DOCDamageTypes.STARVATION);
 
         expect(helper, population, DOCSpecies.CIVET, START, "thirst, /kill and a pet starving");
-        helper.succeed();
+        done(helper);
     }
 
     @GameTest(template = ARENA)
@@ -145,7 +155,7 @@ public final class WildPopulationGameTests {
 
         expect(helper, population, DOCSpecies.CIVET, 5, "set to 0 with the default floor");
         population.set(DOCSpecies.CIVET, START, server(helper));
-        helper.succeed();
+        done(helper);
     }
 
     // --- Births: they span ticks, so each owns a species.
@@ -184,6 +194,7 @@ public final class WildPopulationGameTests {
                 helper.assertFalse(baby.isInWild(), "a captive-born baby must not be wild");
             }
             expect(helper, population, species, expectedPopulation, "after the birth");
+            helper.killAllEntities();
         });
     }
 
