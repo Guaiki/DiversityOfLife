@@ -371,13 +371,6 @@ public class CivetEntity extends DiverseCritter
                 .setPlayCondition(a -> this.isNewborn() && this.isCrying());
     }
 
-    @Override
-    public boolean isOrderedSitPlaying() {
-        return this.animator().isPlaying("ordered_sit_enter")
-                || this.animator().isPlaying("ordered_sit_loop")
-                || this.animator().isPlaying("ordered_sit_exit");
-    }
-
     private boolean groundLocomotionAllowed() {
         return this.isAlive()
                 && !this.isNewborn()

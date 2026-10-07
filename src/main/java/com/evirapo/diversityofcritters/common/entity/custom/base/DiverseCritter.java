@@ -232,20 +232,6 @@ public abstract class DiverseCritter extends TamableAnimal
     /** Tick en que se vio por ultima vez a la cuidadora. Ver {@link #readAdditionalSaveData}. */
     private int lastCaregiverSeenTick;
 
-    public final AnimationState preparingSleepState = new AnimationState();
-    public final AnimationState sleepState = new AnimationState();
-    public final AnimationState awakeningState = new AnimationState();
-
-    public final AnimationState orderedSitStartingState = new AnimationState();
-    public final AnimationState orderedSitIdleState = new AnimationState();
-    public final AnimationState orderedSitEndingState = new AnimationState();
-
-    private boolean prevOrderedSitClient = false;
-    public int clientOrderedSitTick = 0;
-    public int clientOrderedSitEndingTick = 0;
-
-    private SleepState prevSleepState = SleepState.AWAKE;
-
     // --- ANIMACIONES (DeluxeLib) ---
     private final MobAnimator<DiverseCritter> animator = new MobAnimator<>(this);
     /** Suaviza el "se está moviendo" para que el umbral crudo no parpadee entre idle y walk. */
@@ -432,11 +418,11 @@ public abstract class DiverseCritter extends TamableAnimal
     public int getAwakeningDuration() { return 40; }
     protected boolean getDefaultDiurnal() { return true; }
 
-    public int getOrderedSitStartingDuration() { return 10; }
-    public int getOrderedSitEndingDuration() { return 20; }
-
+    /** Any of the three ordered-sit clips is playing. Read from the animator, so it holds on both sides. */
     public boolean isOrderedSitPlaying() {
-        return prevOrderedSitClient || clientOrderedSitEndingTick > 0;
+        return this.animator().isPlaying("ordered_sit_enter")
+                || this.animator().isPlaying("ordered_sit_loop")
+                || this.animator().isPlaying("ordered_sit_exit");
     }
 
     @Override
@@ -1053,11 +1039,6 @@ public abstract class DiverseCritter extends TamableAnimal
             // Last: sitting zeroes the horizontal movement above, and must not hold the body on an edge.
             this.slideOffEdge();
         }
-
-        if (this.level().isClientSide()) {
-            updateSitAnimationClient();
-            handleSleepAnimationsClient();
-        }
     }
 
     /** Something at least this far ahead of the heading (cosine) is met head on. */
@@ -1160,71 +1141,6 @@ public abstract class DiverseCritter extends TamableAnimal
         this.setPregnant(false);
         this.pregnancyTimer = 0;
         this.breedCooldown = this.wildScaledCooldown(96000 + this.random.nextInt(24000));
-    }
-
-    private void handleSleepAnimationsClient() {
-        SleepState current = getSleepState();
-
-        if (prevSleepState != current) {
-            preparingSleepState.stop();
-            sleepState.stop();
-            awakeningState.stop();
-
-            switch (current) {
-                case PREPARING -> preparingSleepState.start(this.tickCount);
-                case SLEEPING -> sleepState.start(this.tickCount);
-                case AWAKENING -> awakeningState.start(this.tickCount);
-                default -> {}
-            }
-            prevSleepState = current;
-        }
-    }
-
-    protected void updateSitAnimationClient() {
-        if (this.getSleepState() != SleepState.AWAKE) {
-            orderedSitStartingState.stop();
-            orderedSitIdleState.stop();
-            orderedSitEndingState.stop();
-            return;
-        }
-
-        boolean isOrdered = this.isOrderedToSit();
-        boolean inPose = this.isInSittingPose();
-        boolean wandering = this.isWandering();
-
-        boolean shouldSit = isOrdered || (inPose && !wandering);
-
-        if (shouldSit && !prevOrderedSitClient) {
-            this.clientOrderedSitTick = 0;
-            this.clientOrderedSitEndingTick = 0;
-        } else if (!shouldSit && prevOrderedSitClient) {
-            this.clientOrderedSitEndingTick = 1;
-            this.clientOrderedSitTick = 0;
-        }
-
-        if (shouldSit) {
-            this.clientOrderedSitTick++;
-        } else if (this.clientOrderedSitEndingTick > 0) {
-            this.clientOrderedSitEndingTick++;
-            if (this.clientOrderedSitEndingTick > getOrderedSitEndingDuration() + 1) {
-                this.clientOrderedSitEndingTick = 0;
-            }
-        }
-        this.prevOrderedSitClient = shouldSit;
-
-        boolean isStarting = shouldSit && this.clientOrderedSitTick <= getOrderedSitStartingDuration();
-        boolean isIdle     = shouldSit && this.clientOrderedSitTick > getOrderedSitStartingDuration();
-        boolean isEnding   = !shouldSit && this.clientOrderedSitEndingTick > 0;
-
-        if (isStarting || isIdle || isEnding) {
-            this.orderedSitStartingState.animateWhen(isStarting, this.tickCount);
-            this.orderedSitIdleState.animateWhen(isIdle, this.tickCount);
-            this.orderedSitEndingState.animateWhen(isEnding, this.tickCount);
-        } else {
-            this.orderedSitStartingState.stop();
-            this.orderedSitIdleState.stop();
-            this.orderedSitEndingState.stop();
-        }
     }
 
     protected void starve() { this.hurt(DOCDamageTypes.source(this.level(), DOCDamageTypes.STARVATION), 1); }
