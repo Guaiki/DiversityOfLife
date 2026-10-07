@@ -631,9 +631,16 @@ public abstract class DiverseCritter extends TamableAnimal
     public void readAdditionalSaveData(CompoundTag pCompound) {
         super.readAdditionalSaveData(pCompound);
         this.wasReleased = pCompound.getBoolean("DOCWasReleased");
-        // Animals saved before this flag existed: the wild ones are counted, the tame ones are not.
-        // super.readAdditionalSaveData() has already restored the tame state.
-        this.inWild = pCompound.contains("DOCInWild") ? pCompound.getBoolean("DOCInWild") : !this.isTame();
+        // Without the flag there are two very different cases. A full save from before the flag
+        // existed (it always carries DiverseAge): wild ones are counted, tame ones are not, and
+        // super.readAdditionalSaveData() has already restored the tame state. Or a partial tag, which
+        // is how /summon and other mods create entities: that animal never lived in the wild, so it
+        // keeps the default and is not counted.
+        if (pCompound.contains("DOCInWild")) {
+            this.inWild = pCompound.getBoolean("DOCInWild");
+        } else if (pCompound.contains("DiverseAge")) {
+            this.inWild = !this.isTame();
+        }
         this.sireOwner = pCompound.hasUUID("DOCSireOwner") ? pCompound.getUUID("DOCSireOwner") : null;
         if (pCompound.contains("DiverseAge")) {
             this.loadedNbtAge = pCompound.getInt("DiverseAge");

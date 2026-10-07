@@ -8,11 +8,13 @@ import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
 import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.damagesource.DamageType;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
@@ -144,6 +146,34 @@ public final class WildPopulationGameTests {
         killWith(helper, pet, DOCDamageTypes.STARVATION);
 
         expect(helper, population, DOCSpecies.CIVET, START, "thirst, /kill and a pet starving");
+        done(helper);
+    }
+
+    /** Builds a civet the way /summon and other mods do: by loading it from NBT. Not added to the world. */
+    private static DiverseCritter loadCivet(GameTestHelper helper, CompoundTag tag) {
+        tag.putString("id", "diversityofcritters:civet");
+        Entity entity = EntityType.loadEntityRecursive(tag, helper.getLevel(), e -> e);
+        helper.assertTrue(entity instanceof DiverseCritter, "the tag must load a civet");
+        return (DiverseCritter) entity;
+    }
+
+    @GameTest(template = ARENA)
+    public static void summonedAnimalsAreNotWild(GameTestHelper helper) {
+        floor(helper);
+        helper.assertFalse(loadCivet(helper, new CompoundTag()).isInWild(),
+                "/summon with no NBT must not count the animal as wild");
+        done(helper);
+    }
+
+    @GameTest(template = ARENA)
+    public static void untameAnimalsSavedBeforeTheFlagAreWild(GameTestHelper helper) {
+        floor(helper);
+        CompoundTag saved = new CompoundTag();
+        // A critter saved by an older version: it has the mod's state but not DOCInWild.
+        saved.putInt("DiverseAge", 0);
+        saved.putInt("Hunger", 100);
+        helper.assertTrue(loadCivet(helper, saved).isInWild(),
+                "an untamed animal saved before DOCInWild existed must stay wild");
         done(helper);
     }
 
