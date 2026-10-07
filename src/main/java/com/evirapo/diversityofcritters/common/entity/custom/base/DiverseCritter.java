@@ -16,6 +16,7 @@ import com.evirapo.diversityofcritters.common.locomotion.FootSupport;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.common.locomotion.MantleState;
 import com.evirapo.diversityofcritters.common.spawn.PopulationEvent;
+import com.evirapo.diversityofcritters.common.spawn.PopulationMath;
 import com.evirapo.diversityofcritters.common.spawn.WildDeathRules;
 import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
@@ -551,6 +552,9 @@ public abstract class DiverseCritter extends TamableAnimal
         pCompound.putInt("HumidityComfort", this.getHumidityComfort());
         pCompound.putBoolean("DOCWasReleased", this.wasReleased);
         pCompound.putBoolean("DOCInWild", this.inWild);
+        if (this.sireOwner != null) {
+            pCompound.putUUID("DOCSireOwner", this.sireOwner);
+        }
         pCompound.putInt("TranqDrowsy", this.sedation.drowsyTicks());
         pCompound.putInt("TranqSedated", this.sedation.sedatedTicks());
         pCompound.putInt("TranqCooldown", this.sedation.cooldownTicks());
@@ -591,6 +595,23 @@ public abstract class DiverseCritter extends TamableAnimal
     }
 
     /**
+     * Owner of the father, recorded at conception, absent if he was wild. With the mother's owner it
+     * decides whether the baby is born tame. Cleared at birth.
+     */
+    @Nullable
+    private UUID sireOwner;
+
+    public void setSireOwner(@Nullable UUID sireOwner) {
+        this.sireOwner = sireOwner;
+    }
+
+    /** Breeding cooldown for this animal: wild ones follow wildBreedingRate, tame ones never do. */
+    public int wildScaledCooldown(int ticks) {
+        if (this.isTame()) return ticks;
+        return PopulationMath.scaledCooldown(ticks, DOCServerConfig.population().wildBreedingRate());
+    }
+
+    /**
      * Gives released animals the despawn behaviour of wild fauna.
      *
      * Animal.removeWhenFarAway() returns false, so vanilla passive mobs (and these critters by
@@ -613,6 +634,7 @@ public abstract class DiverseCritter extends TamableAnimal
         // Animals saved before this flag existed: the wild ones are counted, the tame ones are not.
         // super.readAdditionalSaveData() has already restored the tame state.
         this.inWild = pCompound.contains("DOCInWild") ? pCompound.getBoolean("DOCInWild") : !this.isTame();
+        this.sireOwner = pCompound.hasUUID("DOCSireOwner") ? pCompound.getUUID("DOCSireOwner") : null;
         if (pCompound.contains("DiverseAge")) {
             this.loadedNbtAge = pCompound.getInt("DiverseAge");
             if (this.loadedNbtAge != null) {
@@ -1056,16 +1078,33 @@ public abstract class DiverseCritter extends TamableAnimal
             // comportamiento correcto por defecto.
             if (baby instanceof DiverseCritter cria) {
                 cria.setCaregiver(this.getUUID());
+
+                // Con algun progenitor domesticado la cria nace domesticada: nunca vivio en libertad,
+                // asi que no puede contar ni restar de la poblacion salvaje. El dueño es el de la
+                // madre o, si ella es salvaje, el del padre.
+                UUID owner = this.isTame() ? this.getOwnerUUID() : this.sireOwner;
+                if (owner != null) {
+                    cria.setTame(true);
+                    cria.setOwnerUUID(owner);
+                    cria.setInWild(false);
+                } else {
+                    cria.setInWild(true);
+                }
             }
 
             serverLevel.addFreshEntityWithPassengers(baby);
 
+            if (baby instanceof DiverseCritter cria && cria.isInWild()) {
+                WildPopulation.record(cria, PopulationEvent.WILD_BIRTH);
+            }
+
             serverLevel.broadcastEntityEvent(this, (byte) 18);
         }
 
+        this.sireOwner = null;
         this.setPregnant(false);
         this.pregnancyTimer = 0;
-        this.breedCooldown = 96000 + this.random.nextInt(24000);
+        this.breedCooldown = this.wildScaledCooldown(96000 + this.random.nextInt(24000));
     }
 
     private void handleSleepAnimationsClient() {

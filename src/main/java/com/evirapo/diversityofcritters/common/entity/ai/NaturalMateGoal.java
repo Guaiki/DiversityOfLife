@@ -1,6 +1,8 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
+import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.evirapo.diversityofcritters.common.spawn.PopulationMath;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.level.Level;
@@ -17,6 +19,8 @@ public class NaturalMateGoal extends Goal {
     private boolean bred;
 
     private static final int COURTSHIP_TICKS = 60;
+    /** One chance in this many per goal check to go looking for a mate, at wildBreedingRate 1. */
+    private static final int MATE_ROLL = 400;
     private static final double CLOSE_DISTANCE_SQ = 1.5D;
     private static final int MAX_APPROACH_TICKS = 200;
 
@@ -41,7 +45,11 @@ public class NaturalMateGoal extends Goal {
             return false;
         }
 
-        if (this.animal.getRandom().nextInt(400) != 0) {
+        // Wild animals breed at wildBreedingRate: it is the lever that balances winter deaths.
+        // Captive breeding is the player's business and keeps its own pace.
+        double rate = this.animal.isTame() ? 1.0D : DOCServerConfig.population().wildBreedingRate();
+        int bound = PopulationMath.mateRollBound(MATE_ROLL, rate);
+        if (bound <= 0 || this.animal.getRandom().nextInt(bound) != 0) {
             return false;
         }
 
@@ -113,10 +121,12 @@ public class NaturalMateGoal extends Goal {
 
         female.setPregnant(true);
         female.pregnancyTimer = DiverseCritter.PREGNANCY_TIME_TICKS;
+        // At birth the baby is tame if either parent is; the father may be gone by then.
+        female.setSireOwner(male.getOwnerUUID());
 
         int cooldown = 96000 + this.animal.getRandom().nextInt(24000);
-        female.breedCooldown = cooldown;
-        male.breedCooldown = cooldown;
+        female.breedCooldown = female.wildScaledCooldown(cooldown);
+        male.breedCooldown = male.wildScaledCooldown(cooldown);
 
         this.level.broadcastEntityEvent(female, (byte) 18);
         this.level.broadcastEntityEvent(male, (byte) 18);
