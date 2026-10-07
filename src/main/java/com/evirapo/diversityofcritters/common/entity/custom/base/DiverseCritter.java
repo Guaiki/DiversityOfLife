@@ -15,6 +15,9 @@ import com.evirapo.diversityofcritters.common.entity.ai.mantle.MantleController;
 import com.evirapo.diversityofcritters.common.locomotion.FootSupport;
 import com.evirapo.diversityofcritters.common.locomotion.ILocomotionSubject;
 import com.evirapo.diversityofcritters.common.locomotion.MantleState;
+import com.evirapo.diversityofcritters.common.spawn.PopulationEvent;
+import com.evirapo.diversityofcritters.common.spawn.WildDeathRules;
+import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.network.DOCNetworkHandler;
 import com.evirapo.diversityofcritters.network.OpenStatsScreenPacket;
 import net.darkblade.deluxelib.anim.AnimSource;
@@ -547,6 +550,7 @@ public abstract class DiverseCritter extends TamableAnimal
         pCompound.putInt("TempComfort", this.getTemperatureComfort());
         pCompound.putInt("HumidityComfort", this.getHumidityComfort());
         pCompound.putBoolean("DOCWasReleased", this.wasReleased);
+        pCompound.putBoolean("DOCInWild", this.inWild);
         pCompound.putInt("TranqDrowsy", this.sedation.drowsyTicks());
         pCompound.putInt("TranqSedated", this.sedation.sedatedTicks());
         pCompound.putInt("TranqCooldown", this.sedation.cooldownTicks());
@@ -555,11 +559,9 @@ public abstract class DiverseCritter extends TamableAnimal
     private Integer loadedNbtAge = null;
 
     /**
-     * Whether this animal has ever been returned to the wild.
-     *
-     * It serves two purposes: it stops the same individual from counting twice towards the global
-     * counter (anti-farming), and it marks the animal as wild fauna for despawn purposes.
-     * See {@link #removeWhenFarAway(double)}.
+     * Whether this animal has ever been returned to the wild. It marks the animal as wild fauna for
+     * despawn purposes, see {@link #removeWhenFarAway(double)}. Counting it towards the population
+     * is {@link #inWild}'s job.
      */
     private boolean wasReleased = false;
 
@@ -569,6 +571,23 @@ public abstract class DiverseCritter extends TamableAnimal
 
     public void setWasReleased(boolean wasReleased) {
         this.wasReleased = wasReleased;
+    }
+
+    /**
+     * Whether this animal is counted in its species' wild population.
+     *
+     * Not the same as {@code !isTame()}: an animal from a spawn egg or {@code /summon} is not tame
+     * but was never counted either, and if its death subtracted, admin tooling would corrupt the
+     * population. Server only, never synced: nothing is drawn from it.
+     */
+    private boolean inWild = false;
+
+    public boolean isInWild() {
+        return this.inWild;
+    }
+
+    public void setInWild(boolean inWild) {
+        this.inWild = inWild;
     }
 
     /**
@@ -591,6 +610,9 @@ public abstract class DiverseCritter extends TamableAnimal
     public void readAdditionalSaveData(CompoundTag pCompound) {
         super.readAdditionalSaveData(pCompound);
         this.wasReleased = pCompound.getBoolean("DOCWasReleased");
+        // Animals saved before this flag existed: the wild ones are counted, the tame ones are not.
+        // super.readAdditionalSaveData() has already restored the tame state.
+        this.inWild = pCompound.contains("DOCInWild") ? pCompound.getBoolean("DOCInWild") : !this.isTame();
         if (pCompound.contains("DiverseAge")) {
             this.loadedNbtAge = pCompound.getInt("DiverseAge");
             if (this.loadedNbtAge != null) {
@@ -1266,6 +1288,12 @@ public abstract class DiverseCritter extends TamableAnimal
             }
         }
 
+        // Natural spawns are wild animals, but they do not add to the population: they are the
+        // baseline the biome modifier already accounts for. Counting them would feed back on itself.
+        if (reason == MobSpawnType.NATURAL || reason == MobSpawnType.CHUNK_GENERATION) {
+            this.inWild = true;
+        }
+
 
         if (reason == MobSpawnType.EVENT && this.loadedNbtAge != null) {
 
@@ -1276,6 +1304,22 @@ public abstract class DiverseCritter extends TamableAnimal
         }
 
         return res;
+    }
+
+    /**
+     * Taming takes the animal out of the wild population.
+     *
+     * Hooked here and not in setTame(): TamableAnimal calls setTame(true) when it loads a tame
+     * animal from disk, which would subtract on every chunk load. tame(Player) is what every taming
+     * path in the mod goes through.
+     */
+    @Override
+    public void tame(Player pPlayer) {
+        if (!this.level().isClientSide && this.inWild) {
+            this.inWild = false;
+            WildPopulation.record(this, PopulationEvent.TAME);
+        }
+        super.tame(pPlayer);
     }
 
     @Override
@@ -1565,6 +1609,13 @@ public abstract class DiverseCritter extends TamableAnimal
     @Override
     public void die(DamageSource pDamageSource) {
         if (!this.level().isClientSide) {
+            // A tame animal was already subtracted when it was tamed; counting its death would charge
+            // the player twice. The dead/removed check guards against die() running twice.
+            if (this.inWild && !this.isTame() && !this.dead && !this.isRemoved()) {
+                PopulationEvent event = WildDeathRules.classify(pDamageSource, this.lastHurtByPlayer);
+                if (event != null) WildPopulation.record(this, event);
+            }
+
             for (DiverseCritter ward : this.level().getEntitiesOfClass(
                     DiverseCritter.class,
                     this.getBoundingBox().inflate(CAREGIVER_RANGE),

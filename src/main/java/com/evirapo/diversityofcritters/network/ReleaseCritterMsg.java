@@ -63,6 +63,7 @@ public class ReleaseCritterMsg {
             population.apply(species, PopulationEvent.RELEASE, server);
 
             critter.setWasReleased(true);
+            critter.setInWild(true);
             untame(ta);
 
             player.sendSystemMessage(feedback(ta, species, population));
