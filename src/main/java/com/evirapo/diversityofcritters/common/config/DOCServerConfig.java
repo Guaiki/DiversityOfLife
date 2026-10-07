@@ -44,9 +44,7 @@ public final class DOCServerConfig {
 
     public static final ForgeConfigSpec SPEC;
 
-    public static final ForgeConfigSpec.DoubleValue BONUS_PER_RELEASE;
     public static final ForgeConfigSpec.DoubleValue MAX_BONUS;
-    public static final ForgeConfigSpec.IntValue RELEASE_CAP;
     public static final ForgeConfigSpec.IntValue GROUP_CHECK_RADIUS;
     public static final ForgeConfigSpec.BooleanValue RELEASED_CAN_DESPAWN;
 
@@ -64,19 +62,10 @@ public final class DOCServerConfig {
 
         builder.comment("Natural spawning and the release-to-wild system.").push("spawn");
 
-        BONUS_PER_RELEASE = builder
-                .comment("Spawn bonus contributed by each released animal, as an additive multiplier.",
-                         "0.05 = +5% of the base chance per animal.")
-                .defineInRange("bonusPerRelease", 0.05D, 0.0D, 10.0D);
-
         MAX_BONUS = builder
-                .comment("Cap on the accumulated bonus. 2.0 = at most triple the base chance.")
+                .comment("Cap on the spawn bonus a thriving population gives. 2.0 = at most triple the",
+                         "base chance, reached at 3 x basePopulation.")
                 .defineInRange("maxBonus", 2.0D, 0.0D, 100.0D);
-
-        RELEASE_CAP = builder
-                .comment("Hard cap on the released-animal counter, per species.",
-                         "Once reached, releasing more animals no longer raises the counter.")
-                .defineInRange("releaseCap", 50, 0, 100_000);
 
         GROUP_CHECK_RADIUS = builder
                 .comment("Radius in blocks used to count nearby animals of the same species",
@@ -138,10 +127,9 @@ public final class DOCServerConfig {
     // ==============================
 
     /** Already-resolved global settings. */
-    public record Globals(double bonusPerRelease, double maxBonus, int releaseCap,
-                          int groupCheckRadius, boolean releasedCanDespawn) {}
+    public record Globals(double maxBonus, int groupCheckRadius, boolean releasedCanDespawn) {}
 
-    private static final Globals DEFAULT_GLOBALS = new Globals(0.05D, 2.0D, 50, 24, true);
+    private static final Globals DEFAULT_GLOBALS = new Globals(2.0D, 24, true);
 
     private static final Map<String, Snapshot> DEFAULT_SPECIES = Map.of(
             "civet",    CIVET_DEFAULTS.toSnapshot(),
@@ -168,9 +156,7 @@ public final class DOCServerConfig {
      */
     static void bake() {
         globals = new Globals(
-                BONUS_PER_RELEASE.get(),
                 MAX_BONUS.get(),
-                RELEASE_CAP.get(),
                 GROUP_CHECK_RADIUS.get(),
                 RELEASED_CAN_DESPAWN.get()
         );

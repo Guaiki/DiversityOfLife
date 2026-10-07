@@ -1,14 +1,15 @@
 package com.evirapo.diversityofcritters.common.command;
 
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
+import com.evirapo.diversityofcritters.common.config.PopulationSettings;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.SkyAccess;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.Snapshot;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
-import com.evirapo.diversityofcritters.common.spawn.ReleaseRegistry;
 import com.evirapo.diversityofcritters.common.spawn.SpawnBonusFormula;
 import com.evirapo.diversityofcritters.common.spawn.SpawnCheckResult;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
+import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -24,6 +25,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.ForgeConfigSpec;
@@ -34,8 +36,8 @@ import java.util.List;
 /**
  * {@code /doc_spawn} - diagnostic tool for the spawn system.
  *
- * It answers the two questions that come up while balancing this: "how much bonus have I built
- * up?" and "why is nothing appearing here?".
+ * It answers the two questions that come up while balancing this: "how is each species doing?"
+ * and "why is nothing appearing here?".
  */
 public class SpawnDebugCommand {
 
@@ -61,21 +63,11 @@ public class SpawnDebugCommand {
 
                 .then(Commands.literal("set")
                         // --- global settings ---
-                        .then(Commands.literal("bonusPerRelease")
-                                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0D, 10.0D))
-                                        .executes(ctx -> apply(ctx.getSource(), "bonusPerRelease",
-                                                DOCServerConfig.BONUS_PER_RELEASE,
-                                                DoubleArgumentType.getDouble(ctx, "value")))))
                         .then(Commands.literal("maxBonus")
                                 .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0D, 100.0D))
                                         .executes(ctx -> apply(ctx.getSource(), "maxBonus",
                                                 DOCServerConfig.MAX_BONUS,
                                                 DoubleArgumentType.getDouble(ctx, "value")))))
-                        .then(Commands.literal("releaseCap")
-                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 100_000))
-                                        .executes(ctx -> apply(ctx.getSource(), "releaseCap",
-                                                DOCServerConfig.RELEASE_CAP,
-                                                IntegerArgumentType.getInteger(ctx, "value")))))
                         .then(Commands.literal("groupCheckRadius")
                                 .then(Commands.argument("value", IntegerArgumentType.integer(1, 128))
                                         .executes(ctx -> apply(ctx.getSource(), "groupCheckRadius",
@@ -221,28 +213,32 @@ public class SpawnDebugCommand {
     //       SUBCOMMANDS
     // ==============================
 
-    /** Global summary: state, counter and bonus for every species. */
+    /** Global summary: state, population and chance for every species. */
     private static int summary(CommandSourceStack source) {
         DOCServerConfig.Globals globals = DOCServerConfig.globals();
+        PopulationSettings population = DOCServerConfig.population();
 
         send(source, "§e=== DOC SPAWN ===");
-        send(source, "§7bonusPerRelease=" + globals.bonusPerRelease()
+        send(source, "§7basePopulation=" + population.basePopulation()
+                + "  floor=" + population.floor()
+                + "  cap=" + population.cap()
+                + "  endangered<" + population.endangeredThreshold()
                 + "  maxBonus=" + globals.maxBonus()
-                + "  releaseCap=" + globals.releaseCap()
                 + "  groupRadius=" + globals.groupCheckRadius());
 
         for (DOCSpecies species : DOCSpecies.values()) {
             Snapshot cfg = species.settings();
-            int released = ReleaseRegistry.cachedCount(species);
-            double bonus = SpawnBonusFormula.bonus(released);
-            double finalChance = SpawnBonusFormula.finalChance(cfg.spawnChance(), released);
+            int count = WildPopulation.cachedPopulation(species);
+            double finalChance = SpawnBonusFormula.finalChance(cfg.spawnChance(), count);
 
             send(source, "");
-            send(source, "§b" + species.key() + "§r  " + (cfg.enabled() ? "§aenabled" : "§cdisabled"));
-            send(source, "  §7released: §f" + released + "/" + globals.releaseCap()
-                    + "   §7bonus: §f+" + Math.round(bonus * 100) + "%");
+            send(source, "§b" + species.key() + "§r  " + (cfg.enabled() ? "§aenabled" : "§cdisabled")
+                    + (count < population.endangeredThreshold() ? "  §6ENDANGERED" : ""));
+            send(source, "  §7population: §f" + count
+                    + " §7(floor " + population.floor() + ", cap " + population.cap() + ")"
+                    + "   §7bonus: §f" + SpawnBonusFormula.bonusLabel(count));
             if (SpawnRuleEngine.hasChanceOverride(species)) {
-                send(source, String.format("  §6chance: §f%.3f §7(OVERRIDE — bonus ignored)",
+                send(source, String.format("  §6chance: §f%.3f §7(OVERRIDE — population ignored)",
                         SpawnRuleEngine.chanceOverride(species)));
             } else {
                 send(source, String.format("  §7chance: §f%.3f §7-> §f%.3f", cfg.spawnChance(), finalChance));
@@ -261,14 +257,14 @@ public class SpawnDebugCommand {
      * Spawn and release status at the player's position.
      *
      * By default it shows only what matters to whoever is playing: whether it appears here, at what
-     * chance, how many have been released and how much bonus that grants. The filter-by-filter
+     * chance, how big the wild population is and what it does to the chance. The filter-by-filter
      * breakdown sits behind {@code details}, because that is debugging information.
      */
     private static int here(CommandSourceStack source, @Nullable DOCSpecies only, boolean detailed) {
         ServerLevel level = source.getLevel();
         Vec3 position = source.getPosition();
         BlockPos pos = BlockPos.containing(position);
-        int cap = DOCServerConfig.globals().releaseCap();
+        PopulationSettings population = DOCServerConfig.population();
 
         for (DOCSpecies species : DOCSpecies.values()) {
             if (only != null && species != only) continue;
@@ -288,12 +284,12 @@ public class SpawnDebugCommand {
 
             send(source, String.format(" §7Spawn chance:  §f%d%%",
                     Math.round(diagnostic.chanceFinal() * 100.0D)));
-            send(source, " §7Released:      §f" + diagnostic.released() + " §7/ §f" + cap);
-            send(source, String.format(" §7Release bonus: §f+%d%%",
-                    Math.round(diagnostic.bonus() * 100.0D)));
+            send(source, " §7Population:    §f" + diagnostic.population()
+                    + " §7(floor " + population.floor() + ", cap " + population.cap() + ")");
+            send(source, " §7Pop. bonus:    §f" + SpawnBonusFormula.bonusLabel(diagnostic.population()));
 
             if (SpawnRuleEngine.hasChanceOverride(species)) {
-                send(source, " §6Chance override active — the release bonus is being ignored.");
+                send(source, " §6Chance override active — the population is being ignored.");
             }
 
             if (detailed) {
@@ -309,7 +305,7 @@ public class SpawnDebugCommand {
     }
 
     /**
-     * Sets the species to maximum output: chance at 100% and the release counter at its cap.
+     * Sets the species to maximum output: chance at 100% and the population at its cap.
      *
      * The other filters (biome, height, light, ground, density) still apply. Skipping them would
      * make the animal appear in biomes that are not its own, which is exactly what we do not want
@@ -318,16 +314,17 @@ public class SpawnDebugCommand {
     private static int max(CommandSourceStack source, DOCSpecies species) {
         SpawnRuleEngine.setChanceOverride(species, 1.0D);
 
-        int cap = DOCServerConfig.globals().releaseCap();
-        if (source.getServer() != null) {
-            ReleaseRegistry.get(source.getServer()).debugSetCount(species, cap);
+        int cap = DOCServerConfig.population().cap();
+        MinecraftServer server = source.getServer();
+        if (server != null) {
+            WildPopulation.get(server).set(species, cap, server);
         }
 
         send(source, "§a" + species.key() + " set to maximum spawn.");
-        send(source, "  §7chance: §f100%§7 (override)   released: §f" + cap + "/" + cap);
+        send(source, "  §7chance: §f100%§7 (override)   population: §f" + cap);
         send(source, "  §7Biome, Y, light, ground and density filters still apply.");
         send(source, "  §7Undo with: §f/doc_spawn chance " + species.key() + " clear");
-        send(source, "  §7The release counter is persistent — clear it with: §f/doc_spawn reset "
+        send(source, "  §7The population is persistent — put it back with: §f/doc_spawn reset "
                 + species.key() + " confirm");
 
         return 1;
@@ -339,12 +336,12 @@ public class SpawnDebugCommand {
 
         if (value < 0.0D) {
             send(source, "Chance override cleared for " + species.key()
-                    + ". Back to config + release bonus.");
+                    + ". Back to config + population.");
         } else {
             send(source, String.format("§a%s spawn chance overridden to %.0f%%.",
                     species.key(), value * 100.0D));
             send(source, "  §7Temporary: not saved to the config, gone when the server stops.");
-            send(source, "  §7While set, the release bonus is ignored for this species.");
+            send(source, "  §7While set, the population is ignored for this species.");
         }
 
         return 1;
@@ -390,16 +387,17 @@ public class SpawnDebugCommand {
     }
 
     private static int reset(CommandSourceStack source, @Nullable DOCSpecies species) {
-        if (source.getServer() == null) return 0;
+        MinecraftServer server = source.getServer();
+        if (server == null) return 0;
 
-        ReleaseRegistry registry = ReleaseRegistry.get(source.getServer());
+        WildPopulation registry = WildPopulation.get(server);
 
         if (species == null) {
-            registry.resetAll();
-            send(source, "§cRelease counters reset for ALL species.");
+            registry.resetAll(server);
+            send(source, "§cPopulation reset to its base value for ALL species.");
         } else {
-            registry.reset(species);
-            send(source, "§cRelease counter reset for " + species.key() + ".");
+            registry.reset(species, server);
+            send(source, "§cPopulation of " + species.key() + " reset to " + registry.get(species) + ".");
         }
 
         return 1;

@@ -70,9 +70,10 @@
   "message.diversityofcritters.tranquilizer.not_tamed": "Medicine only works on tamed animals",
   "message.diversityofcritters.tranquilizer.no_darts": "No tranquilizer darts",
 
-  "message.diversityofcritters.release.counted": "%1$s returned to the wild. %2$s population: %3$s/%4$s (+%5$s%% spawn rate)",
-  "message.diversityofcritters.release.duplicate": "%1$s was already released before — population unchanged.",
+  "message.diversityofcritters.release.counted": "%1$s returned to the wild. %2$s population: %3$s (%4$s spawn rate)",
   "message.diversityofcritters.release.capped": "%1$s returned to the wild. The %2$s population is already at its peak.",
+  "message.diversityofcritters.population.endangered": "The %1$s is now endangered in this world (population %2$s). Breed and release them to help it recover.",
+  "message.diversityofcritters.population.recovering": "The %1$s population is recovering (population %2$s).",
 
   "key.categories.diversityofcritters.locomotion": "Diversity of Life: Locomotion Debug",
   "key.diversityofcritters.locomotion.overlay": "Toggle leg IK overlay",

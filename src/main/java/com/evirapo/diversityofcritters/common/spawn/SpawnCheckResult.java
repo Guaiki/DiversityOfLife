@@ -8,9 +8,9 @@ import net.minecraft.core.BlockPos;
  * @param species       the species that was evaluated
  * @param reason        the filter that decided the outcome
  * @param chanceBase    base chance from the config, before the bonus
- * @param bonus         bonus accumulated from releases (0.5 = +50%)
+ * @param bonus         bonus from the wild population (0.5 = +50%, -0.75 = -75%)
  * @param chanceFinal   effective chance after applying the bonus
- * @param releasedCount animals of this species released in this save
+ * @param population    wild population of this species in this save
  * @param pos           the position that was evaluated
  * @param detail        short text with the concrete value that failed, or an empty string
  */
@@ -20,7 +20,7 @@ public record SpawnCheckResult(
         double chanceBase,
         double bonus,
         double chanceFinal,
-        int releasedCount,
+        int population,
         BlockPos pos,
         String detail
 ) {

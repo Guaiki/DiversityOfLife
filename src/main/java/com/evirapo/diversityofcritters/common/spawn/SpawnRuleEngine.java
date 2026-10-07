@@ -121,19 +121,19 @@ public final class SpawnRuleEngine {
         return roll(species, cfg, pos, random);
     }
 
-    /** Final roll, modulated by the release bonus (or by the debug override). */
+    /** Final roll, modulated by the wild population (or by the debug override). */
     private static SpawnCheckResult roll(DOCSpecies species, Snapshot cfg, BlockPos pos, RandomSource random) {
-        int released = ReleaseRegistry.cachedCount(species);
+        int population = WildPopulation.cachedPopulation(species);
         double chanceBase = cfg.spawnChance();
-        double bonus = SpawnBonusFormula.bonus(released);
-        double chanceFinal = effectiveChance(species, chanceBase, released);
+        double bonus = SpawnBonusFormula.bonus(population);
+        double chanceFinal = effectiveChance(species, chanceBase, population);
 
         boolean won = random.nextDouble() < chanceFinal;
 
         return new SpawnCheckResult(
                 species,
                 won ? SpawnRejectReason.PASSED : SpawnRejectReason.CHANCE_ROLL_FAILED,
-                chanceBase, bonus, chanceFinal, released, pos.immutable(),
+                chanceBase, bonus, chanceFinal, population, pos.immutable(),
                 String.format("%.3f -> %.3f", chanceBase, chanceFinal)
         );
     }
@@ -178,13 +178,13 @@ public final class SpawnRuleEngine {
     /**
      * The chance actually used in the roll.
      *
-     * When an override is set it replaces the formula's result, so the release bonus is ignored
-     * while it is in place. That is deliberate, so that "set it to 100%" means exactly that.
+     * When an override is set it replaces the formula's result, so the population is ignored while
+     * it is in place. That is deliberate, so that "set it to 100%" means exactly that.
      */
-    private static double effectiveChance(DOCSpecies species, double chanceBase, int released) {
+    private static double effectiveChance(DOCSpecies species, double chanceBase, int population) {
         double override = chanceOverrides[species.ordinal()];
         if (override >= 0.0D) return override;
-        return SpawnBonusFormula.finalChance(chanceBase, released);
+        return SpawnBonusFormula.finalChance(chanceBase, population);
     }
 
     // ==============================
@@ -315,7 +315,7 @@ public final class SpawnRuleEngine {
     /** The full report: every filter evaluated, without short-circuiting. */
     public record SpawnDiagnostic(DOCSpecies species, BlockPos pos, List<DiagnosticLine> lines,
                                   @Nullable SpawnRejectReason firstFailure,
-                                  double chanceBase, double bonus, double chanceFinal, int released) {
+                                  double chanceBase, double bonus, double chanceFinal, int population) {
 
         public boolean wouldSpawn() {
             return this.firstFailure == null;
@@ -345,11 +345,11 @@ public final class SpawnRuleEngine {
             }
         }
 
-        int released = ReleaseRegistry.cachedCount(species);
+        int population = WildPopulation.cachedPopulation(species);
 
         return new SpawnDiagnostic(species, pos.immutable(), lines, firstFailure,
-                cfg.spawnChance(), SpawnBonusFormula.bonus(released),
-                effectiveChance(species, cfg.spawnChance(), released), released);
+                cfg.spawnChance(), SpawnBonusFormula.bonus(population),
+                effectiveChance(species, cfg.spawnChance(), population), population);
     }
 
     /** The concrete value observed by a filter that passed, so the report says more than "OK". */

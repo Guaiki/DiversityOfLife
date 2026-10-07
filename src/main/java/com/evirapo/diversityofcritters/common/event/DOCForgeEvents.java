@@ -7,7 +7,7 @@ import com.evirapo.diversityofcritters.common.command.FamilyDebugCommand;
 import com.evirapo.diversityofcritters.common.command.SetNeedsCommand;
 import com.evirapo.diversityofcritters.common.command.SetPregnancyCommand;
 import com.evirapo.diversityofcritters.common.command.SpawnDebugCommand;
-import com.evirapo.diversityofcritters.common.spawn.ReleaseRegistry;
+import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -50,9 +50,9 @@ public class DOCForgeEvents {
 
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
-        // Load the release registry at startup so its counter cache is populated before the first
-        // spawn cycle.
-        ReleaseRegistry.get(event.getServer());
+        // Load the wild population at startup so its cache is populated before the first spawn
+        // cycle.
+        WildPopulation.get(event.getServer());
 
         // Capture the server thread reference
         serverThread = Thread.currentThread();
@@ -95,7 +95,7 @@ public class DOCForgeEvents {
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         // Stops one world's counters from leaking into the next within the same session.
-        ReleaseRegistry.resetCache();
+        WildPopulation.resetCache();
         SpawnRuleEngine.clearChanceOverrides();
 
         if (watchdogTask != null) watchdogTask.cancel(false);

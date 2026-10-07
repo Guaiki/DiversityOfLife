@@ -3,7 +3,8 @@ package com.evirapo.diversityofcritters.network;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
-import com.evirapo.diversityofcritters.common.spawn.ReleaseRegistry;
+import com.evirapo.diversityofcritters.common.spawn.PopulationEvent;
+import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.common.spawn.SpawnBonusFormula;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -55,19 +56,16 @@ public class ReleaseCritterMsg {
                 return;
             }
 
-            ReleaseRegistry registry = ReleaseRegistry.get(server);
-
-            // Twofold anti-farming safeguard: the entity's own flag saves us from touching the
-            // registry in the common case, and the registry covers animals saved before the flag
-            // existed.
-            ReleaseRegistry.Result result = critter.wasReleased()
-                    ? ReleaseRegistry.Result.DUPLICATE
-                    : registry.register(species, ta.getUUID());
+            // No per-animal anti-farming needed any more: taming took this animal out of the
+            // population, releasing puts it back. Tame-release loops net zero. What really adds is
+            // releasing an animal born in captivity, which is the point; the cap bounds it.
+            WildPopulation population = WildPopulation.get(server);
+            population.apply(species, PopulationEvent.RELEASE, server);
 
             critter.setWasReleased(true);
             untame(ta);
 
-            player.sendSystemMessage(feedback(result, ta, species, registry));
+            player.sendSystemMessage(feedback(ta, species, population));
         });
         ctx.get().setPacketHandled(true);
     }
@@ -86,22 +84,16 @@ public class ReleaseCritterMsg {
         ta.setInSittingPose(false);
     }
 
-    private static Component feedback(ReleaseRegistry.Result result, TamableAnimal ta,
-                                      DOCSpecies species, ReleaseRegistry registry) {
+    private static Component feedback(TamableAnimal ta, DOCSpecies species, WildPopulation population) {
         Component name = ta.getDisplayName();
+        int count = population.get(species);
 
-        return switch (result) {
-            case COUNTED -> {
-                int count = registry.getCount(species);
-                int cap = DOCServerConfig.globals().releaseCap();
-                int bonusPercent = (int) Math.round(SpawnBonusFormula.bonus(count) * 100.0D);
-
-                yield Component.translatable("message.diversityofcritters.release.counted",
-                        name, species.displayName(), count, cap, bonusPercent);
-            }
-            case DUPLICATE -> Component.translatable("message.diversityofcritters.release.duplicate", name);
-            case CAPPED -> Component.translatable("message.diversityofcritters.release.capped",
+        if (count >= DOCServerConfig.population().cap()) {
+            return Component.translatable("message.diversityofcritters.release.capped",
                     name, species.displayName());
-        };
+        }
+
+        return Component.translatable("message.diversityofcritters.release.counted",
+                name, species.displayName(), count, SpawnBonusFormula.bonusLabel(count));
     }
 }
