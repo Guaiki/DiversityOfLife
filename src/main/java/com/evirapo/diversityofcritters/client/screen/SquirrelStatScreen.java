@@ -344,15 +344,10 @@ public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
         Component ageVal = Component.translatable("screen.diversityofcritters.is_baby." + entity.isBaby());
         Component ageKey = Component.translatable("screen.diversityofcritters.age");
 
-        int tempZone = entity.getTemperatureZone();
-        String tempZoneName = tempZone == 0 ? "Comfort" : (tempZone == 1 ? "Stress" : "Danger");
-        int tempColor = tempZone == 0 ? 0x55FF55 : (tempZone == 1 ? 0xFFFF55 : 0xFF5555);
-        String temp = "Temp: " + entity.getTemperatureTier().getDisplayName() + " (" + tempZoneName + ")";
-
-        int humidityZone = entity.getHumidityZone();
-        String humidityZoneName = humidityZone == 0 ? "Comfort" : (humidityZone == 1 ? "Stress" : "Danger");
-        int humidityColor = humidityZone == 0 ? 0x55FF55 : (humidityZone == 1 ? 0xFFFF55 : 0xFF5555);
-        String humidity = "Humidity: " + entity.getHumidityTier().getDisplayName() + " (" + humidityZoneName + ")";
+        ClimateLine tempLine = ClimateLine.of("Temp", entity.getTemperatureTier().getDisplayName(),
+                entity.getTemperatureZone(), entity.climateEnabled(), INFO_TEXT_COLOR);
+        ClimateLine humidityLine = ClimateLine.of("Humidity", entity.getHumidityTier().getDisplayName(),
+                entity.getHumidityZone(), entity.climateEnabled(), INFO_TEXT_COLOR);
 
         String[] info = {
                 "Petaurista alborufus",
@@ -361,12 +356,12 @@ public class SquirrelStatScreen extends AbstractContainerScreen<DOCStatsMenu> {
                 "Morph: " + morphName + " (" + morphIdx + ")",
                 "Breeding: " + (entity.canBreed() ? "ON" : "OFF"),
                 "Status: " + (entity.isTame() ? "Tamed" : "Wild"),
-                temp,
-                humidity,
+                tempLine.text(),
+                humidityLine.text(),
         };
         int[] infoColors = {
                 INFO_TEXT_COLOR, INFO_TEXT_COLOR, INFO_TEXT_COLOR, INFO_TEXT_COLOR,
-                INFO_TEXT_COLOR, INFO_TEXT_COLOR, tempColor, humidityColor,
+                INFO_TEXT_COLOR, INFO_TEXT_COLOR, tempLine.color(), humidityLine.color(),
         };
 
         float lineH = infoLineHeight(sy, info.length);
