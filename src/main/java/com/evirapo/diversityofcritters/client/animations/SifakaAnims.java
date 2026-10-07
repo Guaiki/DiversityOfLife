@@ -162,7 +162,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition SniffRight = AnimationDefinition.Builder.withLength(2.0F).looping()
+	public static final AnimationDefinition SniffRight = AnimationDefinition.Builder.withLength(2.0F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 			new Keyframe(1.4375F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -295,7 +295,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition SniffRight2 = AnimationDefinition.Builder.withLength(2.0F).looping()
+	public static final AnimationDefinition SniffRight2 = AnimationDefinition.Builder.withLength(2.0F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 			new Keyframe(1.4375F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
@@ -784,7 +784,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition LAY_STARTING = AnimationDefinition.Builder.withLength(1.0F).looping()
+	public static final AnimationDefinition LAY_STARTING = AnimationDefinition.Builder.withLength(1.0F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.CATMULLROM),
 			new Keyframe(1.0F, KeyframeAnimations.degreeVec(0.0F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
@@ -2083,7 +2083,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition DRINK_STARTING = AnimationDefinition.Builder.withLength(0.25F).looping()
+	public static final AnimationDefinition DRINK_STARTING = AnimationDefinition.Builder.withLength(0.25F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
 			new Keyframe(0.25F, KeyframeAnimations.degreeVec(102.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
@@ -2263,7 +2263,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition DRINK_ENDING = AnimationDefinition.Builder.withLength(0.25F).looping()
+	public static final AnimationDefinition DRINK_ENDING = AnimationDefinition.Builder.withLength(0.25F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(102.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
 			new Keyframe(0.25F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
@@ -2394,7 +2394,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition EATING_STARTING  = AnimationDefinition.Builder.withLength(0.25F).looping()
+	public static final AnimationDefinition EATING_STARTING  = AnimationDefinition.Builder.withLength(0.25F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.0F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR),
 			new Keyframe(0.25F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
@@ -2493,7 +2493,7 @@ public class SifakaAnims {
 		))
 		.build();
 
-	public static final AnimationDefinition EATING_ENDING = AnimationDefinition.Builder.withLength(0.25F).looping()
+	public static final AnimationDefinition EATING_ENDING = AnimationDefinition.Builder.withLength(0.25F)
 		.addAnimation("Body", new AnimationChannel(AnimationChannel.Targets.ROTATION, 
 			new Keyframe(0.25F, KeyframeAnimations.degreeVec(12.5F, 0.0F, 0.0F), AnimationChannel.Interpolations.LINEAR)
 		))
