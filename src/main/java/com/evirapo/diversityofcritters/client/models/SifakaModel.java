@@ -1,21 +1,32 @@
 package com.evirapo.diversityofcritters.client.models;
 
-import com.evirapo.diversityofcritters.client.animations.SifakaAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.animation.AnimationDefinition;
-import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.HierarchicalModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
-import net.minecraft.world.entity.AnimationState;
-import org.joml.Vector3f;
+import net.darkblade.deluxelib.anim.Animation;
+import net.darkblade.deluxelib.anim.MobAnimator;
+import net.darkblade.deluxelib.client.anim.AnimBlend;
+import net.darkblade.deluxelib.client.rig.AnimContext;
+import net.darkblade.deluxelib.client.rig.component.LookAtAdditive;
+
+import java.util.Set;
 
 public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
-	private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
+	/** The head follows what it looks at only in these; any other pose owns the head. */
+	private static final Set<String> HEAD_TRACKING_ANIMS = Set.of("idle", "walk", "run", "ordered_sit_loop");
+
+	private final LookAtAdditive<T, SifakaModel<T>> lookAt =
+			new LookAtAdditive<T, SifakaModel<T>>(m -> m.Head, 75.0F, 40.0F)
+					.enabledWhile(entity -> {
+						Animation current = entity.animator().getCurrent(0);
+						return current != MobAnimator.EMPTY
+								&& HEAD_TRACKING_ANIMS.contains(current.getName());
+					});
 
 	private final ModelPart meshRoot;
 	private final ModelPart Thewholesifakamodel;
@@ -130,104 +141,23 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 	}
 
 	@Override
-	public void setupAnim(SifakaEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+	public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
 		this.root().getAllParts().forEach(ModelPart::resetPose);
 
-		boolean sleepingLike      = entity.getSleepState() != DiverseCritter.SleepState.AWAKE;
-		boolean orderedSitPlaying = entity.isOrderedSitPlaying();
+		float headScale = entity.isJuvenile() ? 1.05F : 1.0F;
+		this.Head.xScale = headScale;
+		this.Head.yScale = headScale;
+		this.Head.zScale = headScale;
 
-		if (entity.isJuvenile()) {
-			this.Head.xScale = 1.05F;
-			this.Head.yScale = 1.05F;
-			this.Head.zScale = 1.05F;
-		} else {
-			this.Head.xScale = 1.0F;
-			this.Head.yScale = 1.0F;
-			this.Head.zScale = 1.0F;
+		AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 0);
+		this.lookAt.apply(entity, this, AnimContext.of(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch));
+
+		// Render offset, not a keyframe: the swim clip is authored on land height.
+		if (entity.isInWaterOrBubble() && !entity.isClimbing()
+				&& entity.getSleepState() == DiverseCritter.SleepState.AWAKE) {
+			this.Thewholesifakamodel.y += 4.0F;
+			this.Head.xRot -= 0.3F;
 		}
-
-		this.animate(entity.preparingSleepState, SifakaAnims.preparing_sleep, ageInTicks, 1f);
-		this.animate(entity.sleepState,          SifakaAnims.Sleep,           ageInTicks, 1f);
-		this.animate(entity.awakeningState,      SifakaAnims.awakening,       ageInTicks, 1f);
-
-		if (sleepingLike) {
-			limbSwing = 0f;
-			limbSwingAmount = 0f;
-			return;
-		}
-
-		boolean climbing = entity.isClimbing();
-
-		if (orderedSitPlaying) {
-			limbSwing = 0f;
-			limbSwingAmount = 0f;
-			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
-			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
-		}
-
-		if (!climbing && (entity.idleAnimationState.isStarted() || limbSwingAmount > 0.01f)) {
-			this.Head.xRot = headPitch * ((float)Math.PI / 180F);
-			this.Head.yRot = netHeadYaw * ((float)Math.PI / 180F);
-		}
-
-		if (climbing) {
-			this.animate(entity.climbingUpState,   SifakaAnims.CLIMBING_UP,   ageInTicks, 1.0F);
-			this.animate(entity.climbingDownState, SifakaAnims.CLIMBING_DOWN, ageInTicks, 1.0F);
-			this.animate(entity.climbIdleState,    SifakaAnims.CLIMB_IDLE,    ageInTicks, 1.0F);
-		} else {
-			if (entity.isInWaterOrBubble()) {
-				float swimSpeedFactor = 1.0F + limbSwingAmount;
-				this.animate(entity.swimAnimationState, SifakaAnims.Swim, ageInTicks, swimSpeedFactor);
-				this.Thewholesifakamodel.y += 4.0F;
-				this.Head.xRot -= 0.3F;
-			} else {
-				boolean busyBodyAnim = entity.isCleaning()
-				                   || entity.IsDrinking()
-				                   || entity.isVariantActive;
-
-				float moveFraction = Math.min(1.0F, limbSwingAmount * 4.0F);
-				float idleWeight   = busyBodyAnim ? 0.0F : (1.0F - moveFraction) * (1.0F - moveFraction);
-				float sprintWeight = entity.sprintProgress;
-				float walkWeight   = 1.0F - sprintWeight;
-
-				if (idleWeight > 0.01F) {
-					this.animateWithWeight(entity.idleAnimationState, SifakaAnims.Idle, ageInTicks, idleWeight);
-				}
-				if (walkWeight > 0.01F) {
-					this.animateHop(SifakaAnims.Walk, ageInTicks, limbSwingAmount, walkWeight);
-				}
-				if (sprintWeight > 0.01F) {
-					this.animateHop(SifakaAnims.Run, ageInTicks, limbSwingAmount, sprintWeight);
-				}
-
-				this.animate(entity.idleStandUpState,    SifakaAnims.stand_up,    ageInTicks, 1.0F);
-				this.animate(entity.idleSniffLeftState,  SifakaAnims.SniffRight,  ageInTicks, 1.0F);
-				this.animate(entity.idleSniffRightState, SifakaAnims.SniffRight2, ageInTicks, 1.0F);
-
-				this.animate(entity.idleSitStartingState, SifakaAnims.SIT_STARTING, ageInTicks, 1.0F);
-				this.animate(entity.idleSitState,         SifakaAnims.SIT_IDLE,     ageInTicks, 1.0F);
-				this.animate(entity.idleSitEndingState,   SifakaAnims.SIT_ENDING,   ageInTicks, 1.0F);
-
-				this.animate(entity.idleLayStartingState, SifakaAnims.LAY_STARTING, ageInTicks, 1.0F);
-				this.animate(entity.idleLayState,         SifakaAnims.LAY_IDLE,     ageInTicks, 1.0F);
-				this.animate(entity.idleLayEndingState,   SifakaAnims.LAY_ENDING,   ageInTicks, 1.0F);
-			}
-		}
-
-		this.animate(entity.cleanStartingState,   SifakaAnims.GROOMING_STARTING, ageInTicks, 1.0F);
-		this.animate(entity.cleanIdleState,       SifakaAnims.GROOMING_IDLE,     ageInTicks, 1.0F);
-		this.animate(entity.cleanEndingState,     SifakaAnims.GROOMING_ENDING,   ageInTicks, 1.0F);
-		this.animate(entity.attackAnimationState, SifakaAnims.Attack,            ageInTicks, 1.0F);
-		this.animate(entity.eatPlantStartingState,  SifakaAnims.EATING_STARTING,   ageInTicks, 1.0F);
-		this.animate(entity.eatPlantIdleState,      SifakaAnims.EATING_IDLE,       ageInTicks, 1.0F);
-		this.animate(entity.eatPlantEndingState,    SifakaAnims.EATING_ENDING,     ageInTicks, 1.0F);
-		this.animate(entity.drinkStartingState,   SifakaAnims.DRINK_STARTING,    ageInTicks, 1.0F);
-		this.animate(entity.drinkIdleState,       SifakaAnims.DRINK_IDLE,        ageInTicks, 1.0F);
-		this.animate(entity.drinkEndingState,     SifakaAnims.DRINK_ENDING,      ageInTicks, 1.0F);
-
-		this.animate(entity.orderedSitStartingState, SifakaAnims.SIT_STARTING, ageInTicks, 1.0F);
-		this.animate(entity.orderedSitIdleState,     SifakaAnims.SIT_IDLE,     ageInTicks, 1.0F);
-		this.animate(entity.orderedSitEndingState,   SifakaAnims.SIT_ENDING,   ageInTicks, 1.0F);
 	}
 
 	@Override
@@ -255,18 +185,5 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 		this.Body.translateAndRotate(poseStack);
 		this.Rightarm.translateAndRotate(poseStack);
 		poseStack.translate(0.45, 0.0, -0.45);
-	}
-
-	private void animateWithWeight(AnimationState state, AnimationDefinition definition,
-	                               float ageInTicks, float weight) {
-		state.updateTime(ageInTicks, 1.0F);
-		state.ifStarted(s -> KeyframeAnimations.animate(
-				this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
-	}
-
-	private void animateHop(AnimationDefinition definition, float ageInTicks, float limbSwingAmount, float weight) {
-		long time        = (long)(ageInTicks * 50.0F * 0.5F);
-		float finalScale = Math.min(limbSwingAmount * 2.5F, 1.0F) * weight;
-		KeyframeAnimations.animate(this, definition, time, finalScale, ANIMATION_VECTOR_CACHE);
 	}
 }

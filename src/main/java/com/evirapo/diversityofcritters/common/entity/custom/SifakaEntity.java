@@ -1,5 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.custom;
 
+import com.evirapo.diversityofcritters.client.animations.SifakaAnims;
+import com.evirapo.diversityofcritters.client.animations.SifakaBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.ai.*;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -8,6 +10,9 @@ import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
+import net.darkblade.deluxelib.anim.AnimSource;
+import net.darkblade.deluxelib.anim.Loop;
+import net.darkblade.deluxelib.anim.StandardAnimation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -71,34 +76,6 @@ public class SifakaEntity extends DiverseCritter {
         return com.evirapo.diversityofcritters.common.humidity.HumidityTier.MODERATE;
     }
 
-    public final AnimationState idleAnimationState    = new AnimationState();
-    public final AnimationState idleStandUpState      = new AnimationState();
-    public final AnimationState idleSniffLeftState    = new AnimationState();
-    public final AnimationState idleSniffRightState   = new AnimationState();
-    public final AnimationState idleSitStartingState  = new AnimationState();
-    public final AnimationState idleSitState          = new AnimationState();
-    public final AnimationState idleSitEndingState    = new AnimationState();
-    public final AnimationState idleLayStartingState  = new AnimationState();
-    public final AnimationState idleLayState          = new AnimationState();
-    public final AnimationState idleLayEndingState    = new AnimationState();
-    public final AnimationState climbIdleState        = new AnimationState();
-    public final AnimationState climbingUpState       = new AnimationState();
-    public final AnimationState climbingDownState     = new AnimationState();
-    public final AnimationState attackAnimationState  = new AnimationState();
-    public final AnimationState drinkStartingState    = new AnimationState();
-    public final AnimationState drinkIdleState        = new AnimationState();
-    public final AnimationState drinkEndingState      = new AnimationState();
-    public final AnimationState cleanStartingState    = new AnimationState();
-    public final AnimationState cleanIdleState        = new AnimationState();
-    public final AnimationState cleanEndingState      = new AnimationState();
-    public final AnimationState preparingCryState     = new AnimationState();
-    public final AnimationState cryingState           = new AnimationState();
-    public final AnimationState stoppingCryState      = new AnimationState();
-    public final AnimationState eatPlantStartingState = new AnimationState();
-    public final AnimationState eatPlantIdleState     = new AnimationState();
-    public final AnimationState eatPlantEndingState   = new AnimationState();
-    public final AnimationState swimAnimationState    = new AnimationState();
-
     private static final EntityDataAccessor<Byte>    CLIMB_STATE   = SynchedEntityData.defineId(SifakaEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Float>   CLIMB_FACING_YAW = SynchedEntityData.defineId(SifakaEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean>   IS_EATING_PLANT = SynchedEntityData.defineId(SifakaEntity.class, EntityDataSerializers.BOOLEAN);
@@ -109,27 +86,7 @@ public class SifakaEntity extends DiverseCritter {
     public static final byte CLIMB_DOWN = 2;
     public static final byte CLIMB_HANG = 3;
 
-    private CritterEatItemGoal forFoodGoal;
     private int tamingFeedsLeft = 0;
-    private int cryTimer = 0;
-    private int stopCryTimer = 0;
-    private boolean wasCryingClient = false;
-
-    private IdleVariant prevClientVariant = IdleVariant.NONE;
-    private int clientIdleTick = 0;
-
-    private boolean prevCleaningClient = false;
-    private int clientCleanTick = 0;
-    private int clientCleanEndingTick = 0;
-
-    private boolean prevDrinkingClient = false;
-    private int clientDrinkTick = 0;
-    private int clientDrinkEndingTick = 0;
-
-    private boolean prevEatingPlantClient = false;
-    private int clientEatPlantTick = 0;
-    private int clientEatPlantEndingTick = 0;
-
     private boolean climbRewardArmed = false;
     private int climbRewardCooldown = 0;
 
@@ -137,9 +94,6 @@ public class SifakaEntity extends DiverseCritter {
     private static final int   HOP_INTERVAL      = 10;
     private static final float HOP_POWER         = 0.38F;
     private static final float HOP_HORIZ_BOOST   = 1.6F;
-
-    public float sprintProgress = 0.0F;
-    public boolean isVariantActive = false;
 
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
@@ -149,7 +103,6 @@ public class SifakaEntity extends DiverseCritter {
         super(pEntityType, pLevel);
         this.setMaxUpStep(1);
         this.moveControl = new SifakaMoveControl(this);
-        this.idleAnimationState.start(0);
     }
 
     @Override
@@ -180,9 +133,9 @@ public class SifakaEntity extends DiverseCritter {
         this.goalSelector.addGoal(0, new CustomFloatGoal(this));
         this.goalSelector.addGoal(1, new SleepBehaviorGoal(this));
 
-        this.goalSelector.addGoal(2, new BabyCryGoal(this));
+        this.goalSelector.addGoal(2, new CritterCryChainGoal(this));
         this.goalSelector.addGoal(2, new FindCryingBabyGoal(this, 1.4D, 24.0D));
-        this.goalSelector.addGoal(3, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(3, new CritterOrderedSitGoal(this));
         this.goalSelector.addGoal(4, new NaturalMateGoal(this, 1.0D));
 
         // Solo domesticados: en un salvaje pelearia con la alerta por el flag MOVE, tirando del bicho
@@ -203,18 +156,17 @@ public class SifakaEntity extends DiverseCritter {
             @Override public boolean canContinueToUse() { return isFollowing() && super.canContinueToUse(); }
         });
 
-        this.goalSelector.addGoal(8, new CritterCleanGoal(this));
+        this.goalSelector.addGoal(8, new CritterCleanChainGoal(this));
         this.goalSelector.addGoal(9, new CritterMotherCleanBabyGoal<>(this, SifakaEntity.class, 1.2D, 16.0D));
-        this.forFoodGoal = new CritterEatItemGoal(this, DoCTags.Items.SIFAKA_FOOD);
-        this.goalSelector.addGoal(10, this.forFoodGoal);
+        this.goalSelector.addGoal(10, new CritterEatItemChainGoal(this, DoCTags.Items.SIFAKA_FOOD));
 
         this.goalSelector.addGoal(11, new FindFoodBowlGoal(this, 1.1D, 16));
         this.goalSelector.addGoal(12, new FindWaterBowlGoal(this, 1.1D, 16));
-        this.goalSelector.addGoal(13, new CritterDrinkGoal(this));
-        this.goalSelector.addGoal(14, new SifakaEatPlantGoal(this, 1.1D, 12));
+        this.goalSelector.addGoal(13, new CritterDrinkChainGoal(this));
+        this.goalSelector.addGoal(14, new SifakaEatLeavesChainGoal(this, 1.1D, 12));
         this.goalSelector.addGoal(16, new SifakaClimbGoal(this, 1.1D, 16));
 
-        this.goalSelector.addGoal(17, new CritterIdleGoal(this));
+        this.goalSelector.addGoal(17, new CritterIdleVariantGoal(this));
         this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
         this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
@@ -225,6 +177,157 @@ public class SifakaEntity extends DiverseCritter {
         });
         this.goalSelector.addGoal(20, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(21, new RandomLookAroundGoal(this));
+
+        // Gestos sueltos con el mismo sorteo que la civeta y la ardilla; sentarse y tumbarse los
+        // lleva CritterIdleVariantGoal.
+        this.goalSelector.addGoal(22, new CritterIdleGestureGoal(this, 120, 120)
+                .add(IdleVariant.STRETCH, "stretch", 20)
+                .add(IdleVariant.SNIFF_LEFT, "sniff_left", 25)
+                .add(IdleVariant.SNIFF_RIGHT, "sniff_right", 25)
+                .condition(c -> !this.isClimbing()));
+    }
+
+    // --- ANIMACIONES ---
+
+    @Override
+    public void registerAnimations() {
+        StandardAnimation idle = new StandardAnimation("idle",
+                new AnimSource(() -> SifakaAnims.Idle), Loop.REPEATING, LAYER_ADULT, 9, 2.0F);
+        // El modelo viejo muestreaba la marcha a media velocidad (ageInTicks * 25 ms): mismo ritmo.
+        StandardAnimation walk = new StandardAnimation("walk",
+                new AnimSource(() -> SifakaAnims.Walk), Loop.REPEATING, LAYER_ADULT, 8, 2.0F);
+        StandardAnimation run = new StandardAnimation("run",
+                new AnimSource(() -> SifakaAnims.Run), Loop.REPEATING, LAYER_ADULT, 7, 2.0F);
+
+        idle.blendInMs(250).blendOutMs(150);
+        walk.blendInMs(150).blendOutMs(150).playbackSpeed(0.5F);
+        run.blendInMs(150).blendOutMs(150).playbackSpeed(0.5F);
+
+        idle.setPlayCondition(a -> groundLocomotionAllowed() && !this.isMoving());
+        walk.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && !this.isSprinting());
+        run.setPlayCondition(a -> groundLocomotionAllowed() && this.isMoving() && this.isSprinting());
+
+        StandardAnimation sitEnter = new StandardAnimation("ordered_sit_enter",
+                new AnimSource(() -> SifakaAnims.SIT_STARTING), Loop.PLAY_ONCE, LAYER_ADULT, P_ORDERED_SIT, 0.5F);
+        StandardAnimation sitLoop = new StandardAnimation("ordered_sit_loop",
+                new AnimSource(() -> SifakaAnims.SIT_IDLE), Loop.REPEATING, LAYER_ADULT, P_ORDERED_SIT, 5.0F);
+        StandardAnimation sitExit = new StandardAnimation("ordered_sit_exit",
+                new AnimSource(() -> SifakaAnims.SIT_ENDING), Loop.PLAY_ONCE, LAYER_ADULT, P_ORDERED_SIT, 0.5F);
+
+        sitEnter.blendInMs(150).blendOutMs(120).setNextAnimation("ordered_sit_loop");
+        sitLoop.blendInMs(120).blendOutMs(150);
+        sitLoop.setPlayCondition(a -> this.isOrderedToSit());
+        sitExit.blendInMs(120).blendOutMs(200).locksMovement();
+
+        this.animator().register(idle, walk, run, sitEnter, sitLoop, sitExit);
+
+        registerChain("drink", () -> SifakaAnims.DRINK_STARTING, 0.25F,
+                () -> SifakaAnims.DRINK_IDLE, 1.0F,
+                () -> SifakaAnims.DRINK_ENDING, 0.25F, P_ACTIVITY)
+                .setPlayCondition(a -> this.IsDrinking());
+
+        registerChain("clean", () -> SifakaAnims.GROOMING_STARTING, 0.5F,
+                () -> SifakaAnims.GROOMING_IDLE, 0.5F,
+                () -> SifakaAnims.GROOMING_ENDING, 0.5F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isCleaning());
+
+        registerChain("eat", () -> SifakaAnims.EATING_STARTING, 0.25F,
+                () -> SifakaAnims.EATING_IDLE, 0.5F,
+                () -> SifakaAnims.EATING_ENDING, 0.25F, P_ACTIVITY)
+                .setPlayCondition(a -> this.isEatingPlant());
+
+        // Same mapping the old client state machine used: STRETCH played stand_up, and the two sniffs
+        // played SniffRight / SniffRight2.
+        registerSingle("stretch", () -> SifakaAnims.stand_up, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STRETCH);
+        registerSingle("sniff_left", () -> SifakaAnims.SniffRight, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_LEFT);
+        registerSingle("sniff_right", () -> SifakaAnims.SniffRight2, 2.0F, Loop.PLAY_ONCE, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SNIFF_RIGHT);
+
+        registerChain("idle_sit", () -> SifakaAnims.SIT_STARTING, 0.5F,
+                () -> SifakaAnims.SIT_IDLE, 5.0F,
+                () -> SifakaAnims.SIT_ENDING, 0.5F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.SIT);
+
+        registerChain("idle_stand_up", () -> SifakaAnims.LAY_STARTING, 1.0F,
+                () -> SifakaAnims.LAY_IDLE, 1.0F,
+                () -> SifakaAnims.LAY_ENDING, 1.0F, P_IDLE_VARIANT)
+                .setPlayCondition(a -> this.getIdleVariant() == IdleVariant.STAND_UP);
+
+        StandardAnimation climbUp = new StandardAnimation("climb_up",
+                new AnimSource(() -> SifakaAnims.CLIMBING_UP), Loop.REPEATING, LAYER_ADULT, P_CLIMB, 1.0F);
+        StandardAnimation climbDown = new StandardAnimation("climb_down",
+                new AnimSource(() -> SifakaAnims.CLIMBING_DOWN), Loop.REPEATING, LAYER_ADULT, P_CLIMB, 1.0F);
+        StandardAnimation climbHang = new StandardAnimation("climb_hang",
+                new AnimSource(() -> SifakaAnims.CLIMB_IDLE), Loop.REPEATING, LAYER_ADULT, P_CLIMB, 4.0F);
+        StandardAnimation swim = new StandardAnimation("swim",
+                new AnimSource(() -> SifakaAnims.Swim), Loop.REPEATING, LAYER_ADULT, P_SWIM, 2.0F);
+        StandardAnimation attack = new StandardAnimation("attack",
+                new AnimSource(() -> SifakaAnims.Attack), Loop.PLAY_ONCE, LAYER_ADULT, P_ATTACK, 0.5F);
+        StandardAnimation sleepEnter = new StandardAnimation("sleep_enter",
+                new AnimSource(() -> SifakaAnims.preparing_sleep), Loop.REPEATING, LAYER_ADULT, P_SLEEP, 2.0F);
+        StandardAnimation sleepLoop = new StandardAnimation("sleep_loop",
+                new AnimSource(() -> SifakaAnims.Sleep), Loop.REPEATING, LAYER_ADULT, P_SLEEP, 4.0F);
+        StandardAnimation sleepExit = new StandardAnimation("sleep_exit",
+                new AnimSource(() -> SifakaAnims.awakening), Loop.REPEATING, LAYER_ADULT, P_SLEEP, 2.0F);
+
+        climbUp.blendInMs(100).blendOutMs(100);
+        climbDown.blendInMs(100).blendOutMs(100);
+        climbHang.blendInMs(150).blendOutMs(150);
+        // The old model sped swimming up with limbSwingAmount; the library takes a fixed multiplier.
+        swim.blendInMs(200).blendOutMs(200).playbackSpeed(1.5F);
+        attack.blendInMs(80).blendOutMs(120);
+        sleepEnter.blendInMs(200).blendOutMs(200);
+        sleepLoop.blendInMs(300).blendOutMs(300);
+        sleepExit.blendInMs(200).blendOutMs(200);
+
+        climbUp.setPlayCondition(a -> this.isClimbingUp());
+        climbDown.setPlayCondition(a -> this.isClimbingDown());
+        climbHang.setPlayCondition(a -> this.isHanging());
+        swim.setPlayCondition(a -> this.isInWaterOrBubble() && this.isAlive());
+        sleepEnter.setPlayCondition(a -> this.getSleepState() == SleepState.PREPARING);
+        sleepLoop.setPlayCondition(a -> this.getSleepState() == SleepState.SLEEPING);
+        sleepExit.setPlayCondition(a -> this.getSleepState() == SleepState.AWAKENING);
+
+        this.animator().register(climbUp, climbDown, climbHang, swim, attack,
+                sleepEnter, sleepLoop, sleepExit);
+
+        this.registerBabyAnimations();
+    }
+
+    private void registerBabyAnimations() {
+        StandardAnimation babyIdle = registerSingle("baby_idle",
+                () -> SifakaBabyAnims.idle, 4.0F, Loop.REPEATING, P_IDLE, LAYER_BABY);
+        StandardAnimation babyCrawl = registerSingle("baby_crawl",
+                () -> SifakaBabyAnims.move, 4.0F, Loop.REPEATING, P_WALK, LAYER_BABY);
+
+        babyIdle.setPlayCondition(a -> this.isNewborn() && !this.isMoving());
+        babyCrawl.setPlayCondition(a -> this.isNewborn() && this.isMoving());
+
+        registerSingle("baby_sleep_enter", () -> SifakaBabyAnims.preparing_sleep,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.PREPARING);
+        registerSingle("baby_sleep_loop", () -> SifakaBabyAnims.sleep,
+                4.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.SLEEPING);
+        registerSingle("baby_sleep_exit", () -> SifakaBabyAnims.awakening,
+                1.0F, Loop.REPEATING, P_SLEEP, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.getSleepState() == SleepState.AWAKENING);
+
+        registerChain("cry",
+                () -> SifakaBabyAnims.preparing_cry, 0.5F,
+                () -> SifakaBabyAnims.cry, 1.0F,
+                () -> SifakaBabyAnims.stopping_cry, 0.5F, P_ACTIVITY, LAYER_BABY)
+                .setPlayCondition(a -> this.isNewborn() && this.isCrying());
+    }
+
+    private boolean groundLocomotionAllowed() {
+        return this.isAlive()
+                && !this.isNewborn()
+                && this.getSleepState() == SleepState.AWAKE
+                && !this.isClimbing()
+                && !this.isInWaterOrBubble();
     }
 
     @Override
@@ -275,76 +378,6 @@ public class SifakaEntity extends DiverseCritter {
                 setIsDrinking(false);
             }
         }
-
-        if (this.level().isClientSide) {
-            IdleVariant currentVariant = getIdleVariant();
-
-            if (currentVariant != prevClientVariant) {
-                this.clientIdleTick = 0;
-                this.prevClientVariant = currentVariant;
-            }
-            if (currentVariant != IdleVariant.NONE) {
-                this.clientIdleTick++;
-            }
-
-            // MODIFICADO: Sistema de ticks para la limpieza (incluye ending tick de 0.5s = 10 ticks)
-            boolean currentCleaning = isCleaning();
-            if (currentCleaning && !prevCleaningClient) {
-                this.clientCleanTick = 0;
-                this.clientCleanEndingTick = 0;
-            } else if (!currentCleaning && prevCleaningClient) {
-                this.clientCleanEndingTick = 1;
-                this.clientCleanTick = 0;
-            }
-            if (currentCleaning) {
-                this.clientCleanTick++;
-            } else if (this.clientCleanEndingTick > 0) {
-                this.clientCleanEndingTick++;
-                if (this.clientCleanEndingTick > 10) this.clientCleanEndingTick = 0;
-            }
-            this.prevCleaningClient = currentCleaning;
-
-            boolean currentDrinking = IsDrinking();
-            if (currentDrinking && !prevDrinkingClient) {
-                this.clientDrinkTick = 0;
-                this.clientDrinkEndingTick = 0;
-            } else if (!currentDrinking && prevDrinkingClient) {
-                this.clientDrinkEndingTick = 1;
-                this.clientDrinkTick = 0;
-            }
-            if (currentDrinking) {
-                this.clientDrinkTick++;
-            } else if (this.clientDrinkEndingTick > 0) {
-                this.clientDrinkEndingTick++;
-                if (this.clientDrinkEndingTick > 6) this.clientDrinkEndingTick = 0;
-            }
-            this.prevDrinkingClient = currentDrinking;
-
-            boolean currentEatingPlant = isEatingPlant();
-            if (currentEatingPlant && !prevEatingPlantClient) {
-                this.clientEatPlantTick = 0;
-                this.clientEatPlantEndingTick = 0;
-            } else if (!currentEatingPlant && prevEatingPlantClient) {
-                this.clientEatPlantEndingTick = 1;
-                this.clientEatPlantTick = 0;
-            }
-            if (currentEatingPlant) {
-                this.clientEatPlantTick++;
-            } else if (this.clientEatPlantEndingTick > 0) {
-                this.clientEatPlantEndingTick++;
-                if (this.clientEatPlantEndingTick > 6) this.clientEatPlantEndingTick = 0;
-            }
-            this.prevEatingPlantClient = currentEatingPlant;
-
-            if (this.isSprinting()) {
-                this.sprintProgress = Math.min(1.0F, this.sprintProgress + 0.1F);
-            } else {
-                this.sprintProgress = Math.max(0.0F, this.sprintProgress - 0.1F);
-            }
-
-            setupAnimationStatesClient();
-            handleCryingAnimationClient();
-        }
     }
 
     @Override
@@ -366,8 +399,6 @@ public class SifakaEntity extends DiverseCritter {
                 this.setItemInHand(InteractionHand.MAIN_HAND, Items.AIR.getDefaultInstance());
             }
         }
-
-        if (isHungry() && !this.isNewborn() && (double)this.random.nextFloat() <= 0.2) triggerFoodSearch();
 
         super.aiStep();
 
@@ -399,12 +430,12 @@ public class SifakaEntity extends DiverseCritter {
             this.walkHopTick = 3;
             return;
         }
+        // isVariantActive se rellenaba solo en el cliente: en servidor, que es donde se salta, valía
+        // siempre false. isPerformingActivity() cubre beber, acicalarse, sentarse, variantes de
+        // reposo, comer y cualquier clip que clave el movimiento.
         boolean busy = this.getSleepState() != DiverseCritter.SleepState.AWAKE
                 || this.isOrderedSitPlaying()
-                || this.isVariantActive
-                || this.isCleaning()
-                || this.IsDrinking()
-                || this.isEatingPlant();
+                || this.isPerformingActivity();
         if (busy) {
             this.walkHopTick = 3;
             return;
@@ -456,137 +487,6 @@ public class SifakaEntity extends DiverseCritter {
     @Override
     public void sinkInFluid(FluidType type) {
         self().setDeltaMovement(self().getDeltaMovement().add(0.0D, -0.04F * self().getAttributeValue(ForgeMod.SWIM_SPEED.get()) / 6, 0.0D));
-    }
-
-    private void setupAnimationStatesClient() {
-        boolean sleepingLike = this.isPreparingSleep() || this.isSleeping() || this.isAwakeing();
-        boolean swimming     = this.isInWaterOrBubble();
-        boolean climbing     = this.isClimbing();
-
-        IdleVariant v = getIdleVariant();
-        int ticksActive = this.clientIdleTick;
-
-        int sitStarting = 10;
-        int sitIdle     = 80;
-        int sitEnding   = 20;
-        int sitTotal    = sitStarting + sitIdle + sitEnding;
-
-        int layStarting = 20;
-        int layIdle     = 80;
-        int layEnding   = 20;
-        int layTotal    = layStarting + layIdle + layEnding;
-
-        boolean isOrderedSitPlaying = this.isOrderedSitPlaying() && !sleepingLike;
-
-        boolean isVariantPlaying = false;
-        if (!isOrderedSitPlaying) {
-            if (v == IdleVariant.STRETCH  && ticksActive <= 40)       isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_LEFT  && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SNIFF_RIGHT && ticksActive <= 40) isVariantPlaying = true;
-            else if (v == IdleVariant.SIT  && ticksActive <= sitTotal)  isVariantPlaying = true;
-            else if (v == IdleVariant.STAND_UP  && ticksActive <= layTotal)  isVariantPlaying = true;
-        }
-
-        // MODIFICADO: Ahora el estado de limpieza depende del nuevo sistema de Ticks (Starting / Idle / Ending)
-        boolean cleaning        = isCleaning();
-        boolean isCleanStarting = cleaning && this.clientCleanTick <= 10;
-        boolean isCleanIdle     = cleaning && this.clientCleanTick > 10;
-        boolean isCleanEnding   = !cleaning && this.clientCleanEndingTick > 0;
-        boolean isCleanPlaying  = (isCleanStarting || isCleanIdle || isCleanEnding) && !isOrderedSitPlaying;
-
-        boolean drinking        = IsDrinking();
-        boolean isDrinkStarting = drinking && this.clientDrinkTick <= 5;
-        boolean isDrinkIdle     = drinking && this.clientDrinkTick > 5;
-        boolean isDrinkEnding   = !drinking && this.clientDrinkEndingTick > 0;
-        boolean isDrinkPlaying  = (isDrinkStarting || isDrinkIdle || isDrinkEnding) && !isOrderedSitPlaying;
-
-        boolean eatingPlant   = isEatingPlant();
-        boolean isEatStarting = eatingPlant && this.clientEatPlantTick <= 5;
-        boolean isEatIdle     = eatingPlant && this.clientEatPlantTick > 5;
-        boolean isEatEnding   = !eatingPlant && this.clientEatPlantEndingTick > 0;
-        boolean isEatPlaying  = (isEatStarting || isEatIdle || isEatEnding) && !isOrderedSitPlaying;
-
-        boolean groundLocomotion = this.isAlive()
-                && !sleepingLike && !swimming && !climbing
-                && !isOrderedSitPlaying && !isVariantPlaying && !isEatPlaying;
-
-        this.isVariantActive = isVariantPlaying;
-        this.idleAnimationState.animateWhen(groundLocomotion, this.tickCount);
-        this.swimAnimationState.animateWhen(swimming && this.isAlive(), this.tickCount);
-
-        this.idleStandUpState.animateWhen(v == IdleVariant.STRETCH  && isVariantPlaying, this.tickCount);
-        this.idleSniffLeftState.animateWhen(v == IdleVariant.SNIFF_LEFT  && isVariantPlaying, this.tickCount);
-        this.idleSniffRightState.animateWhen(v == IdleVariant.SNIFF_RIGHT && isVariantPlaying, this.tickCount);
-
-        if (v == IdleVariant.SIT && isVariantPlaying) {
-            this.idleSitStartingState.animateWhen(ticksActive <= sitStarting, this.tickCount);
-            this.idleSitState.animateWhen(ticksActive > sitStarting && ticksActive <= sitStarting + sitIdle, this.tickCount);
-            this.idleSitEndingState.animateWhen(ticksActive > sitStarting + sitIdle, this.tickCount);
-        } else {
-            this.idleSitStartingState.stop();
-            this.idleSitState.stop();
-            this.idleSitEndingState.stop();
-        }
-
-        if (v == IdleVariant.STAND_UP && isVariantPlaying) {
-            this.idleLayStartingState.animateWhen(ticksActive <= layStarting, this.tickCount);
-            this.idleLayState.animateWhen(ticksActive > layStarting && ticksActive <= layStarting + layIdle, this.tickCount);
-            this.idleLayEndingState.animateWhen(ticksActive > layStarting + layIdle, this.tickCount);
-        } else {
-            this.idleLayStartingState.stop();
-            this.idleLayState.stop();
-            this.idleLayEndingState.stop();
-        }
-
-        // MODIFICADO: Se asocian los estados de limpieza a las nuevas variables
-        if (isCleanPlaying) {
-            this.cleanStartingState.animateWhen(isCleanStarting, this.tickCount);
-            this.cleanIdleState.animateWhen(isCleanIdle, this.tickCount);
-            this.cleanEndingState.animateWhen(isCleanEnding, this.tickCount);
-        } else {
-            this.cleanStartingState.stop();
-            this.cleanIdleState.stop();
-            this.cleanEndingState.stop();
-        }
-
-        if (isDrinkPlaying) {
-            this.drinkStartingState.animateWhen(isDrinkStarting, this.tickCount);
-            this.drinkIdleState.animateWhen(isDrinkIdle, this.tickCount);
-            this.drinkEndingState.animateWhen(isDrinkEnding, this.tickCount);
-        } else {
-            this.drinkStartingState.stop();
-            this.drinkIdleState.stop();
-            this.drinkEndingState.stop();
-        }
-
-        if (isEatPlaying) {
-            this.eatPlantStartingState.animateWhen(isEatStarting, this.tickCount);
-            this.eatPlantIdleState.animateWhen(isEatIdle, this.tickCount);
-            this.eatPlantEndingState.animateWhen(isEatEnding, this.tickCount);
-        } else {
-            this.eatPlantStartingState.stop();
-            this.eatPlantIdleState.stop();
-            this.eatPlantEndingState.stop();
-        }
-
-        boolean climbUp   = this.isClimbingUp();
-        boolean climbDown = this.isClimbingDown();
-        boolean climbHang = this.isHanging();
-        this.climbingUpState.animateWhen(climbUp, this.tickCount);
-        this.climbingDownState.animateWhen(climbDown, this.tickCount);
-        this.climbIdleState.animateWhen(climbHang, this.tickCount);
-
-        if (this.isAttacking()) {
-            if (this.attackAnimationTimeout <= 0) {
-                this.attackAnimationTimeout = 10;
-                this.attackAnimationState.start(this.tickCount);
-            } else {
-                --this.attackAnimationTimeout;
-            }
-        } else {
-            this.attackAnimationState.stop();
-            this.attackAnimationTimeout = 0;
-        }
     }
 
     @Override
@@ -662,18 +562,6 @@ public class SifakaEntity extends DiverseCritter {
         }
 
         return super.mobInteract(pPlayer, pHand);
-    }
-
-    private void triggerFoodSearch() {
-        if (this.isNewborn()) return;
-        if (this.forFoodGoal != null) {
-            this.forFoodGoal.trigger();
-        } else {
-            this.navigation.stop();
-            Predicate<ItemEntity> predicate = (e) -> e.getItem().is(DoCTags.Items.SIFAKA_FOOD);
-            List<? extends ItemEntity> list = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), predicate);
-            if (!list.isEmpty()) this.navigation.moveTo(list.get(0), 1.1);
-        }
     }
 
     @Override
@@ -921,42 +809,6 @@ public class SifakaEntity extends DiverseCritter {
         this.tamingFeedsLeft = tag.getInt("TamingFeedsLeft");
     }
 
-    private void handleCryingAnimationClient() {
-        boolean isCrying = this.isCrying();
-
-        if (isCrying) {
-            this.stoppingCryState.stop();
-            this.stopCryTimer = 0;
-            this.wasCryingClient = true;
-
-            if (this.cryTimer < 10) {
-                this.preparingCryState.startIfStopped(this.tickCount);
-                this.cryingState.stop();
-            } else {
-                this.preparingCryState.stop();
-                this.cryingState.startIfStopped(this.tickCount);
-            }
-            this.cryTimer++;
-        } else {
-            this.preparingCryState.stop();
-            this.cryingState.stop();
-            this.cryTimer = 0;
-
-            if (this.wasCryingClient) {
-                if (this.stopCryTimer < 10) {
-                    this.stoppingCryState.startIfStopped(this.tickCount);
-                } else {
-                    this.stoppingCryState.stop();
-                    this.wasCryingClient = false;
-                }
-                this.stopCryTimer++;
-            } else {
-                this.stoppingCryState.stop();
-                this.stopCryTimer = 0;
-            }
-        }
-    }
-
     @Nullable
     @Override
     protected SoundEvent getAmbientSound() {
@@ -986,6 +838,7 @@ public class SifakaEntity extends DiverseCritter {
     public boolean doHurtTarget(Entity pEntity) {
         boolean flag = super.doHurtTarget(pEntity);
         if (flag) {
+            this.animator().play(this.animator().getByName("attack"));
             this.playSound(SoundEvents.FOX_BITE, 1.0F, 1.0F);
             if (!this.level().isClientSide && isPrey(pEntity) && pEntity instanceof LivingEntity living && living.isDeadOrDying()) {
                 this.setEnrichment(this.maxEnrichment());

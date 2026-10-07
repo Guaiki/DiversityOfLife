@@ -1,19 +1,22 @@
 package com.evirapo.diversityofcritters.client.models;
 
-import com.evirapo.diversityofcritters.client.animations.SifakaBabyAnims;
 import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.animation.AnimationDefinition;
-import net.minecraft.client.animation.KeyframeAnimations;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.*;
 import net.minecraft.client.model.HierarchicalModel;
-import net.minecraft.world.entity.AnimationState;
-import org.joml.Vector3f;
+import net.darkblade.deluxelib.client.anim.AnimBlend;
 
 public class SifakaBabyModel<T extends SifakaEntity> extends HierarchicalModel<T> {
+
+    /**
+     * What {@link #root()} returns: the part wrapping the root bone. KeyframeBlender resolves channels
+     * with getAnyDescendantWithName from root(), so returning the root bone itself would silently drop
+     * that bone's channels. See CivetModel's meshRoot.
+     */
+    private final ModelPart meshRoot;
 
     private final ModelPart Bandedpalmcivetkit;
     private final ModelPart Torse;
@@ -29,9 +32,8 @@ public class SifakaBabyModel<T extends SifakaEntity> extends HierarchicalModel<T
     private final ModelPart bone7;
     private final ModelPart bone8;
 
-    private static final Vector3f ANIMATION_VECTOR_CACHE = new Vector3f();
-
     public SifakaBabyModel(ModelPart root) {
+        this.meshRoot = root;
         this.Bandedpalmcivetkit = root.getChild("Bandedpalmcivetkit");
         this.Torse = this.Bandedpalmcivetkit.getChild("Torse");
         this.Head  = this.Torse.getChild("Head");
@@ -107,40 +109,10 @@ public class SifakaBabyModel<T extends SifakaEntity> extends HierarchicalModel<T
     }
 
     @Override
-    public void setupAnim(SifakaEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
         this.root().getAllParts().forEach(ModelPart::resetPose);
-
-        this.animate(entity.preparingSleepState, SifakaBabyAnims.preparing_sleep, ageInTicks, 1f);
-        this.animate(entity.sleepState,          SifakaBabyAnims.sleep,           ageInTicks, 1f);
-        this.animate(entity.awakeningState,      SifakaBabyAnims.awakening,       ageInTicks, 1f);
-
-        if (entity.preparingSleepState.isStarted() || entity.sleepState.isStarted() || entity.awakeningState.isStarted()) {
-            return;
-        }
-
-        float idleWeight = 1.0F - Math.min(1.0F, limbSwingAmount * 20.0F);
-        float walkWeight = 1.0F - idleWeight;
-
-        if (idleWeight > 0) {
-            this.animateWithWeight(entity.idleAnimationState, SifakaBabyAnims.idle, ageInTicks, 1.0F, idleWeight);
-        }
-        if (walkWeight > 0) {
-            this.animateCrawling(SifakaBabyAnims.move, limbSwing, limbSwingAmount, 8.0f, walkWeight);
-        }
-
-        this.animate(entity.preparingCryState, SifakaBabyAnims.preparing_cry, ageInTicks, 1f);
-        this.animate(entity.cryingState,       SifakaBabyAnims.cry,           ageInTicks, 1f);
-        this.animate(entity.stoppingCryState,  SifakaBabyAnims.stopping_cry,  ageInTicks, 1f);
-    }
-
-    protected void animateWithWeight(AnimationState state, AnimationDefinition definition, float ageInTicks, float speed, float weight) {
-        state.updateTime(ageInTicks, speed);
-        state.ifStarted(s -> KeyframeAnimations.animate(this, definition, s.getAccumulatedTime(), weight, ANIMATION_VECTOR_CACHE));
-    }
-
-    protected void animateCrawling(AnimationDefinition definition, float limbSwing, float limbSwingAmount, float speedMultiplier, float weight) {
-        long time = (long)(limbSwing * 50.0F * speedMultiplier);
-        KeyframeAnimations.animate(this, definition, time, weight, ANIMATION_VECTOR_CACHE);
+        // Layer 1: the baby has its own bone hierarchy, so its clips live apart from the adult's.
+        AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 1);
     }
 
     @Override
@@ -150,6 +122,6 @@ public class SifakaBabyModel<T extends SifakaEntity> extends HierarchicalModel<T
 
     @Override
     public ModelPart root() {
-        return Bandedpalmcivetkit;
+        return meshRoot;
     }
 }
