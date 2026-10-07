@@ -15,7 +15,9 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 /**
  * The critter gamerules with a real civet, headless: {@code gradlew runGameTestServer}.
  *
- * <p>Gamerules belong to the whole world and every game test runs at once, so each test touches
+ * <p>Gamerules belong to the whole world, and the tests of one batch run at the same time. These
+ * tests get a batch of their own, so no other test ever runs while a rule is off (a civet that is
+ * meant to be hungry gets refilled by doCritterNeeds = false). Within the batch each test touches
  * only its own rule and turns it back on before passing.
  */
 @GameTestHolder(DiversityOfCritters.MODID)
@@ -24,6 +26,7 @@ public final class CritterGameRulesGameTests {
 
     private static final String ARENA = "mantle_arena";
     private static final Vec3 SPOT = new Vec3(5.5, 3, 5.5);
+    private static final String BATCH = "gamerules";
 
     private CritterGameRulesGameTests() {
     }
@@ -45,7 +48,7 @@ public final class CritterGameRulesGameTests {
      * With needs on, a civet at zero hunger and thirst stays there. Only the gamerule can fill both
      * bars within the test's time.
      */
-    @GameTest(template = ARENA, timeoutTicks = 100)
+    @GameTest(template = ARENA, timeoutTicks = 100, batch = BATCH)
     public static void needsOffKeepsHungerAndThirstFull(GameTestHelper helper) {
         floor(helper);
         setRule(helper, DOCGameRules.CRITTER_NEEDS, false);
@@ -67,7 +70,7 @@ public final class CritterGameRulesGameTests {
      * The comfort bars start empty. Even in its comfort zone a bar refills at 4 points a second, 25
      * seconds from empty, so only the gamerule can fill it within the test's time.
      */
-    @GameTest(template = ARENA, timeoutTicks = 100)
+    @GameTest(template = ARENA, timeoutTicks = 100, batch = BATCH)
     public static void climateOffMakesEveryCritterComfortable(GameTestHelper helper) {
         floor(helper);
         setRule(helper, DOCGameRules.CRITTER_CLIMATE, false);
