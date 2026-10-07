@@ -824,8 +824,9 @@ public abstract class DiverseCritter extends TamableAnimal
 
     public TemperatureTier getTemperatureTier() { return TemperatureTier.byId(this.entityData.get(TEMP_TIER)); }
 
-    /** 0 = Confort, 1 = Estrés, 2+ = Peligro */
+    /** 0 = Confort, 1 = Estrés, 2+ = Peligro. Siempre confort con doCritterClimate apagado. */
     public int getTemperatureZone() {
+        if (!this.climateEnabled()) return 0;
         return getTemperatureTier().distanceOutside(comfortTierMin(), comfortTierMax());
     }
 
@@ -845,6 +846,12 @@ public abstract class DiverseCritter extends TamableAnimal
     }
 
     private void tickTemperature() {
+        if (!this.climateEnabled()) {
+            // doCritterClimate off: the bar shows full, and the tier is not worth computing.
+            setTemperatureComfort(100);
+            return;
+        }
+
         if (this.tickCount % TEMP_CHECK_INTERVAL == 0) {
             TemperatureTier tier = TemperatureSystem.getEffectiveTier(this.level(), this.blockPosition());
             this.entityData.set(TEMP_TIER, tier.ordinal());
@@ -879,8 +886,9 @@ public abstract class DiverseCritter extends TamableAnimal
 
     public HumidityTier getHumidityTier() { return HumidityTier.byId(this.entityData.get(HUMIDITY_TIER)); }
 
-    /** 0 = Confort, 1 = Estrés, 2+ = Peligro */
+    /** 0 = Confort, 1 = Estrés, 2+ = Peligro. Siempre confort con doCritterClimate apagado. */
     public int getHumidityZone() {
+        if (!this.climateEnabled()) return 0;
         return getHumidityTier().distanceOutside(comfortHumidityMin(), comfortHumidityMax());
     }
 
@@ -900,6 +908,11 @@ public abstract class DiverseCritter extends TamableAnimal
     }
 
     private void tickHumidity() {
+        if (!this.climateEnabled()) {
+            setHumidityComfort(100);
+            return;
+        }
+
         if (this.tickCount % HUMIDITY_CHECK_INTERVAL == 0) {
             HumidityTier tier = HumiditySystem.getEffectiveTier(this.level(), this.blockPosition());
             this.entityData.set(HUMIDITY_TIER, tier.ordinal());

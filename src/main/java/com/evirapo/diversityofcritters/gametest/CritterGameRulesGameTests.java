@@ -62,4 +62,27 @@ public final class CritterGameRulesGameTests {
             helper.killAllEntities();
         });
     }
+
+    /**
+     * The comfort bars start empty. Even in its comfort zone a bar refills at 4 points a second, 25
+     * seconds from empty, so only the gamerule can fill it within the test's time.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 100)
+    public static void climateOffMakesEveryCritterComfortable(GameTestHelper helper) {
+        floor(helper);
+        setRule(helper, DOCGameRules.CRITTER_CLIMATE, false);
+        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), SPOT);
+        civet.setTemperatureComfort(0);
+        civet.setHumidityComfort(0);
+
+        helper.succeedWhen(() -> {
+            helper.assertFalse(civet.climateEnabled(), "the civet must see doCritterClimate as off");
+            helper.assertTrue(civet.getTemperatureZone() == 0, "temperature zone must be comfort");
+            helper.assertTrue(civet.getHumidityZone() == 0, "humidity zone must be comfort");
+            helper.assertTrue(civet.getTemperatureComfort() == 100, "temperature bar must be full");
+            helper.assertTrue(civet.getHumidityComfort() == 100, "humidity bar must be full");
+            setRule(helper, DOCGameRules.CRITTER_CLIMATE, true);
+            helper.killAllEntities();
+        });
+    }
 }
