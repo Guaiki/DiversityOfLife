@@ -974,7 +974,8 @@ public abstract class DiverseCritter extends TamableAnimal
 
             // Hunger and thirst kill through different causes because only starvation counts against
             // the wild population. With both empty, hunger wins: it is the one that counts.
-            if (random.nextInt(10) > 8) {
+            // The needs check goes first so the roll only consumes randomness when it matters.
+            if ((this.getHunger() <= 0 || this.getThirst() <= 0) && random.nextInt(10) > 8) {
                 if (this.getHunger() <= 0) {
                     this.starve();
                 } else if (this.getThirst() <= 0) {
