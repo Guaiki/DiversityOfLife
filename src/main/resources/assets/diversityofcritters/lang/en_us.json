@@ -79,6 +79,10 @@
   "death.attack.diversityofcritters.hypothermia": "%1$s froze to death",
   "death.attack.diversityofcritters.heatstroke": "%1$s died of heatstroke",
   "death.attack.diversityofcritters.humidity": "%1$s could not survive the humidity",
+  "gamerule.doCritterNeeds": "Critter hunger and thirst",
+  "gamerule.doCritterNeeds.description": "When off, Diversity of Critters animals stay fed and watered and never starve.",
+  "gamerule.doCritterClimate": "Critter temperature and humidity",
+  "gamerule.doCritterClimate.description": "When off, Diversity of Critters animals are comfortable in any climate and take no climate damage.",
 
   "key.categories.diversityofcritters.locomotion": "Diversity of Life: Locomotion Debug",
   "key.diversityofcritters.locomotion.overlay": "Toggle leg IK overlay",

@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.damage.DOCDamageTypes;
+import com.evirapo.diversityofcritters.common.gamerule.DOCGameRules;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import com.evirapo.diversityofcritters.common.entity.util.Sedation;
 import com.evirapo.diversityofcritters.common.entity.util.ThreatSensor;
@@ -47,6 +48,7 @@ import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.pathfinder.BlockPathTypes;
@@ -115,6 +117,7 @@ public abstract class DiverseCritter extends TamableAnimal
     private static final EntityDataAccessor<Integer> TEMP_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_TIER = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HUMIDITY_COMFORT = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Byte> RULES_OFF = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BYTE);
 
     // Mantle in progress (see MantleController). Empty lip = not mantling. The phase is not synced:
     // both sides derive it from the body's height.
@@ -464,6 +467,7 @@ public abstract class DiverseCritter extends TamableAnimal
         this.entityData.define(TEMP_COMFORT, 100);
         this.entityData.define(HUMIDITY_TIER, HumidityTier.MODERATE.ordinal());
         this.entityData.define(HUMIDITY_COMFORT, 100);
+        this.entityData.define(RULES_OFF, (byte) 0);
         this.entityData.define(MANTLE_LIP, Optional.empty());
         this.entityData.define(MANTLE_FACING, (byte) Direction.SOUTH.get2DDataValue());
         this.entityData.define(MANTLE_START, 0);
@@ -787,6 +791,26 @@ public abstract class DiverseCritter extends TamableAnimal
     public boolean isDoingSpecialActivity() { return false; }
 
     // --- TEMPERATURE ---
+    // --- GAMERULES ---
+    // Gamerules never reach the client, but the stat screens work out comfort zones there. So the
+    // server copies the two rules into this synced byte, and both sides read the byte.
+    private static final byte NEEDS_OFF = 1;
+    private static final byte CLIMATE_OFF = 2;
+
+    /** False while {@code doCritterNeeds} is off. Safe on both sides. */
+    public boolean needsEnabled() { return (this.entityData.get(RULES_OFF) & NEEDS_OFF) == 0; }
+
+    /** False while {@code doCritterClimate} is off. Safe on both sides. */
+    public boolean climateEnabled() { return (this.entityData.get(RULES_OFF) & CLIMATE_OFF) == 0; }
+
+    private void syncGameRules() {
+        GameRules rules = this.level().getGameRules();
+        byte off = 0;
+        if (!rules.getBoolean(DOCGameRules.CRITTER_NEEDS)) off |= NEEDS_OFF;
+        if (!rules.getBoolean(DOCGameRules.CRITTER_CLIMATE)) off |= CLIMATE_OFF;
+        if (off != this.entityData.get(RULES_OFF)) this.entityData.set(RULES_OFF, off);
+    }
+
     private static final int TEMP_CHECK_INTERVAL = 40;
     private static final int TEMP_DANGER_DAMAGE_INTERVAL = 600; // 30s
     private static final float TEMP_DANGER_DAMAGE = 2.0F;       // 1 corazón
@@ -940,26 +964,36 @@ public abstract class DiverseCritter extends TamableAnimal
                 }
             }
 
+            // Once a second is plenty: a gamerule change taking up to a second to land is not noticeable.
+            if (this.tickCount % 20 == 0) this.syncGameRules();
+
             // Aquí y no en el goal de sueño: tick() corre todos los ticks y los goals en alternos.
             this.sedation.tick();
             this.tickTemperature();
             this.tickHumidity();
             double tempMultiplier = Math.max(getTemperatureLossMultiplier(), getHumidityLossMultiplier());
 
-            if (this.getHunger() > 0) {
-                double lossPerTick = getHungerLossPerSecond() / 60.0 * tempMultiplier;
-                hungerLossAccum += lossPerTick;
-                if (hungerLossAccum >= 1.0) {
-                    int loss = (int) hungerLossAccum; hungerLossAccum -= loss;
-                    this.prevHunger = this.getHunger(); this.setHunger(prevHunger - loss);
+            if (!this.needsEnabled()) {
+                // doCritterNeeds off: kept full rather than frozen, so nothing downstream ever sees a
+                // hungry or thirsty animal (it would hunt for food forever and never fall asleep).
+                if (this.getHunger() < this.maxHunger()) this.setHunger(this.maxHunger());
+                if (this.getThirst() < this.maxThirst()) this.setThirst(this.maxThirst());
+            } else {
+                if (this.getHunger() > 0) {
+                    double lossPerTick = getHungerLossPerSecond() / 60.0 * tempMultiplier;
+                    hungerLossAccum += lossPerTick;
+                    if (hungerLossAccum >= 1.0) {
+                        int loss = (int) hungerLossAccum; hungerLossAccum -= loss;
+                        this.prevHunger = this.getHunger(); this.setHunger(prevHunger - loss);
+                    }
                 }
-            }
-            if (this.getThirst() > 0) {
-                double lossPerTick = getThirstLossPerSecond() / 60.0 * tempMultiplier;
-                thirstLossAccum += lossPerTick;
-                if (thirstLossAccum >= 1.0) {
-                    int loss = (int) thirstLossAccum; thirstLossAccum -= loss;
-                    this.prevThirst = this.getThirst(); this.setThirst(prevThirst - loss);
+                if (this.getThirst() > 0) {
+                    double lossPerTick = getThirstLossPerSecond() / 60.0 * tempMultiplier;
+                    thirstLossAccum += lossPerTick;
+                    if (thirstLossAccum >= 1.0) {
+                        int loss = (int) thirstLossAccum; thirstLossAccum -= loss;
+                        this.prevThirst = this.getThirst(); this.setThirst(prevThirst - loss);
+                    }
                 }
             }
             if (this.getEnrichment() > 0 && !this.isNewborn()) {

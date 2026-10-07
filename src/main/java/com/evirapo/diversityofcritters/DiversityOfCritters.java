@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters;
 
 import com.evirapo.diversityofcritters.client.menu.DOCMenuTypes;
+import com.evirapo.diversityofcritters.common.gamerule.DOCGameRules;
 import com.evirapo.diversityofcritters.client.screen.AirConditionerScreen;
 import com.evirapo.diversityofcritters.client.screen.BowlScreen;
 import com.evirapo.diversityofcritters.client.screen.DigBoxScreen;
@@ -38,6 +39,7 @@ public class DiversityOfCritters {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         DOCConfig.register(modEventBus);
+        DOCGameRules.register();
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::clientSetup);
