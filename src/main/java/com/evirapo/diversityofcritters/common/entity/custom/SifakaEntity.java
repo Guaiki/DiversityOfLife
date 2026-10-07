@@ -54,7 +54,7 @@ public class SifakaEntity extends DiverseCritter {
     // Sifaka de Verreaux: bosques secos y calurosos de Madagascar
     @Override
     public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.WARM;
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.MODERATE;
     }
     @Override
     public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
@@ -64,7 +64,7 @@ public class SifakaEntity extends DiverseCritter {
     // Bosques secos y espinosos del oeste de Madagascar
     @Override
     public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.LOW;
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.ARID;
     }
     @Override
     public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {

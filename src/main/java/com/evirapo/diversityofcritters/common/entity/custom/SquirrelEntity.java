@@ -62,7 +62,7 @@ public class SquirrelEntity extends DiverseCritter {
     // Ardilla voladora gigante: bosques templados de montaña
     @Override
     public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMin() {
-        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.COOL;
+        return com.evirapo.diversityofcritters.common.temperature.TemperatureTier.FREEZING;
     }
     @Override
     public com.evirapo.diversityofcritters.common.temperature.TemperatureTier comfortTierMax() {
@@ -72,11 +72,11 @@ public class SquirrelEntity extends DiverseCritter {
     // Bosques templados de montaña, húmedos pero no tropicales
     @Override
     public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMin() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.MODERATE;
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.ARID;
     }
     @Override
     public com.evirapo.diversityofcritters.common.humidity.HumidityTier comfortHumidityMax() {
-        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.HUMID;
+        return com.evirapo.diversityofcritters.common.humidity.HumidityTier.SATURATED;
     }
 
     // Sin AnimationState: TODAS las animaciones de la ardilla, adulta y bebé, viven en el

@@ -70,7 +70,7 @@ public class CivetEntity extends DiverseCritter
 
     @Override
     public TemperatureTier comfortTierMin() {
-        return TemperatureTier.WARM;
+        return TemperatureTier.COOL;
     }
     @Override
     public TemperatureTier comfortTierMax() {
@@ -79,7 +79,7 @@ public class CivetEntity extends DiverseCritter
 
     @Override
     public HumidityTier comfortHumidityMin() {
-        return HumidityTier.HUMID;
+        return HumidityTier.MODERATE;
     }
     @Override
     public HumidityTier comfortHumidityMax() {
