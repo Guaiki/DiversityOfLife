@@ -6,6 +6,7 @@ import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.SkyAccess;
 import com.evirapo.diversityofcritters.common.config.SpeciesSpawnSettings.Snapshot;
 import com.evirapo.diversityofcritters.common.spawn.DOCSpecies;
+import com.evirapo.diversityofcritters.common.spawn.PopulationEvent;
 import com.evirapo.diversityofcritters.common.spawn.SpawnBonusFormula;
 import com.evirapo.diversityofcritters.common.spawn.SpawnCheckResult;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
@@ -63,6 +64,32 @@ public class SpawnDebugCommand {
 
                 .then(Commands.literal("set")
                         // --- global settings ---
+                        .then(Commands.literal("basePopulation")
+                                .then(Commands.argument("value", IntegerArgumentType.integer(1, 1000))
+                                        .executes(ctx -> apply(ctx.getSource(), "basePopulation",
+                                                DOCServerConfig.BASE_POPULATION,
+                                                IntegerArgumentType.getInteger(ctx, "value")))))
+                        .then(Commands.literal("populationFloor")
+                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 1000))
+                                        .executes(ctx -> apply(ctx.getSource(), "populationFloor",
+                                                DOCServerConfig.POPULATION_FLOOR,
+                                                IntegerArgumentType.getInteger(ctx, "value")))))
+                        .then(Commands.literal("populationCap")
+                                .then(Commands.argument("value", IntegerArgumentType.integer(1, 100_000))
+                                        .executes(ctx -> apply(ctx.getSource(), "populationCap",
+                                                DOCServerConfig.POPULATION_CAP,
+                                                IntegerArgumentType.getInteger(ctx, "value")))))
+                        .then(Commands.literal("endangeredThreshold")
+                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 1000))
+                                        .executes(ctx -> apply(ctx.getSource(), "endangeredThreshold",
+                                                DOCServerConfig.ENDANGERED_THRESHOLD,
+                                                IntegerArgumentType.getInteger(ctx, "value")))))
+                        .then(Commands.literal("wildBreedingRate")
+                                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0D, 10.0D))
+                                        .executes(ctx -> apply(ctx.getSource(), "wildBreedingRate",
+                                                DOCServerConfig.WILD_BREEDING_RATE,
+                                                DoubleArgumentType.getDouble(ctx, "value")))))
+                        .then(weightsSetNode())
                         .then(Commands.literal("maxBonus")
                                 .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0D, 100.0D))
                                         .executes(ctx -> apply(ctx.getSource(), "maxBonus",
@@ -87,6 +114,13 @@ public class SpawnDebugCommand {
                         .then(Commands.argument("species", StringArgumentType.word())
                                 .suggests(SPECIES_SUGGESTIONS)
                                 .executes(ctx -> max(ctx.getSource(), requireSpecies(ctx)))))
+
+                .then(Commands.literal("population")
+                        .then(Commands.argument("species", StringArgumentType.word())
+                                .suggests(SPECIES_SUGGESTIONS)
+                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 100_000))
+                                        .executes(ctx -> population(ctx.getSource(), requireSpecies(ctx),
+                                                IntegerArgumentType.getInteger(ctx, "value"))))))
 
                 .then(Commands.literal("chance")
                         .then(Commands.argument("species", StringArgumentType.word())
@@ -168,6 +202,23 @@ public class SpawnDebugCommand {
                                         requireSkyAccess(ctx)))));
     }
 
+    /** The {@code /doc_spawn set weights <event> <value>} branch, one literal per event. */
+    private static LiteralArgumentBuilder<CommandSourceStack> weightsSetNode() {
+        LiteralArgumentBuilder<CommandSourceStack> node = Commands.literal("weights");
+
+        for (PopulationEvent event : PopulationEvent.values()) {
+            ForgeConfigSpec.IntValue weight = DOCServerConfig.weightValue(event);
+            String label = "weights." + event.configKey();
+
+            node.then(Commands.literal(event.configKey())
+                    .then(Commands.argument("value", IntegerArgumentType.integer(0, 100))
+                            .executes(ctx -> apply(ctx.getSource(), label, weight,
+                                    IntegerArgumentType.getInteger(ctx, "value")))));
+        }
+
+        return node;
+    }
+
     /**
      * Writes the value, persists it and reports the change.
      *
@@ -226,6 +277,9 @@ public class SpawnDebugCommand {
                 + "  maxBonus=" + globals.maxBonus()
                 + "  groupRadius=" + globals.groupCheckRadius());
 
+        MinecraftServer server = source.getServer();
+        WildPopulation registry = server != null ? WildPopulation.get(server) : null;
+
         for (DOCSpecies species : DOCSpecies.values()) {
             Snapshot cfg = species.settings();
             int count = WildPopulation.cachedPopulation(species);
@@ -234,8 +288,12 @@ public class SpawnDebugCommand {
             send(source, "");
             send(source, "§b" + species.key() + "§r  " + (cfg.enabled() ? "§aenabled" : "§cdisabled")
                     + (count < population.endangeredThreshold() ? "  §6ENDANGERED" : ""));
+            String trend = registry != null
+                    ? String.format("%+d this week", registry.trend(species))
+                    : "n/a";
             send(source, "  §7population: §f" + count
                     + " §7(floor " + population.floor() + ", cap " + population.cap() + ")"
+                    + "   §7trend: §f" + trend
                     + "   §7bonus: §f" + SpawnBonusFormula.bonusLabel(count));
             if (SpawnRuleEngine.hasChanceOverride(species)) {
                 send(source, String.format("  §6chance: §f%.3f §7(OVERRIDE — population ignored)",
@@ -326,6 +384,24 @@ public class SpawnDebugCommand {
         send(source, "  §7Undo with: §f/doc_spawn chance " + species.key() + " clear");
         send(source, "  §7The population is persistent — put it back with: §f/doc_spawn reset "
                 + species.key() + " confirm");
+
+        return 1;
+    }
+
+    /**
+     * Sets the population directly. It exists to test the floor, extinction and the endangered
+     * warning without having to kill a dozen animals by hand.
+     */
+    private static int population(CommandSourceStack source, DOCSpecies species, int requested) {
+        MinecraftServer server = source.getServer();
+        if (server == null) return 0;
+
+        int stored = WildPopulation.get(server).set(species, requested, server);
+
+        send(source, "§a" + species.key() + " population set to " + stored + ".");
+        if (stored != requested) {
+            send(source, "  §7Clamped from " + requested + " to the configured floor/cap.");
+        }
 
         return 1;
     }

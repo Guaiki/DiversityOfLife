@@ -30,6 +30,10 @@ public class WildPopulation extends SavedData {
 
     private final Map<DOCSpecies, Integer> populations = new EnumMap<>(DOCSpecies.class);
 
+    // One sample per in-game day, oldest first, for the trend /doc_spawn shows.
+    private final Map<DOCSpecies, int[]> history = new EnumMap<>(DOCSpecies.class);
+    private long lastSampledDay = Long.MIN_VALUE;
+
     // ==============================
     //       LOCK-FREE CACHE
     // ==============================
@@ -121,8 +125,9 @@ public class WildPopulation extends SavedData {
         return write(species, population, server);
     }
 
-    /** Back to the base population. Only for {@code /doc_spawn reset}. */
+    /** Back to the base population, with a clean history. Only for {@code /doc_spawn reset}. */
     public void reset(DOCSpecies species, MinecraftServer server) {
+        this.history.remove(species);
         set(species, DOCServerConfig.population().basePopulation(), server);
     }
 
@@ -130,6 +135,27 @@ public class WildPopulation extends SavedData {
         for (DOCSpecies species : DOCSpecies.values()) {
             reset(species, server);
         }
+    }
+
+    /**
+     * Records today's population, once per in-game day. Called from the Overworld tick; it compares
+     * the day number for inequality rather than "greater than", so {@code /time set} going back
+     * still starts a new sample instead of freezing the history.
+     */
+    public void sampleDay(long day) {
+        if (day == this.lastSampledDay) return;
+        this.lastSampledDay = day;
+
+        for (DOCSpecies species : DOCSpecies.values()) {
+            int[] previous = this.history.getOrDefault(species, new int[0]);
+            this.history.put(species, PopulationMath.pushSample(previous, get(species)));
+        }
+        setDirty();
+    }
+
+    /** Change over the last week (or since the oldest sample, if the save is younger). */
+    public int trend(DOCSpecies species) {
+        return PopulationMath.trend(get(species), this.history.getOrDefault(species, new int[0]));
     }
 
     private int write(DOCSpecies species, int population, MinecraftServer server) {
@@ -175,9 +201,11 @@ public class WildPopulation extends SavedData {
         for (DOCSpecies species : DOCSpecies.values()) {
             CompoundTag entry = new CompoundTag();
             entry.putInt("Population", get(species));
+            entry.putIntArray("History", this.history.getOrDefault(species, new int[0]));
             speciesTag.put(species.key(), entry);
         }
         tag.put("Species", speciesTag);
+        tag.putLong("LastSampledDay", this.lastSampledDay);
 
         return tag;
     }
@@ -197,6 +225,14 @@ public class WildPopulation extends SavedData {
                             settings.basePopulation(), settings.floor(), settings.cap())
                     : settings.clamp(entry.getInt("Population"));
             registry.populations.put(species, population);
+
+            if (entry.contains("History")) {
+                registry.history.put(species, entry.getIntArray("History"));
+            }
+        }
+
+        if (tag.contains("LastSampledDay")) {
+            registry.lastSampledDay = tag.getLong("LastSampledDay");
         }
 
         // Rewrite in the new format on the next save, so the migration only ever runs once.

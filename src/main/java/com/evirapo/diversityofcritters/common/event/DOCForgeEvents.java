@@ -10,7 +10,10 @@ import com.evirapo.diversityofcritters.common.command.SpawnDebugCommand;
 import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.mojang.logging.LogUtils;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -46,6 +49,19 @@ public class DOCForgeEvents {
         WarinessDebugCommand.register(event.getDispatcher());
         FamilyDebugCommand.register(event.getDispatcher());
         SpawnDebugCommand.register(event.getDispatcher());
+    }
+
+    /**
+     * Daily population sample for the trend. Every 100 ticks is plenty: a day is 24000 ticks long,
+     * and the sample itself is a no-op unless the day changed.
+     */
+    @SubscribeEvent
+    public static void onLevelTick(TickEvent.LevelTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!(event.level instanceof ServerLevel level) || level.dimension() != Level.OVERWORLD) return;
+        if (level.getGameTime() % 100L != 0L) return;
+
+        WildPopulation.get(level.getServer()).sampleDay(level.getDayTime() / 24000L);
     }
 
     @SubscribeEvent
