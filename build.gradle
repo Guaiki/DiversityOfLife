@@ -161,9 +161,9 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // fg.deobf es obligatorio: el jar publicado está reobfuscado a SRG, igual que uno de CurseForge.
-    // Versión publicada en CurseForge (deluxelib-1.0.1-1.20.1, proyecto 1594910, file 9015746), para
+    // Versión publicada en CurseForge (deluxelib-1.0.2-1.20.1, proyecto 1594910, file 9060031), para
     // que compile fuera del PC de Andres. La 1.4.11 local de arriba no está publicada.
-    implementation fg.deobf("curse.maven:deluxe-lib-1594910:9015746")
+    implementation fg.deobf("curse.maven:deluxe-lib-1594910:9060031")
 
     compileOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")
     runtimeOnly fg.deobf("tschipp.carryon:carryon-forge-1.20.1:2.1.2.7")
