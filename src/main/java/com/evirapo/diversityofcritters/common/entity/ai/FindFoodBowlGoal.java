@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.util.BowlFeedingHelper;
+import com.evirapo.diversityofcritters.common.entity.util.Reachability;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
@@ -9,7 +10,10 @@ import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.function.Function;
 
 public class FindFoodBowlGoal extends Goal {
 
@@ -46,7 +50,7 @@ public class FindFoodBowlGoal extends Goal {
         if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
         lastScanTime = now;
 
-        bowlPos = findNearestFoodBowl();
+        bowlPos = Reachability.nearestReachable(critter, findFoodBowls(), Function.identity(), 1, pathRange());
         return bowlPos != null;
     }
 
@@ -67,16 +71,20 @@ public class FindFoodBowlGoal extends Goal {
         if (bowlPos != null) navigateToBowl();
     }
 
-    private void navigateToBowl() {
-        if (bowlPos == null) return;
-        // No distance guard here — the pathfinder itself will return null
-        // if the target is unreachable. The followRange guard was causing
-        // the civeta to never start when the bowl was just outside the range.
-        double tx = bowlPos.getX() + 0.5;
-        double ty = bowlPos.getY() + 1.0;
-        double tz = bowlPos.getZ() + 0.5;
-        Path path = critter.getNavigation().createPath(tx, ty, tz, 1);
+    private float pathRange() {
+        return this.searchRadius * 2.0F;
+    }
+
+    /**
+     * False si ya no hay camino completo hasta el bowl: le han puesto una pared delante a mitad de
+     * camino. Mismo objetivo y precisión que la comprobación de {@code canUse()}.
+     */
+    private boolean navigateToBowl() {
+        if (bowlPos == null) return false;
+        Path path = Reachability.pathTo(critter, bowlPos, 1, pathRange());
+        if (path == null) return false;
         critter.getNavigation().moveTo(path, speed);
+        return true;
     }
 
     @Override
@@ -100,7 +108,10 @@ public class FindFoodBowlGoal extends Goal {
             navigationRetryTimer++;
             if (!critter.getNavigation().isInProgress() || navigationRetryTimer >= NAV_RETRY_INTERVAL) {
                 navigationRetryTimer = 0;
-                navigateToBowl();
+                if (!navigateToBowl()) {
+                    this.cooldown = 100;
+                    this.stop();
+                }
             }
             return;
         }
@@ -128,12 +139,11 @@ public class FindFoodBowlGoal extends Goal {
     @Nullable
     public BlockPos getBowlPos() { return this.bowlPos; }
 
-    @Nullable
-    private BlockPos findNearestFoodBowl() {
+    /** Todos los bowls con comida para esta dieta; cuál se alcanza lo decide {@link Reachability}. */
+    private List<BlockPos> findFoodBowls() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
-        BlockPos bestPos = null;
-        double bestDistSq = Double.MAX_VALUE;
+        List<BlockPos> bowls = new ArrayList<>();
 
         int r = this.searchRadius;
         int vy = Math.min(r, 6);
@@ -142,13 +152,9 @@ public class FindFoodBowlGoal extends Goal {
                 origin.offset(-r, -vy, -r),
                 origin.offset(r,   vy,  r))) {
             if (BowlFeedingHelper.hasFoodFor(critter, level, pos)) {
-                double distSq = origin.distSqr(pos);
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    bestPos = pos.immutable();
-                }
+                bowls.add(pos.immutable());
             }
         }
-        return bestPos;
+        return bowls;
     }
 }

@@ -35,10 +35,15 @@ public final class Reachability {
     }
 
     public static boolean canReach(Mob mob, BlockPos target, int accuracy, float range) {
+        return pathTo(mob, target, accuracy, range) != null;
+    }
+
+    /** La ruta hasta {@code target} si llega entera, o null. Para recalcular a mitad de camino. */
+    public static @Nullable Path pathTo(Mob mob, BlockPos target, int accuracy, float range) {
         Path path = mob.getNavigation() instanceof CritterNavigation nav
                 ? nav.createPathWithin(target, accuracy, range)
                 : mob.getNavigation().createPath(target, accuracy);
-        return path != null && path.canReach();
+        return path != null && path.canReach() ? path : null;
     }
 
     /**
