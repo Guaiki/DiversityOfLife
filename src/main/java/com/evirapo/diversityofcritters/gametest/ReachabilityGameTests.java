@@ -117,6 +117,9 @@ public final class ReachabilityGameTests {
                     "a climber found no way over the log wall");
             helper.assertFalse(pathReaches(civet, new CritterNodeEvaluator(false), target),
                     "a non-climber pathed over the log wall");
+            // And the civet's own navigation was built as a climber's (canClimb() wiring).
+            helper.assertTrue(Reachability.canReach(civet, target, 1, RANGE),
+                    "the civet's navigation does not climb");
             helper.killAllEntities();
         });
     }
