@@ -5,19 +5,23 @@ import com.evirapo.diversityofcritters.common.block.entity.DigBoxBlockEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.custom.base.IDiggingCritter;
 import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
+import com.evirapo.diversityofcritters.common.entity.util.Reachability;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 
-import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 public class FindDigBoxGoal extends Goal {
 
@@ -34,6 +38,10 @@ public class FindDigBoxGoal extends Goal {
     private boolean isFinishing = false;
     private int finishingTimer = 0;
 
+    // Cada barrido cuesta hasta MAX_PATH_CHECKS pathfindings: no se repite en cada canUse().
+    private long lastScanTime = -999;
+    private static final int SCAN_INTERVAL_TICKS = 20;
+
     public <E extends DiverseCritter & IDiggingCritter> FindDigBoxGoal(
             E critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -48,9 +56,16 @@ public class FindDigBoxGoal extends Goal {
         if (critter.level().isClientSide() || critter.isNewborn()) return false;
         if (!critter.isEnrichmentNeeded()) return false;
 
+        long now = critter.level().getGameTime();
+        if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
+        lastScanTime = now;
+
         // Saltarse las cajas que ya tiene apartadas otro critter: si la mas cercana esta ocupada se
         // coge la siguiente, y si no queda ninguna libre este goal cede y le toca a cavar en tierra.
-        boxPos = findNearestValidDigBox(CritterClaims.digClaims(critter, searchRadius * 2.0D));
+        // De las libres, la mas cercana a la que se llegue andando.
+        boxPos = Reachability.nearestReachable(critter,
+                findValidDigBoxes(CritterClaims.digClaims(critter, searchRadius * 2.0D)),
+                Function.identity(), 1, pathRange());
         if (boxPos == null) return false;
 
         // Reservar al elegir, no al llegar: durante el camino es cuando otro critter buscaria.
@@ -77,6 +92,10 @@ public class FindDigBoxGoal extends Goal {
         if (boxPos != null) {
             critter.getNavigation().moveTo(boxPos.getX() + 0.5, boxPos.getY() + 0.5, boxPos.getZ() + 0.5, speed);
         }
+    }
+
+    private float pathRange() {
+        return this.searchRadius * 2.0F;
     }
 
     @Override
@@ -110,7 +129,14 @@ public class FindDigBoxGoal extends Goal {
         if (!isOnTop) {
             setCritterDigging(false);
             if (!critter.getNavigation().isInProgress()) {
-                critter.getNavigation().moveTo(boxCenter.x, boxCenter.y, boxCenter.z, speed);
+                // Le han puesto una pared delante a mitad de camino: soltar la caja (stop() libera la
+                // reserva) en vez de empujarla.
+                Path path = Reachability.pathTo(critter, boxPos, 1, pathRange());
+                if (path == null) {
+                    this.stop();
+                    return;
+                }
+                critter.getNavigation().moveTo(path, speed);
             }
             if (distSq < MAX_DIST_SQ && critter.getY() < boxPos.getY() + 0.4) {
                 critter.getJumpControl().jump();
@@ -164,11 +190,10 @@ public class FindDigBoxGoal extends Goal {
         }
     }
 
-    @Nullable
-    private BlockPos findNearestValidDigBox(Set<BlockPos> claimed) {
+    /** Las cajas con items y sin reserva; cuál se alcanza lo decide {@link Reachability}. */
+    private List<BlockPos> findValidDigBoxes(Set<BlockPos> claimed) {
         BlockPos origin = critter.blockPosition();
-        BlockPos bestPos = null;
-        double bestDistSq = Double.MAX_VALUE;
+        List<BlockPos> boxes = new ArrayList<>();
         int r = this.searchRadius;
 
         for (int dx = -r; dx <= r; dx++) {
@@ -177,16 +202,12 @@ public class FindDigBoxGoal extends Goal {
                     BlockPos pos = origin.offset(dx, dy, dz);
 
                     if (isValidDigBox(pos) && !claimed.contains(pos)) {
-                        double distSq = origin.distSqr(pos);
-                        if (distSq < bestDistSq) {
-                            bestDistSq = distSq;
-                            bestPos = pos.immutable();
-                        }
+                        boxes.add(pos.immutable());
                     }
                 }
             }
         }
-        return bestPos;
+        return boxes;
     }
 
     private boolean isValidDigBox(BlockPos pos) {
