@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.custom.base.IScratchingCritter;
 import com.evirapo.diversityofcritters.common.entity.util.CritterClaims;
+import com.evirapo.diversityofcritters.common.entity.util.Reachability;
 import net.darkblade.deluxelib.entity.ai.goal.PhasedActivityGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -12,6 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -71,16 +74,17 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
         if (mob.isAttacking() || mob.isOrderedToSit() || mob.isIdleLocked()) return false;
         if (mob.isDoingSpecialActivity()) return false;
 
-        // Descartar los troncos que ya tienen dueno.
-        this.logPos = findNearestLog(CritterClaims.scratchClaims(mob, searchRadius * 2.0D));
+        // Descartar los troncos que ya tienen dueno, y quedarse con el mas cercano al que haya ruta
+        // COMPLETA hasta su casilla contigua. Sin ruta se entraba en la fase APPROACH condenada a
+        // fallar, y al fallar `PhasedActivityGoal.finish(true)` reproduce el clip de SALIDA aunque la
+        // entrada no haya sonado nunca: la civeta se erguia en la pose de aranar y "se corregia" sin
+        // haber aranado. Y con "createPath != null" no bastaba: con una pared delante devuelve un
+        // camino parcial hasta la pared, asi que el tronco de detras se elegia una y otra vez.
+        this.logPos = Reachability.nearestReachable(mob,
+                findLogs(CritterClaims.scratchClaims(mob, searchRadius * 2.0D)),
+                this::standNextTo, 0, searchRadius * 2.0F);
         this.standPos = this.logPos == null ? null : standNextTo(this.logPos);
         if (this.standPos == null) return false;
-
-        // No arrancar si no hay ruta. Sin esto se entraba en la fase APPROACH condenada a fallar, y
-        // al fallar `PhasedActivityGoal.finish(true)` reproduce el clip de SALIDA aunque la entrada
-        // no haya sonado nunca: la civeta se erguia en la pose de aranar y "se corregia" sin haber
-        // aranado. Mismo gate que usa SquirrelEatLeavesChainGoal antes de ponerse en marcha.
-        if (mob.getNavigation().createPath(this.standPos, 0) == null) return false;
 
         // Reservar ya, no al llegar: durante la aproximacion es justo cuando otra civeta haria su
         // busqueda y elegiria el mismo tronco.
@@ -159,14 +163,14 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
     }
 
     /**
-     * El tronco más cercano al que además se pueda uno arrimar. Exigir la casilla contigua durante la
-     * búsqueda —y no después— evita elegir un tronco encajonado y quedarse dando vueltas: es la misma
-     * forma que {@code CritterDrinkChainGoal.findWater()}, que descarta el agua sin orilla.
+     * Los troncos sin dueño a los que además se pueda uno arrimar. Exigir la casilla contigua durante
+     * la búsqueda —y no después— evita elegir un tronco encajonado y quedarse dando vueltas: es la
+     * misma forma que {@code CritterDrinkChainGoal.findWater()}, que descarta el agua sin orilla. Cuál
+     * se alcanza andando lo decide {@link Reachability}.
      */
-    private @Nullable BlockPos findNearestLog(Set<BlockPos> claimed) {
+    private List<BlockPos> findLogs(Set<BlockPos> claimed) {
         BlockPos origin = mob.blockPosition();
-        BlockPos best = null;
-        double bestDistSq = Double.MAX_VALUE;
+        List<BlockPos> logs = new ArrayList<>();
 
         for (int dx = -searchRadius; dx <= searchRadius; dx++) {
             for (int dy = 0; dy <= 2; dy++) {
@@ -174,15 +178,11 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
                     BlockPos pos = origin.offset(dx, dy, dz);
                     if (claimed.contains(pos)) continue;
                     if (!isValidLog(pos) || standNextTo(pos) == null) continue;
-                    double distSq = origin.distSqr(pos);
-                    if (distSq < bestDistSq) {
-                        bestDistSq = distSq;
-                        best = pos.immutable();
-                    }
+                    logs.add(pos.immutable());
                 }
             }
         }
-        return best;
+        return logs;
     }
 
     /**
