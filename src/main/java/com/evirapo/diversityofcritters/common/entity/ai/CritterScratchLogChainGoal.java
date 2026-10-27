@@ -50,6 +50,13 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
     private final int searchRadius;
 
     private @Nullable BlockPos logPos;
+
+    // Cada barrido cuesta hasta MAX_PATH_CHECKS pathfindings, y PhasedActivityGoal pregunta
+    // shouldStart() cada vez que evalúa el goal: sin intervalo, una civeta vallada con troncos fuera
+    // pathfindeaba cada 2 ticks.
+    private long lastScanTime = -999;
+    private static final int SCAN_INTERVAL_TICKS = 20;
+    private final Reachability.Unreachable unreachable = new Reachability.Unreachable();
     private @Nullable BlockPos standPos;
 
     public <E extends DiverseCritter & IScratchingCritter> CritterScratchLogChainGoal(
@@ -74,6 +81,10 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
         if (mob.isAttacking() || mob.isOrderedToSit() || mob.isIdleLocked()) return false;
         if (mob.isDoingSpecialActivity()) return false;
 
+        long now = mob.level().getGameTime();
+        if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
+        lastScanTime = now;
+
         // Descartar los troncos que ya tienen dueno, y quedarse con el mas cercano al que haya ruta
         // COMPLETA hasta su casilla contigua. Sin ruta se entraba en la fase APPROACH condenada a
         // fallar, y al fallar `PhasedActivityGoal.finish(true)` reproduce el clip de SALIDA aunque la
@@ -82,7 +93,7 @@ public class CritterScratchLogChainGoal extends PhasedActivityGoal<DiverseCritte
         // camino parcial hasta la pared, asi que el tronco de detras se elegia una y otra vez.
         this.logPos = Reachability.nearestReachable(mob,
                 findLogs(CritterClaims.scratchClaims(mob, searchRadius * 2.0D)),
-                this::standNextTo, 0, searchRadius * 2.0F);
+                this::standNextTo, 0, searchRadius * 2.0F, unreachable);
         this.standPos = this.logPos == null ? null : standNextTo(this.logPos);
         if (this.standPos == null) return false;
 

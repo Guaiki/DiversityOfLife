@@ -280,4 +280,77 @@ public final class ReachabilityGameTests {
             helper.killAllEntities();
         });
     }
+
+    /**
+     * Checking a target must not touch the walk in progress. Vanilla's createPath hands back the
+     * current path when the target matches, and records every target it paths to; a check that went
+     * through it left the navigation aimed at the walled-off bowl, and the next recompute walked there.
+     */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT, batch = BATCH)
+    public static void aReachabilityCheckLeavesTheCurrentWalkAlone(GameTestHelper helper) {
+        walledFloor(helper);
+        BlockPos sealed = new BlockPos(5, 3, 5);
+        sealIn(helper, sealed, 0, 1);
+        helper.setBlock(sealed, DOCBlocks.BOWL.get());
+        CivetEntity civet = civetAt(helper, 2.5, 2.5);
+        civet.setTame(true);
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(civet.onGround(), "waiting for the civet to land");
+            BlockPos walkTo = helper.absolutePos(new BlockPos(8, 3, 2));
+            civet.getNavigation().moveTo(walkTo.getX() + 0.5, walkTo.getY(), walkTo.getZ() + 0.5, 1.0D);
+            Path walking = civet.getNavigation().getPath();
+            BlockPos walkingTo = civet.getNavigation().getTargetPos();
+            helper.assertTrue(walking != null, "setup: the civet has no path to walk");
+
+            Reachability.canReach(civet, helper.absolutePos(sealed), 1, RANGE);
+
+            helper.assertTrue(civet.getNavigation().getPath() == walking, "the check replaced the path being walked");
+            helper.assertTrue(walkingTo.equals(civet.getNavigation().getTargetPos()),
+                    "the check re-aimed the navigation at " + civet.getNavigation().getTargetPos());
+            helper.killAllEntities();
+        });
+    }
+
+    /** No path can be built in mid-air (canUpdatePath), and that is not the same as a wall in the way. */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT, batch = BATCH)
+    public static void aCivetInMidAirDoesNotWriteOffItsBowl(GameTestHelper helper) {
+        walledFloor(helper);
+        BlockPos bowl = new BlockPos(8, 3, 8);
+        bowlWith(helper, bowl, meat());
+        helper.setDayTime(MIDNIGHT);
+        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(2.5, 8, 2.5));
+
+        helper.runAfterDelay(1, () -> {
+            helper.assertFalse(civet.onGround(), "setup: the civet already landed");
+            helper.assertTrue(Reachability.repath(civet, helper.absolutePos(bowl), 1, RANGE, 1.0D)
+                    != Reachability.Repath.UNREACHABLE, "a civet in mid-air wrote off a reachable bowl");
+            helper.killAllEntities();
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Pens side by side: the bowls in the next pens are nearer than its own. Only the nearest few get a
+     * pathfind per scan, so without remembering the ones that failed it re-checks the same walled-off
+     * bowls forever and never gets to its own. Tame, so it does not stroll into a different order.
+     */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT, batch = BATCH)
+    public static void aCivetGetsPastNearerUnreachableBowlsToItsOwn(GameTestHelper helper) {
+        walledFloor(helper);
+        for (int x : new int[] {3, 5, 7}) {
+            BlockPos sealed = new BlockPos(x, 3, 8);
+            sealIn(helper, sealed, 0, 1);
+            bowlWith(helper, sealed, meat());
+        }
+        bowlWith(helper, new BlockPos(9, 3, 2), meat());
+        CivetEntity civet = civetAt(helper, 2.5, 5.5);
+        civet.setTame(true);
+        civet.setHunger(civet.maxHunger() / 4);
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(refilled(civet.getHunger(), civet.maxHunger()), "waiting for it to eat from its own bowl");
+            helper.killAllEntities();
+        });
+    }
 }

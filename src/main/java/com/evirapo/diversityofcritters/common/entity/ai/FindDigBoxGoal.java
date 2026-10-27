@@ -12,7 +12,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 
@@ -40,6 +39,9 @@ public class FindDigBoxGoal extends Goal {
 
     // Cada barrido cuesta hasta MAX_PATH_CHECKS pathfindings: no se repite en cada canUse().
     private long lastScanTime = -999;
+
+    // Cajas que no se alcanzaron hace poco: el siguiente barrido sigue por los de detrás.
+    private final Reachability.Unreachable unreachable = new Reachability.Unreachable();
     private static final int SCAN_INTERVAL_TICKS = 20;
 
     public <E extends DiverseCritter & IDiggingCritter> FindDigBoxGoal(
@@ -65,7 +67,7 @@ public class FindDigBoxGoal extends Goal {
         // De las libres, la mas cercana a la que se llegue andando.
         boxPos = Reachability.nearestReachable(critter,
                 findValidDigBoxes(CritterClaims.digClaims(critter, searchRadius * 2.0D)),
-                Function.identity(), 1, pathRange());
+                Function.identity(), 1, pathRange(), unreachable);
         if (boxPos == null) return false;
 
         // Reservar al elegir, no al llegar: durante el camino es cuando otro critter buscaria.
@@ -89,9 +91,15 @@ public class FindDigBoxGoal extends Goal {
         digTimer = 0;
         isFinishing = false;
         finishingTimer = 0;
-        if (boxPos != null) {
-            critter.getNavigation().moveTo(boxPos.getX() + 0.5, boxPos.getY() + 0.5, boxPos.getZ() + 0.5, speed);
-        }
+        if (boxPos != null) navigateToBox();
+    }
+
+    /**
+     * False si ya no hay camino completo hasta la caja: le han puesto una pared delante a mitad de
+     * camino. En pleno salto no se puede recalcular y se sigue con la ruta que hubiera.
+     */
+    private boolean navigateToBox() {
+        return Reachability.repath(critter, boxPos, 1, pathRange(), speed) != Reachability.Repath.UNREACHABLE;
     }
 
     private float pathRange() {
@@ -128,15 +136,12 @@ public class FindDigBoxGoal extends Goal {
 
         if (!isOnTop) {
             setCritterDigging(false);
-            if (!critter.getNavigation().isInProgress()) {
+            if (!critter.getNavigation().isInProgress() && !navigateToBox()) {
                 // Le han puesto una pared delante a mitad de camino: soltar la caja (stop() libera la
                 // reserva) en vez de empujarla.
-                Path path = Reachability.pathTo(critter, boxPos, 1, pathRange());
-                if (path == null) {
-                    this.stop();
-                    return;
-                }
-                critter.getNavigation().moveTo(path, speed);
+                unreachable.add(boxPos, critter.level().getGameTime());
+                this.stop();
+                return;
             }
             if (distSq < MAX_DIST_SQ && critter.getY() < boxPos.getY() + 0.4) {
                 critter.getJumpControl().jump();

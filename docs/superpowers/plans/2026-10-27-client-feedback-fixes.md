@@ -355,13 +355,15 @@ Run: `./gradlew runGameTestServer` — Expected: los dos en `passed`.
 - [ ] **Step 1:** `./gradlew build`. Expected: `BUILD SUCCESSFUL`. Informar de los avisos que ya
   existían para que no parezcan nuevos.
 - [ ] **Step 2:** Pasarle al usuario la lista de pruebas en juego:
-  1. Domesticar a un recién nacido con el biberón y alejarse: se queda con la madre, no te sigue.
+  1. Criar dos adultos domesticados y alejarse del recién nacido: se queda con la madre, no te sigue.
+     (No vale domesticarlo con el biberón: eso ya lo deja en modo deambular, con o sin el arreglo.)
   2. Bowl con comida detrás de una pared de 2 bloques y otro accesible más lejos: el animal va al
      accesible. Si solo está el de detrás de la pared, no se queda empujándola.
   3. Lo mismo con un bowl de agua y con una digbox.
   4. Bowl en campo abierto a unos 14 bloques (Review Focus 5): lo encuentra y come.
   5. Juvenil con hambre y la madre lejos del bowl: va a comer y luego vuelve con ella.
   6. Digbox: meter tierra, una espada y comida; las acepta, y al excavar la civeta las va sacando.
+     Ojo: lo que saca queda en el suelo y desaparece a los 5 minutos si nadie lo recoge.
 - [ ] **Step 3:** Con el visto bueno del usuario, añadir una sección "Fixes from client feedback" a la
   guía de pruebas del cliente (artifact `https://claude.ai/artifact/3U5ZEiYMzyqd1KVUHafyCK`; leerla
   antes con `read`), con esos pasos en inglés y en formato `.step` + "Expected".

@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.PathNavigationRegion;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.pathfinder.PathFinder;
 import net.minecraft.world.phys.Vec3;
@@ -16,6 +17,13 @@ import java.util.Set;
 public class CritterNavigation extends WallClimberNavigation {
 
     protected final DiverseCritter critter;
+
+    /**
+     * El mismo PathFinder que usa la navegación, para las comprobaciones de {@link #findPathWithin}.
+     * Sin inicializador a propósito: se asigna en {@link #createPathFinder}, que corre dentro del
+     * constructor de PathNavigation, y un inicializador lo pisaría después con null.
+     */
+    private PathFinder checkPathFinder;
 
     public CritterNavigation(Mob mob, Level level) {
         super(mob, level);
@@ -61,14 +69,42 @@ public class CritterNavigation extends WallClimberNavigation {
         // se asigne this.critter.
         this.nodeEvaluator = new CritterNodeEvaluator(this.mob instanceof DiverseCritter c && c.canClimb());
         this.nodeEvaluator.setCanPassDoors(true);
-        return new PathFinder(this.nodeEvaluator, pMaxVisitedNodes);
+        this.checkPathFinder = new PathFinder(this.nodeEvaluator, pMaxVisitedNodes);
+        return this.checkPathFinder;
+    }
+
+    /** Si ahora mismo se puede trazar una ruta: no en pleno salto o caída (ver {@link #canUpdatePath}). */
+    public boolean canPathNow() {
+        return this.canUpdatePath();
     }
 
     /**
-     * Como {@code createPath(BlockPos, int)} pero con un radio propio en vez del FOLLOW_RANGE del mob
-     * (16), que se queda corto para un objetivo en la esquina del radio de búsqueda o tras un rodeo.
+     * Una ruta de prueba, sin tocar la navegación. {@code createPath} no vale para comprobar: si el
+     * objetivo coincide con el de la ruta en curso devuelve esa ruta (la de seguir a la madre, por
+     * ejemplo), y si traza una nueva apunta {@code targetPos} a ella, con lo que el siguiente recálculo
+     * llevaba al critter hacia el bowl tapiado que acababa de descartar.
+     *
+     * <p>Radio propio en vez del FOLLOW_RANGE del mob (16), que se queda corto para un objetivo en la
+     * esquina del radio de búsqueda o tras un rodeo.
+     */
+    public @Nullable Path findPathWithin(BlockPos target, int accuracy, float range) {
+        if (!this.canUpdatePath() || this.mob.getY() < this.level.getMinBuildHeight()) return null;
+        BlockPos self = this.mob.blockPosition();
+        if (!this.level.hasChunk(target.getX() >> 4, target.getZ() >> 4)) return null;
+        if (!this.level.hasChunk(self.getX() >> 4, self.getZ() >> 4)) return null;
+
+        int r = (int) (range + 8);
+        PathNavigationRegion region = new PathNavigationRegion(this.level, self.offset(-r, -r, -r), self.offset(r, r, r));
+        return this.checkPathFinder.findPath(region, this.mob, ImmutableSet.of(target), range, accuracy, 1.0F);
+    }
+
+    /**
+     * La ruta para echar a andar de verdad. Suelta antes la ruta en curso para que {@code createPath}
+     * no la devuelva tal cual, y deja {@code targetPos} apuntando a este objetivo, que es lo que usan
+     * los recálculos de vanilla.
      */
     public @Nullable Path createPathWithin(BlockPos target, int accuracy, float range) {
+        this.stop();
         return this.createPath(ImmutableSet.of(target), 8, false, accuracy, range);
     }
 

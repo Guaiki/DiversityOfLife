@@ -6,7 +6,6 @@ import com.evirapo.diversityofcritters.common.entity.util.Reachability;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -29,6 +28,9 @@ public class FindWaterBowlGoal extends Goal {
 
     // Cada barrido cuesta hasta MAX_PATH_CHECKS pathfindings: no se repite en cada canUse().
     private long lastScanTime = -999;
+
+    // Bowls que no se alcanzaron hace poco: el siguiente barrido sigue por los de detrás.
+    private final Reachability.Unreachable unreachable = new Reachability.Unreachable();
     private static final int SCAN_INTERVAL_TICKS = 20;
 
     public FindWaterBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
@@ -52,7 +54,7 @@ public class FindWaterBowlGoal extends Goal {
         if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
         lastScanTime = now;
 
-        bowlPos = Reachability.nearestReachable(critter, findWaterBowls(), Function.identity(), 1, pathRange());
+        bowlPos = Reachability.nearestReachable(critter, findWaterBowls(), Function.identity(), 1, pathRange(), unreachable);
         return bowlPos != null;
     }
 
@@ -73,10 +75,15 @@ public class FindWaterBowlGoal extends Goal {
         critter.setIsDrinking(false);
         critter.setDrinkPos(null);
 
-        if (bowlPos != null) {
-            Vec3 center = Vec3.atCenterOf(bowlPos);
-            critter.getNavigation().moveTo(center.x, center.y, center.z, speed);
-        }
+        if (bowlPos != null) navigateToBowl();
+    }
+
+    /**
+     * False si ya no hay camino completo hasta el bowl: le han puesto una pared delante a mitad de
+     * camino. En pleno salto no se puede recalcular y se sigue con la ruta que hubiera.
+     */
+    private boolean navigateToBowl() {
+        return Reachability.repath(critter, bowlPos, 1, pathRange(), speed) != Reachability.Repath.UNREACHABLE;
     }
 
     private float pathRange() {
@@ -113,15 +120,12 @@ public class FindWaterBowlGoal extends Goal {
             critter.setIsDrinking(false);
             critter.setDrinkPos(null);
 
-            if (!critter.getNavigation().isInProgress()) {
+            if (!critter.getNavigation().isInProgress() && !navigateToBowl()) {
                 // Le han puesto una pared delante a mitad de camino: abandonar en vez de empujarla.
-                Path path = Reachability.pathTo(critter, bowlPos, 1, pathRange());
-                if (path == null) {
-                    this.cooldown = 100;
-                    this.stop();
-                    return;
-                }
-                critter.getNavigation().moveTo(path, speed);
+                unreachable.add(bowlPos, critter.level().getGameTime());
+                this.cooldown = 100;
+                this.stop();
+                return;
             }
             return;
         }
