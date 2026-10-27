@@ -919,6 +919,16 @@ public abstract class DiverseCritter extends TamableAnimal
     public boolean isClimbing() { return false; }
 
     /**
+     * Si la especie trepa por los bloques {@code civet_climbable}. Lo lee el pathfinder: sin esto una
+     * especie que no escala trazaría rutas por encima de una pared de troncos y se quedaría pegada a
+     * ella, creyendo alcanzable lo que hay detrás.
+     *
+     * <p>Tiene que devolver una constante: se consulta desde {@code createNavigation()}, que corre en
+     * el constructor de {@code Mob}, antes de que se inicialicen los campos de la subclase.
+     */
+    public boolean canClimb() { return false; }
+
+    /**
      * Poses where the legs are placed by the animation for reasons other than the ground under
      * them: resting, grooming, drinking, rearing, climbing, riding, swimming, dying. Species add
      * their own busy states on top.

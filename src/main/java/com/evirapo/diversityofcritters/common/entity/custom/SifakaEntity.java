@@ -602,6 +602,7 @@ public class SifakaEntity extends DiverseCritter {
     }
 
     public boolean isInPostDescentCooldown() { return this.postDescentCooldown > 0; }
+    @Override public boolean canClimb()  { return true; }
     public boolean isClimbing()     { return getClimbState() != CLIMB_NONE; }
     public boolean isClimbingUp()   { return getClimbState() == CLIMB_UP; }
     public boolean isClimbingDown() { return getClimbState() == CLIMB_DOWN; }

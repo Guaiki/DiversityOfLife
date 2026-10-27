@@ -11,9 +11,17 @@ public class CritterNodeEvaluator extends WalkNodeEvaluator {
 
     private static final float CLIMB_COST_MALUS = 0.5F;
 
+    /** Sin escalada solo quedan los vecinos de andar de {@link WalkNodeEvaluator}. */
+    private final boolean climbs;
+
+    public CritterNodeEvaluator(boolean climbs) {
+        this.climbs = climbs;
+    }
+
     @Override
     public int getNeighbors(Node[] pOutputArray, Node pNode) {
         int count = super.getNeighbors(pOutputArray, pNode);
+        if (!this.climbs) return count;
 
         BlockPos here = new BlockPos(pNode.x, pNode.y, pNode.z);
 

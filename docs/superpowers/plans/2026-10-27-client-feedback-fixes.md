@@ -59,6 +59,44 @@ diagnóstico de esa sesión:
 
 ---
 
+### Task 0: El pathfinder solo trepa si la especie escala
+
+Añadida a petición del usuario. `CritterNodeEvaluator` añade nodos de trepar junto a cualquier bloque
+`civet_climbable` (`#minecraft:logs`) sin preguntar si la especie escala. Con una especie futura que no
+escale, `Reachability` daría por alcanzable un bowl detrás de una pared de troncos y volvería el bug
+de la pared.
+
+**Files:**
+- Modify: `common/entity/custom/base/DiverseCritter.java` (`canClimb()` nuevo)
+- Modify: `CivetEntity`, `SifakaEntity`, `SquirrelEntity` (override `canClimb() → true`)
+- Modify: `common/entity/ai/CritterNodeEvaluator.java` (constructor `(boolean climbs)`)
+- Modify: `common/entity/ai/CritterNavigation.java` (`createPathFinder`)
+- Modify: `gametest/ReachabilityGameTests.java`
+
+**Interfaces:**
+- Produces:
+  - `DiverseCritter.canClimb(): boolean`, `false` por defecto. Tiene que devolver una constante sin leer
+    campos, porque se consulta desde `createNavigation()`, en el constructor de `Mob`, antes de que se
+    inicialicen los campos de la subclase.
+  - `CritterNodeEvaluator(boolean climbs)`: con `false`, `getNeighbors` devuelve solo los vecinos de
+    `WalkNodeEvaluator`.
+  - `CritterNavigation.createPathFinder` construye el evaluador con
+    `mob instanceof DiverseCritter c && c.canClimb()`. Usa `this.mob`, no `this.critter`, que todavía
+    es null en ese momento.
+
+- [ ] **Step 1: Escribir el gametest** `onlyAClimberPathsOverALogWall`: `walledFloor`, un muro de
+  `OAK_LOG` en `z = 6`, `x = 2..9`, `y = 3..4`, un bowl en `(5,3,8)` y una civeta en `(5.5,3,3.5)`.
+  Cuando la civeta esté en el suelo, buscar ruta con un `PathFinder` propio sobre una
+  `PathNavigationRegion` de radio 32: con `new CritterNodeEvaluator(true)` hace `canReach()` (control
+  positivo) y con `new CritterNodeEvaluator(false)` no.
+- [ ] **Step 2: Comprobar que falla** (no compila: no existe el constructor `(boolean)`).
+- [ ] **Step 3: Implementar.**
+- [ ] **Step 4: Comprobar que pasa**, y que `DrinkingGameTests`/`MantleGameTests` siguen verdes (las
+  tres especies siguen trepando).
+- [ ] **Step 5: Commit** — `"Only species that climb get climbing nodes in their paths"`
+
+---
+
 ### Task 1: Helper `Reachability`
 
 **Files:**

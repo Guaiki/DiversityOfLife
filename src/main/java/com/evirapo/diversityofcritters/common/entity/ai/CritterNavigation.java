@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
+import com.google.common.collect.ImmutableSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
@@ -9,6 +10,7 @@ import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.pathfinder.PathFinder;
 import net.minecraft.world.phys.Vec3;
 
+import javax.annotation.Nullable;
 import java.util.Set;
 
 public class CritterNavigation extends WallClimberNavigation {
@@ -55,9 +57,19 @@ public class CritterNavigation extends WallClimberNavigation {
 
     @Override
     protected PathFinder createPathFinder(int pMaxVisitedNodes) {
-        this.nodeEvaluator = new CritterNodeEvaluator();
+        // this.mob y no this.critter: esto corre en el constructor de PathNavigation, antes de que
+        // se asigne this.critter.
+        this.nodeEvaluator = new CritterNodeEvaluator(this.mob instanceof DiverseCritter c && c.canClimb());
         this.nodeEvaluator.setCanPassDoors(true);
         return new PathFinder(this.nodeEvaluator, pMaxVisitedNodes);
+    }
+
+    /**
+     * Como {@code createPath(BlockPos, int)} pero con un radio propio en vez del FOLLOW_RANGE del mob
+     * (16), que se queda corto para un objetivo en la esquina del radio de búsqueda o tras un rodeo.
+     */
+    public @Nullable Path createPathWithin(BlockPos target, int accuracy, float range) {
+        return this.createPath(ImmutableSet.of(target), 8, false, accuracy, range);
     }
 
     @Override
