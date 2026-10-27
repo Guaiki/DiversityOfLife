@@ -2,13 +2,17 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
 import com.evirapo.diversityofcritters.common.entity.util.BowlFeedingHelper;
+import com.evirapo.diversityofcritters.common.entity.util.Reachability;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
-import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.function.Function;
 
 public class FindWaterBowlGoal extends Goal {
 
@@ -22,6 +26,10 @@ public class FindWaterBowlGoal extends Goal {
 
     private boolean isFinishing = false;
     private int finishingTimer = 0;
+
+    // Cada barrido cuesta hasta MAX_PATH_CHECKS pathfindings: no se repite en cada canUse().
+    private long lastScanTime = -999;
+    private static final int SCAN_INTERVAL_TICKS = 20;
 
     public FindWaterBowlGoal(DiverseCritter critter, double speed, int searchRadius) {
         this.critter = critter;
@@ -40,7 +48,11 @@ public class FindWaterBowlGoal extends Goal {
         if (critter.level().isClientSide()) return false;
         if (!critter.isThirsty()) return false;
 
-        bowlPos = findNearestWaterBowl();
+        long now = critter.level().getGameTime();
+        if (now - lastScanTime < SCAN_INTERVAL_TICKS) return false;
+        lastScanTime = now;
+
+        bowlPos = Reachability.nearestReachable(critter, findWaterBowls(), Function.identity(), 1, pathRange());
         return bowlPos != null;
     }
 
@@ -65,6 +77,10 @@ public class FindWaterBowlGoal extends Goal {
             Vec3 center = Vec3.atCenterOf(bowlPos);
             critter.getNavigation().moveTo(center.x, center.y, center.z, speed);
         }
+    }
+
+    private float pathRange() {
+        return this.searchRadius * 2.0F;
     }
 
     @Override
@@ -98,7 +114,14 @@ public class FindWaterBowlGoal extends Goal {
             critter.setDrinkPos(null);
 
             if (!critter.getNavigation().isInProgress()) {
-                critter.getNavigation().moveTo(bowlCenter.x, bowlPos.getY(), bowlCenter.z, speed);
+                // Le han puesto una pared delante a mitad de camino: abandonar en vez de empujarla.
+                Path path = Reachability.pathTo(critter, bowlPos, 1, pathRange());
+                if (path == null) {
+                    this.cooldown = 100;
+                    this.stop();
+                    return;
+                }
+                critter.getNavigation().moveTo(path, speed);
             }
             return;
         }
@@ -139,24 +162,18 @@ public class FindWaterBowlGoal extends Goal {
         }
     }
 
-    @Nullable
-    private BlockPos findNearestWaterBowl() {
+    /** Todos los bowls con agua; cuál se alcanza lo decide {@link Reachability}. */
+    private List<BlockPos> findWaterBowls() {
         Level level = (Level) critter.level();
         BlockPos origin = critter.blockPosition();
-
-        BlockPos bestPos = null;
-        double bestDistSq = Double.MAX_VALUE;
+        List<BlockPos> bowls = new ArrayList<>();
 
         int r = this.searchRadius;
         for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-r, -2, -r), origin.offset(r, 2, r))) {
             if (BowlFeedingHelper.hasWaterFor(level, pos)) {
-                double distSq = origin.distSqr(pos);
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq;
-                    bestPos = pos.immutable();
-                }
+                bowls.add(pos.immutable());
             }
         }
-        return bestPos;
+        return bowls;
     }
 }
