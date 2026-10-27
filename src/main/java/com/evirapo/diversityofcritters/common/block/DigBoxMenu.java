@@ -42,12 +42,7 @@ public class DigBoxMenu extends AbstractContainerMenu {
                 for (int col = 0; col < 3; ++col) {
                     this.addSlot(new SlotItemHandler(internalItemHandler, index++,
                             SLOT_X_START + col * SLOT_SIZE,
-                            SLOT_Y_START + row * SLOT_SIZE) {
-                        @Override
-                        public boolean mayPlace(ItemStack stack) {
-                            return internalItemHandler.isItemValid(0, stack);
-                        }
-                    });
+                            SLOT_Y_START + row * SLOT_SIZE));
                 }
             }
         }
