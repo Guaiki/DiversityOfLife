@@ -707,7 +707,9 @@ public abstract class DiverseCritter extends TamableAnimal
 
     public boolean isWandering() { return this.entityData.get(WANDERING); }
     public void setWandering(boolean value) { this.entityData.set(WANDERING, value); }
-    public boolean isFollowing() { return !this.isOrderedToSit() && !this.isWandering(); }
+    // Un recién nacido no admite órdenes (el palo de entrenamiento lo rechaza), así que tampoco puede
+    // estar en modo seguir: va con su madre, no con el dueño.
+    public boolean isFollowing() { return !this.isNewborn() && !this.isOrderedToSit() && !this.isWandering(); }
 
     @Override public boolean isAttacking() { return this.entityData.get(ATTACKING); }
     @Override public void setAttacking(boolean attacking) { this.entityData.set(ATTACKING, attacking); }

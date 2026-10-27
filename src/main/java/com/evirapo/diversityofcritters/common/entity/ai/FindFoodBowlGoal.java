@@ -99,8 +99,7 @@ public class FindFoodBowlGoal extends Goal {
     public void tick() {
         if (bowlPos == null) return;
 
-        boolean isCloseEnough = critter.getBoundingBox().inflate(0.32D)
-                .intersects(new net.minecraft.world.phys.AABB(bowlPos));
+        boolean isCloseEnough = BowlFeedingHelper.isWithinReach(critter, bowlPos);
         Vec3 bowlCenter = Vec3.atBottomCenterOf(bowlPos);
 
         if (!isCloseEnough) {

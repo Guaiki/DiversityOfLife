@@ -193,7 +193,7 @@ public class CivetEntity extends DiverseCritter
         this.goalSelector.addGoal(16, new CivetClimbGoal(this, 1.1D, 16));
 
         this.goalSelector.addGoal(17, new CritterIdleVariantGoal(this));
-        this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(18, new CritterFollowParentGoal(this, 1.0D));
         this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {

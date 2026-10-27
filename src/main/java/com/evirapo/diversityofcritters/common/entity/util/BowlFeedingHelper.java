@@ -11,8 +11,26 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 
 public class BowlFeedingHelper {
+
+    /**
+     * Si el critter llega al bowl para comer o beber.
+     *
+     * <p>El alcance sale de dónde puede pararse la navegación: la ruta acaba en la casilla de al lado
+     * (centro a 0.5 del bowl) y vanilla da ese último punto por alcanzado a {@code 0.75 - ancho/2} de
+     * su centro (a {@code ancho/2} si mide más de 0.75). Con un margen fijo de 0.32 alrededor del
+     * cuerpo, una cría juvenil (la mitad de ancha que un adulto) se paraba a 0.725 del bowl con 0.70 de
+     * alcance: el camino ya había acabado, no tocaba el bowl, y se moría de hambre al lado.
+     */
+    public static boolean isWithinReach(DiverseCritter critter, BlockPos bowlPos) {
+        double width = critter.getBbWidth();
+        double waypointSlack = width > 0.75D ? width / 2.0D : 0.75D - width / 2.0D;
+        double reachFromCenter = 0.5D + waypointSlack + 0.05D;
+        double inflate = Math.max(0.32D, reachFromCenter - width / 2.0D);
+        return critter.getBoundingBox().inflate(inflate).intersects(new AABB(bowlPos));
+    }
 
     public static boolean hasFoodFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);

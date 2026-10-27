@@ -196,7 +196,7 @@ public class SquirrelEntity extends DiverseCritter {
         this.goalSelector.addGoal(16, new SquirrelClimbGoal(this));
 
         this.goalSelector.addGoal(17, new CritterIdleVariantGoal(this));
-        this.goalSelector.addGoal(18, new FollowParentGoal(this, 1.0D));
+        this.goalSelector.addGoal(18, new CritterFollowParentGoal(this, 1.0D));
         this.goalSelector.addGoal(19, new CritterExploreHeightGoal(this));
         this.goalSelector.addGoal(19, new WaterAvoidingRandomStrollGoal(this, 1.0D) {
             @Override public boolean canUse() {
