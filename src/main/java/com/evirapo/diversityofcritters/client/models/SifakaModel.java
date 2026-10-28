@@ -28,6 +28,15 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 								&& HEAD_TRACKING_ANIMS.contains(current.getName());
 					});
 
+	/**
+	 * How far the body moves toward the wall while climbing, model units: 8 at half scale is 4 px in
+	 * the game. Puts the torso, arms and legs on the bark; the toes, which grip it, go 1-2 px into it
+	 * at the deepest point of the cycle.
+	 */
+	public static final float CLIMB_WALL_OFFSET = 8.0F;
+	/** Hanging, the arms hug the trunk further forward: 8 would put them 2.4 px into the bark. */
+	public static final float CLIMB_HANG_WALL_OFFSET = 5.0F;
+
 	private final ModelPart meshRoot;
 	private final ModelPart Thewholesifakamodel;
 	private final ModelPart Rightleg;
@@ -151,6 +160,12 @@ public class SifakaModel<T extends SifakaEntity> extends HierarchicalModel<T> {
 
 		AnimBlend.applyBlended(this, entity.animator(), ageInTicks, 200L, 0);
 		this.lookAt.apply(entity, this, AnimContext.of(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch));
+
+		// The climb clips leave the body ~5 px off the bark: the hitbox (0.75 wide) is wider than the
+		// torso. The whole model moves toward the wall, which it faces (-Z).
+		if (entity.isClimbing()) {
+			this.Thewholesifakamodel.z -= entity.isHanging() ? CLIMB_HANG_WALL_OFFSET : CLIMB_WALL_OFFSET;
+		}
 
 		// Render offset, not a keyframe: the swim clip is authored on land height.
 		if (entity.isInWaterOrBubble() && !entity.isClimbing()

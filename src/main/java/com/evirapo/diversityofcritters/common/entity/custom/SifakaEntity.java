@@ -14,6 +14,7 @@ import net.darkblade.deluxelib.anim.AnimSource;
 import net.darkblade.deluxelib.anim.Loop;
 import net.darkblade.deluxelib.anim.StandardAnimation;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -97,6 +98,19 @@ public class SifakaEntity extends DiverseCritter {
 
     private int postDescentCooldown = 0;
     private static final int POST_DESCENT_COOLDOWN = 20;
+
+    /**
+     * Coronando un tronco: los pies ya pasaron la copa y el sifaka camina sobre ella a esa altura.
+     * Null si no. Solo en el servidor. El sifaka no tiene mantle: así pasa encima sin el salto de
+     * antes, que lo lanzaba por encima de un tronco de un bloque de ancho.
+     */
+    @Nullable
+    private Direction crestDirection;
+    /** Coordenada de la cara del tronco a lo largo de {@link #crestDirection}. */
+    private double crestFace;
+    /** Lo más que tarda en pasar encima antes de soltar la pared de todas formas, en ticks. */
+    private static final int CREST_MAX_TICKS = 20;
+    private int crestTicks;
     private boolean cachedHasClimbable = false;
 
     public SifakaEntity(EntityType<? extends TamableAnimal> pEntityType, Level pLevel) {
@@ -684,6 +698,10 @@ public class SifakaEntity extends DiverseCritter {
         }
 
         if (this.postDescentCooldown > 0) this.postDescentCooldown--;
+        if (this.getClimbState() != CLIMB_UP) {
+            // Otro sistema cambió el estado (colgarse, por ejemplo): la coronación quedó a medias.
+            this.crestDirection = null;
+        }
 
         this.cachedHasClimbable = this.hasAdjacentClimbableBlockInternal();
         boolean hasClimbable  = this.cachedHasClimbable;
@@ -705,9 +723,15 @@ public class SifakaEntity extends DiverseCritter {
                 this.navigation.recomputePath();
                 return;
             }
+            if (this.crestDirection != null) {
+                this.updateCrest();
+                return;
+            }
+            if (!this.onGround() && this.startCrest()) {
+                return;
+            }
             if (!hasClimbable && !this.onGround()) {
-                float yawRad = this.getYRot() * ((float) Math.PI / 180F);
-                this.setDeltaMovement(-Math.sin(yawRad) * 0.25D, 0.4D, Math.cos(yawRad) * 0.25D);
+                // Pasada la copa sin sitio encima: suelta la pared, sin salto.
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else if (this.onGround() && !hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
@@ -747,6 +771,67 @@ public class SifakaEntity extends DiverseCritter {
 
         this.setClimbState(CLIMB_UP);
         this.updateClimbFacingYaw();
+        this.lockClimbRotation();
+    }
+
+    /** Lo que avanza por tick al pasar sobre la copa, en bloques: los pies van ya por encima. */
+    public static final double CREST_SPEED = 0.15D;
+
+    public boolean isCresting() {
+        return this.crestDirection != null;
+    }
+
+    @Nullable
+    public Direction getCrestDirection() {
+        return this.crestDirection;
+    }
+
+    /**
+     * Si los pies acaban de pasar la copa del tronco que trepa, y encima hay sitio para el cuerpo,
+     * empieza a pasar sobre ella.
+     */
+    private boolean startCrest() {
+        final Direction toward = Direction.fromYRot(this.getClimbFacingYaw());
+        final double halfWidth = this.getBbWidth() * 0.5D;
+        final AABB box = this.getBoundingBox();
+        final double cx = (box.minX + box.maxX) * 0.5D;
+        final double cz = (box.minZ + box.maxZ) * 0.5D;
+        // El bloque de la cara, justo delante del hitbox.
+        final int wallX = Mth.floor(cx + toward.getStepX() * (halfWidth + 0.1D));
+        final int wallZ = Mth.floor(cz + toward.getStepZ() * (halfWidth + 0.1D));
+        final int feetY = Mth.floor(box.minY + 1.0e-3D);
+        final BlockPos top = new BlockPos(wallX, feetY - 1, wallZ);
+        if (!this.level().getBlockState(top).is(DoCTags.Blocks.CIVET_CLIMBABLE)
+                || top.getY() + 1.0D > box.minY + 1.0e-3D) {
+            return false;
+        }
+        final int headY = Mth.floor(box.minY + this.getBbHeight());
+        for (int y = feetY; y <= headY; y++) {
+            final BlockPos above = new BlockPos(wallX, y, wallZ);
+            if (!this.level().getBlockState(above).getCollisionShape(this.level(), above).isEmpty()) {
+                return false;
+            }
+        }
+        this.crestDirection = toward;
+        this.crestFace = toward.getStepX() != 0
+                ? (toward.getStepX() > 0 ? wallX : wallX + 1.0D)
+                : (toward.getStepZ() > 0 ? wallZ : wallZ + 1.0D);
+        this.crestTicks = 0;
+        return true;
+    }
+
+    /** Sigue pasando sobre la copa; con el cuerpo entero encima, deja de trepar. */
+    private void updateCrest() {
+        final Direction toward = this.crestDirection;
+        final double along = toward.getStepX() != 0 ? this.getX() : this.getZ();
+        final double past = (toward.getStepX() + toward.getStepZ()) * (along - this.crestFace);
+        if (past >= this.getBbWidth() * 0.5D || ++this.crestTicks > CREST_MAX_TICKS) {
+            this.crestDirection = null;
+            this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+            // La ruta subía por nodos pegados a la cara; volver a ellos lo tiraría por el borde.
+            this.navigation.recomputePath();
+            return;
+        }
         this.lockClimbRotation();
     }
 

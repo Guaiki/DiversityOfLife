@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.entity.ai;
 import com.evirapo.diversityofcritters.common.entity.custom.SifakaEntity;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -14,6 +15,8 @@ public class SifakaMoveControl extends MoveControl {
     private final SifakaEntity sifaka;
 
     private static final double CLIMB_SPEED = 0.16D;
+    /** Cuánto se empuja el cuerpo contra la pared al trepar, bloques por tick. */
+    private static final double WALL_PUSH = 0.15D;
     private static final double STEP_UP_IMPULSE = 0.02D;
     private static final double STEP_UP_HORIZONTAL_DAMPING = 0.02D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
@@ -181,13 +184,21 @@ public class SifakaMoveControl extends MoveControl {
 
         if (this.sifaka.isHanging()) {
             this.sifaka.setDeltaMovement(motion.x, 0.0D, motion.z);
+        } else if (this.sifaka.isClimbingUp() && this.sifaka.isCresting()) {
+            // Los pies ya pasaron la copa: camina sobre ella a esa altura, sin caer ni saltar.
+            final Direction toward = this.sifaka.getCrestDirection();
+            this.sifaka.setDeltaMovement(toward.getStepX() * SifakaEntity.CREST_SPEED, 0.0D,
+                    toward.getStepZ() * SifakaEntity.CREST_SPEED);
         } else if (this.sifaka.isClimbingDown()) {
             float yawRad = (float) Math.toRadians(this.sifaka.getClimbFacingYaw());
             double pushX = -Math.sin(yawRad) * 0.15;
             double pushZ = Math.cos(yawRad) * 0.15;
             this.sifaka.setDeltaMovement(pushX, -CLIMB_SPEED, pushZ);
         } else {
-            this.sifaka.setDeltaMovement(motion.x, CLIMB_SPEED, motion.z);
+            // Subiendo, pegado a la pared como al bajar: la escalada empieza con la pared hasta a
+            // 0.3 (hasAdjacentClimbableBlock) y en el aire nada más cierra el hueco.
+            float yawRad = (float) Math.toRadians(this.sifaka.getClimbFacingYaw());
+            this.sifaka.setDeltaMovement(-Math.sin(yawRad) * WALL_PUSH, CLIMB_SPEED, Math.cos(yawRad) * WALL_PUSH);
         }
     }
 }

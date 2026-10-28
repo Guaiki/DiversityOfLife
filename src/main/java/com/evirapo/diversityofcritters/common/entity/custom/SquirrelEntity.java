@@ -967,8 +967,18 @@ public class SquirrelEntity extends DiverseCritter {
                 this.navigation.recomputePath();
                 return;
             }
+            // Coronar: con la copa al alcance de las patas, un mantle pasa el cuerpo encima, ya
+            // horizontal (igual que la civeta).
+            final MantleController mantle = this.mantle();
+            if (mantle != null && !this.onGround() && mantle.tryStartFromClimb(this.getClimbFacingYaw())) {
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                if (this.blockPosition().getY() - this.climbUpStartY >= GLIDE_MIN_AIR) {
+                    this.postCrestCooldown = POST_CREST_COOLDOWN;
+                }
+                return;
+            }
             if (!hasClimbable && !this.onGround()) {
-                // CAMBIO vs Civet: sin impulso de salto. Solo se suelta la pared;
+                // Sin mantle (no cabe en la copa): solo se suelta la pared, sin impulso de salto;
                 // si hay altura, SquirrelGlideGoal toma el control (escenario 2).
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
                 // Only arm crest cooldown after a real climb (≥ GLIDE_MIN_AIR blocks).

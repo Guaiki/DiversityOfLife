@@ -15,6 +15,8 @@ public class SquirrelMoveControl extends MoveControl {
     private final SquirrelEntity squirrel;
 
     private static final double CLIMB_SPEED = 0.16D;
+    /** Cuánto se empuja el cuerpo contra la pared al trepar, bloques por tick. */
+    private static final double WALL_PUSH = 0.15D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
     private static final int LOOKAHEAD_NODES = 5;
@@ -261,8 +263,11 @@ public class SquirrelMoveControl extends MoveControl {
             double pushZ = Math.cos(yawRad) * 0.15;
             this.squirrel.setDeltaMovement(pushX, -CLIMB_SPEED, pushZ);
         } else {
-            // CLIMB_UP
-            this.squirrel.setDeltaMovement(motion.x, CLIMB_SPEED, motion.z);
+            // CLIMB_UP, pegada a la pared como al bajar: la escalada empieza con la pared hasta a
+            // 0.3 (hasAdjacentClimbableBlock) y en el aire nada más cierra el hueco. La ardilla
+            // juvenil, con su hitbox pequeño, subía el tronco entero despegada de la corteza.
+            float yawRad = (float) Math.toRadians(this.squirrel.getClimbFacingYaw());
+            this.squirrel.setDeltaMovement(-Math.sin(yawRad) * WALL_PUSH, CLIMB_SPEED, Math.cos(yawRad) * WALL_PUSH);
         }
     }
 }

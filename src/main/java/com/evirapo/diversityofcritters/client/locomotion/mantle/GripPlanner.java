@@ -56,7 +56,21 @@ public final class GripPlanner {
      */
     public static void plan(MantlePhase phase, float t, double lipHeight, MantleProfile profile,
                             Hand first, Hand second) {
+        plan(phase, t, lipHeight, profile, false, first, second);
+    }
+
+    /**
+     * As {@link #plan(MantlePhase, float, double, MantleProfile, Hand, Hand)}. From a climb the
+     * paws are at the top of the face already: they hold the lip through the rise.
+     */
+    public static void plan(MantlePhase phase, float t, double lipHeight, MantleProfile profile, boolean fromClimb,
+                            Hand first, Hand second) {
         final float s = MantleProgress.smoothstep(t);
+        if (fromClimb && phase == MantlePhase.RISE) {
+            first.set(lipHeight, profile.lipInset, 1.0f, 0.0f);
+            second.set(lipHeight, profile.lipInset, 1.0f, 0.0f);
+            return;
+        }
         switch (phase) {
             case REACH -> {
                 // Off the ground and up to the face, a paw at a time; until its turn a paw walks on.

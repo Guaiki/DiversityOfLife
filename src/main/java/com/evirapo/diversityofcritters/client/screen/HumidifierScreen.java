@@ -14,13 +14,29 @@ import net.minecraft.world.entity.player.Inventory;
 
 public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
 
-    /** Textura vanilla provisional; se cambiará por la GUI custom del cliente. */
+    /** Arte del panel: región 120x75 del PNG de 128x128 (desde 4,30), dibujada al doble. */
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation("minecraft", "textures/gui/demo_background.png");
+            new ResourceLocation("diversityofcritters", "textures/gui/humidifier.png");
+    private static final int ART_U = 4;
+    private static final int ART_V = 30;
+    private static final int ART_W = 120;
+    private static final int ART_H = 75;
 
-    private static final int SCALE_MARGIN_X = 24;
-    private static final int SCALE_Y = 45;
-    private static final int SCALE_HEIGHT = 14;
+    /** Ventana clara del panel donde van los controles (coordenadas de la GUI). */
+    private static final int INNER_X = 108;
+    private static final int INNER_W = 114;
+    private static final int INNER_CENTER = INNER_X + INNER_W / 2;
+    private static final int ARROW_SIZE = 14;
+    private static final int ARROW_Y = 34;
+    /** La escala de tiers va en la misma fila que las flechas, entre ambas. */
+    private static final int SCALE_X = INNER_X + ARROW_SIZE + 4;
+    private static final int SCALE_W = INNER_W - 2 * (ARROW_SIZE + 4);
+    private static final int SCALE_HEIGHT = 12;
+    private static final int SCALE_Y = ARROW_Y + (ARROW_SIZE - SCALE_HEIGHT) / 2;
+    private static final int HUMIDITY_LABEL_Y = 22;
+    private static final int NAME_Y = 55;
+    private static final int SIZE_LABEL_Y = 78;
+    private static final int SIZE_BUTTONS_Y = 90;
 
     private HumidityTier tier;
     private int size;
@@ -28,8 +44,8 @@ public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
 
     public HumidifierScreen(HumidifierMenu pMenu, Inventory pPlayerInventory, Component pTitle) {
         super(pMenu, pPlayerInventory, pTitle);
-        this.imageWidth = 248;
-        this.imageHeight = 166;
+        this.imageWidth = ART_W * 2;
+        this.imageHeight = ART_H * 2;
         this.tier = pMenu.blockEntity.getTier();
         this.size = pMenu.blockEntity.getSize();
     }
@@ -37,23 +53,23 @@ public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
     @Override
     protected void init() {
         super.init();
-        this.titleLabelX = (this.imageWidth - this.font.width(this.title)) / 2;
+        this.titleLabelX = 8;
         this.inventoryLabelY = 10000; // sin inventario de jugador
 
         addRenderableWidget(Button.builder(Component.literal("<"), b -> cycleTier(-1))
-                .bounds(this.leftPos + SCALE_MARGIN_X, this.topPos + SCALE_Y + SCALE_HEIGHT + 6, 20, 20).build());
+                .bounds(this.leftPos + INNER_X, this.topPos + ARROW_Y, ARROW_SIZE, ARROW_SIZE).build());
         addRenderableWidget(Button.builder(Component.literal(">"), b -> cycleTier(1))
-                .bounds(this.leftPos + this.imageWidth - SCALE_MARGIN_X - 20, this.topPos + SCALE_Y + SCALE_HEIGHT + 6, 20, 20).build());
+                .bounds(this.leftPos + INNER_X + INNER_W - ARROW_SIZE, this.topPos + ARROW_Y, ARROW_SIZE, ARROW_SIZE).build());
 
         int[] sizes = HumidifierBlockEntity.ALLOWED_SIZES;
-        int buttonWidth = 36;
-        int gap = 8;
+        int buttonWidth = 26;
+        int gap = 4;
         int totalWidth = sizes.length * buttonWidth + (sizes.length - 1) * gap;
-        int x0 = this.leftPos + (this.imageWidth - totalWidth) / 2;
+        int x0 = this.leftPos + INNER_CENTER - totalWidth / 2;
         for (int i = 0; i < sizes.length; i++) {
             final int s = sizes[i];
             sizeButtons[i] = addRenderableWidget(Button.builder(Component.literal(String.valueOf(s)), b -> setSize(s))
-                    .bounds(x0 + i * (buttonWidth + gap), this.topPos + 128, buttonWidth, 20).build());
+                    .bounds(x0 + i * (buttonWidth + gap), this.topPos + SIZE_BUTTONS_Y, buttonWidth, 16).build());
         }
         updateSizeButtons();
     }
@@ -88,7 +104,7 @@ public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
     protected void renderBg(GuiGraphics guiGraphics, float pPartialTick, int pMouseX, int pMouseY) {
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
+        guiGraphics.blit(TEXTURE, x, y, imageWidth, imageHeight, ART_U, ART_V, ART_W, ART_H, 128, 128);
     }
 
     @Override
@@ -97,9 +113,8 @@ public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
 
         // Escala de 7 tiers con marcador sobre el tier actual
         HumidityTier[] tiers = HumidityTier.values();
-        int scaleWidth = this.imageWidth - SCALE_MARGIN_X * 2;
-        int segmentWidth = scaleWidth / tiers.length;
-        int x0 = SCALE_MARGIN_X + (scaleWidth - segmentWidth * tiers.length) / 2;
+        int segmentWidth = SCALE_W / tiers.length;
+        int x0 = SCALE_X + (SCALE_W - segmentWidth * tiers.length) / 2;
 
         for (int i = 0; i < tiers.length; i++) {
             int sx = x0 + i * segmentWidth;
@@ -115,13 +130,13 @@ public class HumidifierScreen extends AbstractContainerScreen<HumidifierMenu> {
 
         String tierName = this.tier.getDisplayName();
         int nameWidth = this.font.width(tierName);
-        guiGraphics.drawString(this.font, tierName, (this.imageWidth - nameWidth) / 2, SCALE_Y + SCALE_HEIGHT + 12, this.tier.getColor(), true);
+        guiGraphics.drawString(this.font, tierName, INNER_CENTER - nameWidth / 2, NAME_Y, this.tier.getColor(), true);
 
         Component humidityLabel = Component.translatable("gui.diversityofcritters.humidifier.humidity");
-        guiGraphics.drawString(this.font, humidityLabel, (this.imageWidth - this.font.width(humidityLabel)) / 2, SCALE_Y - 12, 0xFF404040, false);
+        guiGraphics.drawString(this.font, humidityLabel, INNER_CENTER - this.font.width(humidityLabel) / 2, HUMIDITY_LABEL_Y, 0xFF404040, false);
 
         Component sizeLabel = Component.translatable("gui.diversityofcritters.humidifier.size");
-        guiGraphics.drawString(this.font, sizeLabel, (this.imageWidth - this.font.width(sizeLabel)) / 2, 116, 0xFF404040, false);
+        guiGraphics.drawString(this.font, sizeLabel, INNER_CENTER - this.font.width(sizeLabel) / 2, SIZE_LABEL_Y, 0xFF404040, false);
     }
 
     @Override

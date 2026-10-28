@@ -123,6 +123,13 @@ public final class SpineRules {
         return this.rules.length;
     }
 
+    /** Makes the followers start over from the body's tilt next frame, as on the first one. */
+    public void reseed(LocomotionState state) {
+        for (LocomotionState.SpineState s : state.ensureSpine(this.rules.length)) {
+            s.seeded = false;
+        }
+    }
+
     /**
      * Advances the followers toward the body's current tilt and heading. Call every frame, whether
      * or not the pose is written; a zero {@code dt} changes nothing.

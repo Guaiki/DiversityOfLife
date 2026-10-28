@@ -130,21 +130,22 @@ public final class MantleDriver {
                 this.begin(state, mantle, legs, x, z, bodyHalfWidth);
             }
             final double lipHeight = mantle.lipY - mantle.startY;
-            // A lower lip than a full block (a slab) gets a smaller, quicker manoeuvre.
-            final MantleProfile profile = this.profile.forLip(lipHeight);
+            // A lower lip than a full block (a slab) gets a smaller, quicker manoeuvre. Not the crest
+            // of a climb: the body is up the face already.
+            final MantleProfile profile = mantle.fromClimb ? this.profile : this.profile.forLip(lipHeight);
             final MantleProgress progress = MantleProgress.of(y, mantle.startY, mantle.lipY,
-                    mantle.elapsed(gameTime), mantle.pastFace(x, z), bodyHalfWidth, profile,
+                    mantle.elapsed(gameTime), mantle.pastFace(x, z), bodyHalfWidth, profile, mantle.fromClimb,
                     state.mantleProgress);
             // Nose up is a negative xRot.
             state.mantlePitch = (float) -Math.toRadians(
-                    MantleProgress.pitchDegrees(progress.phase, progress.t, profile));
+                    MantleProgress.pitchDegrees(progress.phase, progress.t, profile, mantle.fromClimb));
             state.mantleLock = lock(progress);
             state.mantleCycleHold = progress.phase == MantlePhase.RECOVER
                     ? 1.0f - MantleProgress.smoothstep(progress.t) : 1.0f;
             state.mantleArch = (float) Math.toRadians(
-                    MantleProgress.archDegrees(progress.phase, progress.t, profile));
+                    MantleProgress.archDegrees(progress.phase, progress.t, profile, mantle.fromClimb));
 
-            GripPlanner.plan(progress.phase, progress.t, lipHeight, profile, this.leading, this.trailing);
+            GripPlanner.plan(progress.phase, progress.t, lipHeight, profile, mantle.fromClimb, this.leading, this.trailing);
             GripPlanner.planHind(progress.phase, progress.t, lipHeight,
                     baseDepth(legs, this.leadHind, mantle), baseDepth(legs, this.otherHind, mantle),
                     state.mantleApproach,
@@ -185,7 +186,8 @@ public final class MantleDriver {
             }
             state.mantleBodyDrop = (float) ((y - state.mantleStartY) * unitsPerBlock) * state.mantleLock * authority;
             state.mantleTuck = mantle != null
-                    ? (float) (this.tuck(state.mantleProgress, mantle.pastFace(x, z), bodyHalfWidth) * unitsPerBlock) * authority
+                    ? (float) (this.tuck(state.mantleProgress, mantle.pastFace(x, z), bodyHalfWidth, mantle.fromClimb)
+                            * unitsPerBlock) * authority
                     : state.mantleTuck * (authority / Math.max(state.mantleAuthority.value(), authority));
         } else {
             state.mantleBodyDrop = 0.0f;
@@ -202,7 +204,8 @@ public final class MantleDriver {
 
     /**
      * A new mantle: remember where the hind feet stand, and how far the body still has to go to
-     * the face; the feet step on from there.
+     * the face; the feet step on from there. From a climb they stand on the face itself, at the
+     * body's height, and the body is already against it.
      */
     private void begin(LocomotionState state, MantleState mantle, LocomotionState.LegState[] legs,
                        double x, double z, float bodyHalfWidth) {
@@ -210,10 +213,21 @@ public final class MantleDriver {
         state.mantleStartTick = mantle.startTick;
         state.mantleStartY = mantle.startY;
         final double pinned = -(bodyHalfWidth + MantleMotion.PIN_GAP);
-        state.mantleApproach = (float) Math.max(0.0, pinned - mantle.pastFace(x, z));
+        state.mantleApproach = mantle.fromClimb ? 0.0f : (float) Math.max(0.0, pinned - mantle.pastFace(x, z));
+        final Direction facing = mantle.facing;
+        final double onFace = mantle.wallCoord() - (facing.getStepX() + facing.getStepZ()) * GripPlanner.FACE_GAP;
         for (int i = 0; i < legs.length; i++) {
             final LocomotionState.LegState leg = legs[i];
-            if (this.rear[i]) {
+            if (!this.rear[i]) {
+                continue;
+            }
+            if (mantle.fromClimb) {
+                leg.mantleBaseX = facing.getStepX() != 0 ? onFace : leg.soleX;
+                leg.mantleBaseY = mantle.startY;
+                leg.mantleBaseZ = facing.getStepX() != 0 ? leg.soleZ : onFace;
+                // Last frame's hips were drawn by the climb, not by this mantle.
+                leg.mantleHipValid = false;
+            } else {
                 leg.mantleBaseX = leg.soleX;
                 leg.mantleBaseY = leg.groundY;
                 leg.mantleBaseZ = leg.soleZ;
@@ -313,11 +327,14 @@ public final class MantleDriver {
 
     /**
      * How far the drawn body closes on the wall, blocks: in over the crest, then given back as the
-     * body walks onto the top, never more than the body has yet to walk.
+     * body walks onto the top, never more than the body has yet to walk. From a climb it starts as
+     * close as the climb pose had it.
      */
-    private double tuck(MantleProgress progress, double pastFace, float bodyHalfWidth) {
+    private double tuck(MantleProgress progress, double pastFace, float bodyHalfWidth, boolean fromClimb) {
+        final double from = fromClimb ? this.profile.climbTuck : 0.0;
         return switch (progress.phase) {
-            case CREST -> this.profile.crestTuck * MantleProgress.smoothstep(progress.t);
+            case RISE -> from;
+            case CREST -> from + (this.profile.crestTuck - from) * MantleProgress.smoothstep(progress.t);
             case RECOVER -> {
                 final double walked = Math.max(pastFace + bodyHalfWidth + MantleMotion.PIN_GAP, 0.0);
                 yield Math.max(this.profile.crestTuck - walked, 0.0)

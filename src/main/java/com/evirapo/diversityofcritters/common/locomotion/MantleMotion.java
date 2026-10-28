@@ -40,6 +40,20 @@ public final class MantleMotion {
     public static MantleMotion plan(MantleProgress progress, double y, double startY, double lipY,
                                     double pastFace, double halfWidth, boolean hop, MantleProfile profile,
                                     MantleMotion out) {
+        return plan(progress, y, startY, lipY, pastFace, halfWidth, hop, false, profile, out);
+    }
+
+    /**
+     * How fast a mantle from a climb rises, blocks per tick: the climb's own pace. The pose holds
+     * the drawn body still through the rise while the paws grip the lip, so a rise at the usual
+     * pace would stall a body that was just climbing.
+     */
+    public static final double CLIMB_RISE_SPEED = 0.16;
+
+    /** As above; {@code fromClimb}, the rise goes at least at {@link #CLIMB_RISE_SPEED}. */
+    public static MantleMotion plan(MantleProgress progress, double y, double startY, double lipY,
+                                    double pastFace, double halfWidth, boolean hop, boolean fromClimb,
+                                    MantleProfile profile, MantleMotion out) {
         final double rise = Math.max(lipY - startY, 0.0);
         final double pinned = -(halfWidth + PIN_GAP);
         final double toPin = clamp(pinned - pastFace, MAX_PIN_SPEED);
@@ -56,6 +70,9 @@ public final class MantleMotion {
                 double speed = rise * profile.crestStart / profile.riseTicks;
                 if (hop && progress.t >= profile.hopFrom) {
                     speed *= profile.hopBoost;
+                }
+                if (fromClimb) {
+                    speed = Math.max(speed, CLIMB_RISE_SPEED);
                 }
                 out.along = toPin;
                 out.up = Math.min(speed, toLip);

@@ -39,6 +39,12 @@ public final class MantleGameTests {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String ARENA = "mantle_arena";
     private static final int TIMEOUT = 400;
+    /** Within this of the face, blocks, a climbing hitbox counts as against it. */
+    private static final double FLUSH = 0.02;
+    /** Juvenile, and stays one through any test: newborns are younger than -4 days. */
+    private static final int JUVENILE_AGE = -90000;
+    /** Furthest a crest may lift the feet above the top of the trunk, blocks. */
+    private static final double CREST_OVERSHOOT = 0.5;
     /** Close enough to the target to count as there: moveTo's path ends a block from its target block. */
     private static final double ARRIVED = 1.5;
 
@@ -127,6 +133,71 @@ public final class MantleGameTests {
         run.start();
     }
 
+    // --- Cresting a trunk.
+
+    /**
+     * A trunk one block wide and three high at x 5, z 6, its top at y 6: the critter climbs its north
+     * face and has to end up standing on it, never rising more than {@link #CREST_OVERSHOOT} above
+     * it (the old jump at the top went 2.3 up and could throw it off the far side).
+     */
+    private static void trunk(GameTestHelper helper) {
+        arena(helper, false);
+        for (int y = 3; y <= 5; y++) {
+            helper.setBlock(5, y, 6, Blocks.OAK_LOG);
+        }
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void civetCrestsATrunk(GameTestHelper helper) {
+        trunk(helper);
+        final Run run = new Run(helper, "civet trunk");
+        run.walk(DOCEntities.CIVET.get(), new Vec3(5.5, 3, 4.5), new Vec3(5.5, 6, 6.5));
+        run.endsOnTopOf(new BlockPos(5, 5, 6));
+        run.mustMantle();
+        run.start();
+    }
+
+    /** No mantle for the sifaka: it walks onto the top once its feet clear it. */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void sifakaCrestsATrunk(GameTestHelper helper) {
+        trunk(helper);
+        final Run run = new Run(helper, "sifaka trunk");
+        run.walk(DOCEntities.SIFAKA.get(), new Vec3(5.5, 3, 4.5), new Vec3(5.5, 6, 6.5));
+        run.endsOnTopOf(new BlockPos(5, 5, 6));
+        run.start();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void squirrelCrestsATrunk(GameTestHelper helper) {
+        trunk(helper);
+        final Run run = new Run(helper, "squirrel trunk");
+        run.walk(DOCEntities.SQUIRREL.get(), new Vec3(5.5, 3, 4.5), new Vec3(5.5, 6, 6.5));
+        run.endsOnTopOf(new BlockPos(5, 5, 6));
+        run.mustMantle();
+        run.start();
+    }
+
+    /** A juvenile: drawn at 0.65 but with half the hitbox, which used to climb away from the bark. */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void juvenileSquirrelCrestsATrunk(GameTestHelper helper) {
+        trunk(helper);
+        final Run run = new Run(helper, "juvenile squirrel trunk");
+        run.walk(DOCEntities.SQUIRREL.get(), new Vec3(5.5, 3, 4.5), new Vec3(5.5, 6, 6.5), JUVENILE_AGE);
+        run.endsOnTopOf(new BlockPos(5, 5, 6));
+        run.mustMantle();
+        run.start();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void juvenileCivetCrestsATrunk(GameTestHelper helper) {
+        trunk(helper);
+        final Run run = new Run(helper, "juvenile civet trunk");
+        run.walk(DOCEntities.CIVET.get(), new Vec3(5.5, 3, 4.5), new Vec3(5.5, 6, 6.5), JUVENILE_AGE);
+        run.endsOnTopOf(new BlockPos(5, 5, 6));
+        run.mustMantle();
+        run.start();
+    }
+
     // --- Running a scene.
 
     /** Critters walking to their targets, traced every tick. */
@@ -135,6 +206,9 @@ public final class MantleGameTests {
         private final String name;
         private final List<Walker> walkers = new ArrayList<>();
         private boolean neverMantles;
+        private BlockPos top;
+        private boolean wentAboveTop;
+        private boolean mustMantle;
 
         Run(GameTestHelper helper, String name) {
             this.helper = helper;
@@ -144,23 +218,42 @@ public final class MantleGameTests {
         }
 
         void walk(EntityType<? extends DiverseCritter> type, Vec3 from, Vec3 to) {
+            this.walk(type, from, to, 0);
+        }
+
+        void walk(EntityType<? extends DiverseCritter> type, Vec3 from, Vec3 to, int age) {
             final DiverseCritter critter = this.helper.spawn(type, from);
-            critter.setAge(0);
+            critter.setAge(age);
             critter.goalSelector.removeAllGoals(goal -> true);
             critter.targetSelector.removeAllGoals(goal -> true);
             critter.setPersistenceRequired();
-            this.walkers.add(new Walker(critter, this.helper.absoluteVec(to), to));
+            this.walkers.add(new Walker(critter, this.helper.absoluteVec(to), to, new boolean[1]));
         }
 
         void neverMantles() {
             this.neverMantles = true;
         }
 
+        /**
+         * Passing through the target is not enough: the critter has to stand on {@code top}, and
+         * never go more than {@link #CREST_OVERSHOOT} above it. Back on the arena floor after
+         * climbing above it, it fell, and the test fails there and then.
+         */
+        void endsOnTopOf(BlockPos top) {
+            this.top = this.helper.absolutePos(top);
+        }
+
+        /** Every critter has to mantle at some point. */
+        void mustMantle() {
+            this.mustMantle = true;
+        }
+
         void start() {
             this.helper.onEachTick(this::tick);
             this.helper.succeedWhen(() -> {
                 for (Walker w : this.walkers) {
-                    if (!w.arrived()) {
+                    if (!w.arrived() || (this.top != null && !this.standsOnTop(w.critter))
+                            || (this.mustMantle && !w.mantled[0])) {
                         throw new GameTestAssertException(String.format(Locale.ROOT, "%s: %s at %s, not at %s",
                                 this.name, w.label(), this.rel(w.critter.position()), w.relTarget));
                     }
@@ -178,6 +271,31 @@ public final class MantleGameTests {
                 if (this.neverMantles && c.isMantling()) {
                     throw new GameTestAssertException(this.name + ": " + w.label() + " mantled at " + this.rel(c.position()));
                 }
+                if (c.isMantling()) {
+                    w.mantled[0] = true;
+                }
+                if (this.top != null) {
+                    // Climbing the north face (the trunk stands on the ground, two blocks under its
+                    // top), the hitbox stays against it: a gap shows as a body drawn off the bark. The
+                    // first two ticks close what the climb started with
+                    // (climbing caps sideways speed at 0.15 a tick).
+                    if (c.onClimbable() && c.getY() > this.top.getY() - 2.0 + 0.4 && c.getY() < this.top.getY() + 1.0
+                            && c.getBoundingBox().maxZ < this.top.getZ() - FLUSH) {
+                        throw new GameTestAssertException(String.format(Locale.ROOT, "%s: %s climbs %.3f off the face, at %s",
+                                this.name, w.label(), this.top.getZ() - c.getBoundingBox().maxZ, this.rel(c.position())));
+                    }
+                    final double aboveTop = c.getY() - (this.top.getY() + 1.0);
+                    if (aboveTop > CREST_OVERSHOOT) {
+                        throw new GameTestAssertException(String.format(Locale.ROOT, "%s: %s went %.2f above the top, at %s",
+                                this.name, w.label(), aboveTop, this.rel(c.position())));
+                    }
+                    if (aboveTop > -0.5) {
+                        this.wentAboveTop = true;
+                    } else if (this.wentAboveTop && c.onGround() && c.getY() < this.top.getY() - 1.0) {
+                        throw new GameTestAssertException(this.name + ": " + w.label() + " fell off the top, at "
+                                + this.rel(c.position()));
+                    }
+                }
                 final Path path = c.getNavigation().getPath();
                 String next = "-";
                 if (path != null && !path.isDone() && path.getNextNodeIndex() < path.getNodeCount()) {
@@ -187,10 +305,15 @@ public final class MantleGameTests {
                 }
                 final Vec3 v = c.getDeltaMovement();
                 LOGGER.info(String.format(Locale.ROOT,
-                        "[MantleTest] %s t=%d %s pos=%s yaw=%.0f ground=%b hcol=%b mantle=%b step=%.2f next=%s v=(%.3f,%.3f,%.3f)",
+                        "[MantleTest] %s t=%d %s pos=%s yaw=%.0f ground=%b hcol=%b climb=%b mantle=%b step=%.2f next=%s v=(%.3f,%.3f,%.3f)",
                         this.name, this.helper.getTick(), w.label(), this.rel(c.position()), c.getYRot(),
-                        c.onGround(), c.horizontalCollision, c.isMantling(), c.maxUpStep(), next, v.x, v.y, v.z));
+                        c.onGround(), c.horizontalCollision, c.onClimbable(), c.isMantling(), c.maxUpStep(), next, v.x, v.y, v.z));
             }
+        }
+
+        private boolean standsOnTop(DiverseCritter c) {
+            return c.onGround() && !c.onClimbable() && c.getBoundingBox().minY >= this.top.getY() + 1.0 - 1.0e-3
+                    && c.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(this.top).expandTowards(0, 1.0, 0));
         }
 
         private String rel(Vec3 p) {
@@ -199,7 +322,8 @@ public final class MantleGameTests {
         }
     }
 
-    private record Walker(DiverseCritter critter, Vec3 target, Vec3 relTarget) {
+    /** {@code mantled}: a one-element flag, set once the critter has mantled. */
+    private record Walker(DiverseCritter critter, Vec3 target, Vec3 relTarget, boolean[] mantled) {
         boolean arrived() {
             final Vec3 p = this.critter.position();
             final double dx = p.x - this.target.x;

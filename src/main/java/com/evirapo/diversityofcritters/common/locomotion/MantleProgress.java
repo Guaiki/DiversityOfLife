@@ -7,7 +7,7 @@ package com.evirapo.diversityofcritters.common.locomotion;
  * <pre>
  *   h = (y - startY) / (lipY - startY)          0 standing, 1 level with the top
  *
- *   REACH    first reachTicks ticks, while h is still 0
+ *   REACH    first reachTicks ticks, while h is still 0 (never from a climb)
  *   RISE     0 <= h < crestStart
  *   CREST    crestStart <= h < 1
  *   RECOVER  on top, until the centre is recoverDistance past where it stood at the face
@@ -40,6 +40,16 @@ public final class MantleProgress {
      */
     public static MantleProgress of(double y, double startY, double lipY, double ticks, double forward,
                                     double bodyHalfWidth, MantleProfile profile, MantleProgress out) {
+        return of(y, startY, lipY, ticks, forward, bodyHalfWidth, profile, false, out);
+    }
+
+    /**
+     * @param fromClimb the body came up the face climbing: its paws are already on it, so there is
+     *                  no REACH and it rises from the first tick
+     */
+    public static MantleProgress of(double y, double startY, double lipY, double ticks, double forward,
+                                    double bodyHalfWidth, MantleProfile profile, boolean fromClimb,
+                                    MantleProgress out) {
         final double rise = lipY - startY;
         final double h = rise > 1.0e-6 ? clamp01((y - startY) / rise) : 1.0;
         out.h = (float) h;
@@ -50,7 +60,7 @@ public final class MantleProgress {
         } else if (h >= profile.crestStart) {
             out.phase = MantlePhase.CREST;
             out.t = (float) ((h - profile.crestStart) / (1.0 - profile.crestStart));
-        } else if (h <= STANDING && ticks < profile.reachTicks) {
+        } else if (!fromClimb && h <= STANDING && ticks < profile.reachTicks) {
             out.phase = MantlePhase.REACH;
             out.t = (float) clamp01(ticks / profile.reachTicks);
         } else {
@@ -60,14 +70,22 @@ public final class MantleProgress {
         return out;
     }
 
+    /** Pitch of a body climbing a face: straight up. Where a mantle from a climb starts. */
+    public static final float CLIMB_PITCH = 90.0f;
+
     /** Body pitch in degrees, nose up positive; continuous across phase borders. */
     public static float pitchDegrees(MantlePhase phase, float t, MantleProfile profile) {
+        return pitchDegrees(phase, t, profile, false);
+    }
+
+    /** As {@link #pitchDegrees(MantlePhase, float, MantleProfile)}; from a climb the rise starts upright. */
+    public static float pitchDegrees(MantlePhase phase, float t, MantleProfile profile, boolean fromClimb) {
         final float s = smoothstep(t);
         return switch (phase) {
             case NONE -> 0.0f;
             // Rears quickly at first, so the body is up before the first paw reaches the face.
             case REACH -> lerp(easeOut(t), 0.0f, profile.reachPitch);
-            case RISE -> lerp(s, profile.reachPitch, profile.risePitch);
+            case RISE -> lerp(s, fromClimb ? CLIMB_PITCH : profile.reachPitch, profile.risePitch);
             case CREST -> lerp(s, profile.risePitch, profile.crestPitch);
             case RECOVER -> lerp(s, profile.crestPitch, 0.0f);
         };
@@ -80,11 +98,19 @@ public final class MantleProgress {
      * toward the top); walking on, it straightens out. Continuous across phase borders.
      */
     public static float archDegrees(MantlePhase phase, float t, MantleProfile profile) {
+        return archDegrees(phase, t, profile, false);
+    }
+
+    /**
+     * As {@link #archDegrees(MantlePhase, float, MantleProfile)}. A climbing body starts with a
+     * straight spine, and from a climb the rise extends it as the reach would have.
+     */
+    public static float archDegrees(MantlePhase phase, float t, MantleProfile profile, boolean fromClimb) {
         final float s = smoothstep(t);
         return switch (phase) {
             case NONE -> 0.0f;
             case REACH -> lerp(easeOut(t), 0.0f, -profile.rearArchDegrees);
-            case RISE -> -profile.rearArchDegrees;
+            case RISE -> fromClimb ? lerp(s, 0.0f, -profile.rearArchDegrees) : -profile.rearArchDegrees;
             case CREST -> lerp(s, -profile.rearArchDegrees, profile.archDegrees);
             case RECOVER -> lerp(s, profile.archDegrees, 0.0f);
         };

@@ -128,6 +128,8 @@ public abstract class DiverseCritter extends TamableAnimal
     private static final EntityDataAccessor<Float> MANTLE_LIP_Y = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
     /** The mantle's pace, 1 normally; lower for slow motion (/civet_debug mantle_speed). */
     private static final EntityDataAccessor<Float> MANTLE_TIME_SCALE = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.FLOAT);
+    /** The mantle crests a trunk the critter was climbing (MantleState#fromClimb). */
+    private static final EntityDataAccessor<Boolean> MANTLE_FROM_CLIMB = SynchedEntityData.defineId(DiverseCritter.class, EntityDataSerializers.BOOLEAN);
 
     /** Species that can climb a ledge set this in their constructor. Server side only acts on it. */
     @Nullable
@@ -460,6 +462,7 @@ public abstract class DiverseCritter extends TamableAnimal
         this.entityData.define(MANTLE_START_Y, 0.0F);
         this.entityData.define(MANTLE_LIP_Y, 0.0F);
         this.entityData.define(MANTLE_TIME_SCALE, 1.0F);
+        this.entityData.define(MANTLE_FROM_CLIMB, false);
     }
 
     // --- MANTLE ---
@@ -483,12 +486,14 @@ public abstract class DiverseCritter extends TamableAnimal
     }
 
     /** Publishes a mantle to the clients. Only {@link MantleController} calls this. */
-    public void setMantleData(BlockPos lip, Direction facing, int startTick, float startY, float lipY, float timeScale) {
+    public void setMantleData(BlockPos lip, Direction facing, int startTick, float startY, float lipY, float timeScale,
+                              boolean fromClimb) {
         this.entityData.set(MANTLE_FACING, (byte) facing.get2DDataValue());
         this.entityData.set(MANTLE_START, startTick);
         this.entityData.set(MANTLE_START_Y, startY);
         this.entityData.set(MANTLE_LIP_Y, lipY);
         this.entityData.set(MANTLE_TIME_SCALE, timeScale);
+        this.entityData.set(MANTLE_FROM_CLIMB, fromClimb);
         // Last: clients treat the lip as the switch, so everything else is in place when it flips.
         this.entityData.set(MANTLE_LIP, Optional.of(lip));
     }
@@ -511,6 +516,7 @@ public abstract class DiverseCritter extends TamableAnimal
                 Direction.from2DDataValue(this.entityData.get(MANTLE_FACING)),
                 this.entityData.get(MANTLE_START_Y), startTick);
         out.timeScale = this.entityData.get(MANTLE_TIME_SCALE);
+        out.fromClimb = this.entityData.get(MANTLE_FROM_CLIMB);
         return true;
     }
 

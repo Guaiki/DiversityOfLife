@@ -129,4 +129,25 @@ class MantleProgressTest {
         }
         assertEquals(MantlePhase.RECOVER, last);
     }
+
+    @Test
+    void fromAClimbThereIsNoReach() {
+        // Up the face already, standing still at the start: rising, not reaching.
+        final MantleProgress p = MantleProgress.of(64.0, 64.0, 65.0, 0.0, AT_FACE, HALF_WIDTH, PROFILE, true,
+                new MantleProgress());
+        assertEquals(MantlePhase.RISE, p.phase);
+        assertEquals(0.0f, p.t, 1.0e-6f);
+    }
+
+    @Test
+    void fromAClimbTheRiseStartsUpright() {
+        assertEquals(MantleProgress.CLIMB_PITCH, MantleProgress.pitchDegrees(MantlePhase.RISE, 0.0f, PROFILE, true), 1.0e-6f);
+        assertEquals(PROFILE.risePitch, MantleProgress.pitchDegrees(MantlePhase.RISE, 1.0f, PROFILE, true), 1.0e-6f);
+        // A climbing body's spine is straight; it extends through the rise as a reach would have.
+        assertEquals(0.0f, MantleProgress.archDegrees(MantlePhase.RISE, 0.0f, PROFILE, true), 1.0e-6f);
+        assertEquals(-PROFILE.rearArchDegrees, MantleProgress.archDegrees(MantlePhase.RISE, 1.0f, PROFILE, true), 1.0e-6f);
+        // Continuous into the crest, as from the ground.
+        assertEquals(MantleProgress.pitchDegrees(MantlePhase.CREST, 0.0f, PROFILE),
+                MantleProgress.pitchDegrees(MantlePhase.RISE, 1.0f, PROFILE, true), 1.0e-6f);
+    }
 }

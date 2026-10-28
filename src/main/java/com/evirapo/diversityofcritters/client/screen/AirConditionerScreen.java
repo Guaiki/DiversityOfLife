@@ -14,21 +14,34 @@ import net.minecraft.world.entity.player.Inventory;
 
 public class AirConditionerScreen extends AbstractContainerScreen<AirConditionerMenu> {
 
-    /** Textura vanilla provisional; se cambiará por la GUI custom del cliente. */
+    /** Arte del panel: región 120x75 del PNG de 128x128 (desde 4,30), dibujada al doble. */
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation("minecraft", "textures/gui/demo_background.png");
+            new ResourceLocation("diversityofcritters", "textures/gui/air_conditioner.png");
+    private static final int ART_U = 4;
+    private static final int ART_V = 30;
+    private static final int ART_W = 120;
+    private static final int ART_H = 75;
 
-    // Nuevas texturas
-    private static final ResourceLocation LINE_TEXTURE =
-            new ResourceLocation("diversityofcritters", "textures/gui/line.png");
     private static final ResourceLocation SNOWFLAKE_TEXTURE =
             new ResourceLocation("diversityofcritters", "textures/gui/snowflake.png");
     private static final ResourceLocation ICE_TEXTURE =
             new ResourceLocation("diversityofcritters", "textures/gui/ice.png");
 
-    private static final int SCALE_MARGIN_X = 24;
-    private static final int SCALE_Y = 54;
+    /** Ventana clara del panel donde van los controles (coordenadas de la GUI). */
+    private static final int INNER_X = 108;
+    private static final int INNER_W = 114;
+    private static final int INNER_CENTER = INNER_X + INNER_W / 2;
+    private static final int ARROW_SIZE = 14;
+    private static final int ARROW_Y = 22;
+    /** La escala de tiers va en la misma fila que las flechas, entre ambas. */
+    private static final int SCALE_X = INNER_X + ARROW_SIZE + 4;
+    private static final int SCALE_W = INNER_W - 2 * (ARROW_SIZE + 4);
     private static final int SCALE_HEIGHT = 8;
+    private static final int SCALE_Y = ARROW_Y + (ARROW_SIZE - SCALE_HEIGHT) / 2;
+    private static final int NAME_Y = 41;
+    private static final int TOGGLES_Y = 55;
+    private static final int SIZE_LABEL_Y = 84;
+    private static final int SIZE_BUTTONS_Y = 95;
 
     private TemperatureTier tier;
     private int size;
@@ -41,8 +54,8 @@ public class AirConditionerScreen extends AbstractContainerScreen<AirConditioner
 
     public AirConditionerScreen(AirConditionerMenu pMenu, Inventory pPlayerInventory, Component pTitle) {
         super(pMenu, pPlayerInventory, pTitle);
-        this.imageWidth = 248;
-        this.imageHeight = 166;
+        this.imageWidth = ART_W * 2;
+        this.imageHeight = ART_H * 2;
         this.tier = pMenu.blockEntity.getTier();
         this.size = pMenu.blockEntity.getSize();
         this.snowEnabled = pMenu.blockEntity.isSnowEnabled();
@@ -52,35 +65,32 @@ public class AirConditionerScreen extends AbstractContainerScreen<AirConditioner
     @Override
     protected void init() {
         super.init();
-        this.titleLabelX = (this.imageWidth - this.font.width(this.title)) / 2;
+        this.titleLabelX = 8;
         this.inventoryLabelY = 10000; // sin inventario de jugador
 
         addRenderableWidget(Button.builder(Component.literal("<"), b -> cycleTier(-1))
-                .bounds(this.leftPos + SCALE_MARGIN_X, this.topPos + SCALE_Y + SCALE_HEIGHT + 6, 20, 20).build());
+                .bounds(this.leftPos + INNER_X, this.topPos + ARROW_Y, ARROW_SIZE, ARROW_SIZE).build());
         addRenderableWidget(Button.builder(Component.literal(">"), b -> cycleTier(1))
-                .bounds(this.leftPos + this.imageWidth - SCALE_MARGIN_X - 20, this.topPos + SCALE_Y + SCALE_HEIGHT + 6, 20, 20).build());
+                .bounds(this.leftPos + INNER_X + INNER_W - ARROW_SIZE, this.topPos + ARROW_Y, ARROW_SIZE, ARROW_SIZE).build());
 
-        // ==========================================
-        // TUNING: BOTONES DE SNOW Y ICE (MÁS GRANDES)
-        // ==========================================
-        int iconButtonSize = 26; // <-- Tamaño del contenedor/botón (Antes era 20)
-        int toggleGap = 12;      // <-- Separación entre ambos botones
-        int buttonsY = 88;       // <-- Posición Y (altura) de los botones en la GUI
+        int iconButtonSize = 22; // Tamaño del contenedor/botón
+        int toggleGap = 10;      // Separación entre ambos botones
+        int buttonsY = TOGGLES_Y;
 
-        int togglesX0 = this.leftPos + (this.imageWidth - iconButtonSize * 2 - toggleGap) / 2;
+        int togglesX0 = this.leftPos + INNER_CENTER - (iconButtonSize * 2 + toggleGap) / 2;
 
         this.snowButton = addRenderableWidget(createIconButton(togglesX0, this.topPos + buttonsY, iconButtonSize, SNOWFLAKE_TEXTURE, false));
         this.iceButton = addRenderableWidget(createIconButton(togglesX0 + iconButtonSize + toggleGap, this.topPos + buttonsY, iconButtonSize, ICE_TEXTURE, true));
 
         int[] sizes = AirConditionerBlockEntity.ALLOWED_SIZES;
-        int buttonWidth = 36;
-        int gap = 8;
+        int buttonWidth = 26;
+        int gap = 4;
         int totalWidth = sizes.length * buttonWidth + (sizes.length - 1) * gap;
-        int x0 = this.leftPos + (this.imageWidth - totalWidth) / 2;
+        int x0 = this.leftPos + INNER_CENTER - totalWidth / 2;
         for (int i = 0; i < sizes.length; i++) {
             final int s = sizes[i];
             sizeButtons[i] = addRenderableWidget(Button.builder(Component.literal(String.valueOf(s)), b -> setSize(s))
-                    .bounds(x0 + i * (buttonWidth + gap), this.topPos + 128, buttonWidth, 20).build());
+                    .bounds(x0 + i * (buttonWidth + gap), this.topPos + SIZE_BUTTONS_Y, buttonWidth, 16).build());
         }
         updateSizeButtons();
     }
@@ -163,21 +173,7 @@ public class AirConditionerScreen extends AbstractContainerScreen<AirConditioner
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        // Fondo base de la GUI
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
-
-        // ==========================================
-        // TUNING: RENDERIZADO Y ESCALADO DE LINE.PNG
-        // ==========================================
-        int lineDisplayWidth = 196;  // <-- Ancho en pantalla
-        int lineDisplayHeight = 210; // <-- Alto en pantalla
-        int lineYOffset = -116;       // <-- Ajuste vertical
-
-        int lineX = x + (this.imageWidth - lineDisplayWidth) / 2; // Centrado horizontal
-        int lineY = y + SCALE_Y + lineYOffset;
-
-        // blit(textura, xPantalla, yPantalla, anchoPantalla, altoPantalla, xTextura, yTextura, anchoLeidoTextura, altoLeidoTextura, anchoTotalTextura, altoTotalTextura)
-        guiGraphics.blit(LINE_TEXTURE, lineX, lineY, lineDisplayWidth, lineDisplayHeight, 0, 0, 128, 128, 128, 128);
+        guiGraphics.blit(TEXTURE, x, y, imageWidth, imageHeight, ART_U, ART_V, ART_W, ART_H, 128, 128);
     }
 
     @Override
@@ -186,9 +182,8 @@ public class AirConditionerScreen extends AbstractContainerScreen<AirConditioner
 
         // Escala de 7 tiers con marcador sobre el tier actual
         TemperatureTier[] tiers = TemperatureTier.values();
-        int scaleWidth = this.imageWidth - SCALE_MARGIN_X * 2;
-        int segmentWidth = scaleWidth / tiers.length;
-        int x0 = SCALE_MARGIN_X + (scaleWidth - segmentWidth * tiers.length) / 2;
+        int segmentWidth = SCALE_W / tiers.length;
+        int x0 = SCALE_X + (SCALE_W - segmentWidth * tiers.length) / 2;
 
         for (int i = 0; i < tiers.length; i++) {
             int sx = x0 + i * segmentWidth;
@@ -204,12 +199,10 @@ public class AirConditionerScreen extends AbstractContainerScreen<AirConditioner
 
         String tierName = this.tier.getDisplayName();
         int nameWidth = this.font.width(tierName);
-        guiGraphics.drawString(this.font, tierName, (this.imageWidth - nameWidth) / 2, SCALE_Y + SCALE_HEIGHT + 12, this.tier.getColor(), true);
-
-        // SE ELIMINÓ EL TEXTO "TEMPERATURA" DE AQUÍ
+        guiGraphics.drawString(this.font, tierName, INNER_CENTER - nameWidth / 2, NAME_Y, this.tier.getColor(), true);
 
         Component sizeLabel = Component.translatable("gui.diversityofcritters.air_conditioner.size");
-        guiGraphics.drawString(this.font, sizeLabel, (this.imageWidth - this.font.width(sizeLabel)) / 2, 116, 0xFF404040, false);
+        guiGraphics.drawString(this.font, sizeLabel, INNER_CENTER - this.font.width(sizeLabel) / 2, SIZE_LABEL_Y, 0xFF404040, false);
     }
 
     @Override

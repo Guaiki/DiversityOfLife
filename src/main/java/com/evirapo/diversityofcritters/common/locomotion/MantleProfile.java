@@ -13,7 +13,7 @@ public final class MantleProfile {
      * Squirrel: shorter legs and hips closer together than the civet's reach about 0.97 blocks
      * rearing up, so even an adult hops the last of a full block.
      */
-    public static final MantleProfile SQUIRREL = builder().hop(0.95, 0.5, 3.0).build();
+    public static final MantleProfile SQUIRREL = builder().hop(0.95, 0.5, 3.0).climbPose(0.18, 0.15).build();
 
     /**
      * Lip height the pose and the timing are tuned for: a full block. Lower lips get a smaller,
@@ -101,6 +101,18 @@ public final class MantleProfile {
      */
     public final double hindFaceGrip;
 
+    // --- Cresting a climb (MantleState#fromClimb), measured on the climb pose (MantleFromClimbSceneTest).
+    /**
+     * How far above the feet of the hitbox the climb pose holds the hind feet, blocks, adult: a
+     * mantle from a climb starts with them there, so the body does not drop as it takes over.
+     */
+    public final double climbLift;
+    /**
+     * How much closer to the face the climb pose draws the body than a mantle does, blocks: held
+     * through the rise from a climb, then eased into {@link #crestTuck} over the crest.
+     */
+    public final double climbTuck;
+
     /** The full-block profile this one was scaled from, or null if this is it. */
     private final MantleProfile base;
     /** {@link #forLip} results, one per {@link #LIP_STEPS}; filled as lips are met. */
@@ -162,6 +174,8 @@ public final class MantleProfile {
         this.hindStepLength = b.hindStepLength;
         this.hindStepLift = b.hindStepLift;
         this.hindFaceGrip = b.hindFaceGrip;
+        this.climbLift = b.climbLift;
+        this.climbTuck = b.climbTuck;
         this.base = b.base;
         this.byLip = b.base == null ? new MantleProfile[LIP_STEPS] : null;
     }
@@ -251,6 +265,8 @@ public final class MantleProfile {
         b.hindStepLength = this.hindStepLength;
         b.hindStepLift = this.hindStepLift;
         b.hindFaceGrip = this.hindFaceGrip;
+        b.climbLift = this.climbLift;
+        b.climbTuck = this.climbTuck;
         return b;
     }
 
@@ -293,6 +309,8 @@ public final class MantleProfile {
         private double hindStepLength = 0.06;
         private double hindStepLift = 0.06;
         private double hindFaceGrip = 0.45;
+        private double climbLift = 0.08;
+        private double climbTuck = 0.30;
         private MantleProfile base;
 
         private Builder() {
@@ -407,6 +425,12 @@ public final class MantleProfile {
 
         public Builder crestTuck(double blocks) {
             this.crestTuck = blocks;
+            return this;
+        }
+
+        public Builder climbPose(double lift, double tuck) {
+            this.climbLift = lift;
+            this.climbTuck = tuck;
             return this;
         }
 

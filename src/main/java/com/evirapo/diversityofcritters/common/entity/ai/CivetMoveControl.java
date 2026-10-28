@@ -15,6 +15,8 @@ public class CivetMoveControl extends MoveControl {
     private final CivetEntity civet;
 
     private static final double CLIMB_SPEED = 0.16D;
+    /** How hard the body is pushed into the wall while climbing, blocks per tick. */
+    private static final double WALL_PUSH = 0.15D;
     private static final int POST_CLIMB_DAMPING_TICKS = 6;
     private static final double POST_CLIMB_HORIZONTAL_DAMPING = 0.65D;
     private static final int LOOKAHEAD_NODES = 5;
@@ -224,8 +226,11 @@ public class CivetMoveControl extends MoveControl {
             double pushZ = Math.cos(yawRad) * 0.15;
             this.civet.setDeltaMovement(pushX, -CLIMB_SPEED, pushZ);
         } else {
-            // CLIMB_UP
-            this.civet.setDeltaMovement(motion.x, CLIMB_SPEED, motion.z);
+            // CLIMB_UP, pressed against the wall as on the way down: the climb starts with the wall
+            // up to 0.3 away (hasAdjacentClimbableBlock), and in the air nothing else closes the gap.
+            // A juvenile's small hitbox climbed the whole trunk drawn off the bark.
+            float yawRad = (float) Math.toRadians(this.civet.getClimbFacingYaw());
+            this.civet.setDeltaMovement(-Math.sin(yawRad) * WALL_PUSH, CLIMB_SPEED, Math.cos(yawRad) * WALL_PUSH);
         }
     }
 }

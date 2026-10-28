@@ -156,4 +156,19 @@ class MantleMotionTest {
         assertTrue(MantleMotion.completesWhenInterrupted(0.9f));
         assertFalse(MantleMotion.completesWhenInterrupted(0.5f));
     }
+
+    @Test
+    void fromAClimbTheRiseKeepsTheClimbsPace() {
+        final MantleProgress rising = MantleProgress.of(64.2, 64.0, 65.0, 0.0, -HALF_WIDTH, HALF_WIDTH, PROFILE, true,
+                new MantleProgress());
+        assertEquals(MantlePhase.RISE, rising.phase);
+        final MantleMotion m = MantleMotion.plan(rising, 64.2, 64.0, 65.0, -HALF_WIDTH, HALF_WIDTH, false, true,
+                PROFILE, new MantleMotion());
+        assertEquals(MantleMotion.CLIMB_RISE_SPEED, m.up, 1.0e-9);
+        assertTrue(m.holdsVertical);
+        // Never past the lip.
+        final MantleMotion last = MantleMotion.plan(rising, 64.95, 64.0, 65.0, -HALF_WIDTH, HALF_WIDTH, false, true,
+                PROFILE, new MantleMotion());
+        assertEquals(0.05, last.up, 1.0e-9);
+    }
 }

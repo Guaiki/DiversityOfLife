@@ -746,9 +746,15 @@ public class CivetEntity extends DiverseCritter
                 this.navigation.recomputePath();
                 return;
             }
+            // Cresting: once the top is within reach, a mantle takes the body over onto it, level.
+            final MantleController mantle = this.mantle();
+            if (mantle != null && !this.onGround() && mantle.tryStartFromClimb(this.getClimbFacingYaw())) {
+                this.entityData.set(CLIMB_STATE, CLIMB_NONE);
+                return;
+            }
             if (!hasClimbable && !this.onGround()) {
-                float yawRad = this.getYRot() * ((float) Math.PI / 180F);
-                this.setDeltaMovement(-Math.sin(yawRad) * 0.25D, 0.4D, Math.cos(yawRad) * 0.25D);
+                // Past the top with no mantle (no room on it): let go of the wall. No jump, which
+                // threw the civet clean over a one-block trunk.
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);
             } else if (this.onGround() && !hasClimbable) {
                 this.entityData.set(CLIMB_STATE, CLIMB_NONE);

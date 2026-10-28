@@ -25,8 +25,13 @@ public final class MantleState {
      * (a debug setting). Counting mantle time is {@code (gameTime - startTick) × timeScale}.
      */
     public float timeScale = 1.0f;
+    /**
+     * Started from a climb, at the top of a trunk: the body is already up against the face, so
+     * there is no reach and the hind feet push on the face, not on the ground.
+     */
+    public boolean fromClimb;
 
-    /** Sets everything but the time scale, which starts at 1. */
+    /** Sets everything but the time scale, which starts at 1, and {@link #fromClimb}, which starts false. */
     public MantleState set(int lipX, int lipBlockY, int lipZ, double lipY, Direction facing, double startY, long startTick) {
         this.lipX = lipX;
         this.lipBlockY = lipBlockY;
@@ -36,6 +41,7 @@ public final class MantleState {
         this.startY = startY;
         this.startTick = startTick;
         this.timeScale = 1.0f;
+        this.fromClimb = false;
         return this;
     }
 

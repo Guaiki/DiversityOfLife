@@ -124,6 +124,14 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
 
     @Override
     protected void solve(T entity, LocomotionState state, float partialTick, float dt) {
+        // A mantle that crests a climb takes over from the climb pose, upright on the face. The rig
+        // stood down while climbing; fading in from a level body would show one for a moment.
+        final boolean crestFromClimb = this.mantle != null && this.isActive(entity)
+                && entity.readMantle(this.mantleState) && this.mantleState.fromClimb
+                && (!state.mantleActive || state.mantleStartTick != this.mantleState.startTick);
+        if (crestFromClimb) {
+            this.takeOverFromClimb(state);
+        }
         final float gate = state.gate.value();
         final int count = this.legs.size();
         final LocomotionState.LegState[] legStates = state.legs();
@@ -174,6 +182,7 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         solver.mantlePitch = state.mantlePitch;
 
         solver.solve(state, gate, dt);
+        solver.snap = false;
         this.spine.track(state, state.pelvisPitch.value(), state.pelvisRoll.value(), state.bodyYaw, dt);
         state.debugAuthority = solver.authority;
         state.debugUnitsPerBlock = unitsPerBlock;
@@ -186,6 +195,18 @@ public final class QuadrupedRig<T extends LivingEntity & ILocomotionSubject> ext
         if (LocomotionDebugFlags.capturing()) {
             this.captureCorrected(legStates);
         }
+    }
+
+    /**
+     * Takes the body at once, for a mantle cresting a climb: full authority, and the pelvis, feet and
+     * spine starting from this frame's targets instead of following them from a level body. The
+     * next {@link QuadrupedSolver#solve} snaps.
+     */
+    void takeOverFromClimb(LocomotionState state) {
+        state.gate.snap(1.0f);
+        state.mantleAuthority.snap(1.0f);
+        this.spine.reseed(state);
+        this.solver.snap = true;
     }
 
     /** Where each sole ended up after the correction, for the debug overlay. */

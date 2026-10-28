@@ -79,6 +79,7 @@ public final class MantleController {
     /** Game time of the last probe, so {@link #shouldJumpInstead} only answers for this tick's. */
     private long probedTick = Long.MIN_VALUE;
     private boolean fromPath;
+    private boolean fromClimb;
     private boolean holdsGravity;
     private boolean hop;
     private float timeScale = 1.0f;
@@ -131,27 +132,66 @@ public final class MantleController {
         if (!s.found || s.continuesUp || s.confidence < this.profile.minConfidence) {
             return false;
         }
+        this.start(s, fromPath, false);
+        return true;
+    }
 
+    /**
+     * Crests the trunk the critter is climbing: once the top is within reach of the front paws, the
+     * climb hands over to a mantle that starts against the face, with no reach and the hind feet
+     * pushing on the face. That takes the body over onto the top, level, instead of climbing on
+     * until it hangs in the air above it. The caller ends the climb when this returns true.
+     *
+     * @param wallYaw the yaw the critter faces the wall with
+     * @return whether a mantle started
+     */
+    public boolean tryStartFromClimb(float wallYaw) {
+        if (this.active || this.critter.isNewborn() || this.critter.hurtTime > 0 || this.critter.isInWaterOrBubble()) {
+            return false;
+        }
+        LedgeSampler.sample(this.critter.level(), this.critter.position(), wallYaw,
+                this.critter.getBbWidth() * 0.5f, this.critter.getBbHeight(), this.profile, this.sample);
+        this.probedTick = this.critter.level().getGameTime();
+        final LedgeSample s = this.sample;
+        if (!s.found || s.continuesUp || s.confidence < this.profile.minConfidence
+                || s.lipHeight > this.climbCrestHeight()) {
+            return false;
+        }
+        this.start(s, false, true);
+        return true;
+    }
+
+    /**
+     * How far above the feet the top of a trunk is when a climbing critter's front paws reach it,
+     * blocks: it climbs until then. Within reach, so the mantle needs no hop.
+     */
+    public double climbCrestHeight() {
+        return Math.min(this.profile.maxMantleHeight, this.profile.reach * this.critter.growthScale());
+    }
+
+    private void start(LedgeSample s, boolean fromPath, boolean fromClimb) {
         this.active = true;
         this.fromPath = fromPath;
+        this.fromClimb = fromClimb;
         this.startTick = this.critter.level().getGameTime();
-        this.startY = this.critter.getY();
+        // From a climb the hind feet are on the face a little above the hitbox's feet: start there.
+        this.startY = this.critter.getY() + (fromClimb ? this.profile.climbLift * this.critter.growthScale() : 0.0);
         this.lipY = s.lipY;
         this.wallCoord = s.wallCoord;
         this.facing = s.facing;
         this.lip.set(s.lipX, s.lipBlockY, s.lipZ);
-        this.lipProfile = this.profile.forLip(s.lipHeight);
-        this.hop = MantleMotion.needsHop(s.lipHeight, this.critter.growthScale(), this.profile);
+        // A crest from a climb is a full manoeuvre whatever is left to the lip: the body is up already.
+        this.lipProfile = fromClimb ? this.profile : this.profile.forLip(s.lipHeight);
+        this.hop = !fromClimb && MantleMotion.needsHop(s.lipHeight, this.critter.growthScale(), this.profile);
         this.timeScale = debugTimeScale;
 
         // Vanilla would otherwise step the body straight up the block and leave the pose behind.
         this.critter.setMaxUpStep(0.0f);
         this.critter.setMantleData(this.lip.immutable(), this.facing, (int) this.startTick,
-                (float) this.startY, (float) this.lipY, this.timeScale);
+                (float) this.startY, (float) this.lipY, this.timeScale, fromClimb);
         this.lockRotation();
-        LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}{}", this.critter, this.lip, this.facing,
-                String.format("%.2f", s.lipHeight), this.hop ? ", with a hop" : "");
-        return true;
+        LOGGER.debug("[Mantle] {} starts at {} facing {}, lip +{}{}{}", this.critter, this.lip, this.facing,
+                String.format("%.2f", s.lipHeight), this.hop ? ", with a hop" : "", fromClimb ? ", from a climb" : "");
     }
 
     /**
@@ -283,7 +323,7 @@ public final class MantleController {
         final double mantleTicks = ticks * (double) this.timeScale;
         final double pastFace = this.pastFace();
         MantleProgress.of(this.critter.getY(), this.startY, this.lipY, mantleTicks, pastFace,
-                this.critter.getBbWidth() * 0.5, this.lipProfile, this.progress);
+                this.critter.getBbWidth() * 0.5, this.lipProfile, this.fromClimb, this.progress);
 
         final String exit = this.exitReason(ticks, mantleTicks);
         if (exit != null) {
@@ -292,7 +332,7 @@ public final class MantleController {
         }
 
         MantleMotion.plan(this.progress, this.critter.getY(), this.startY, this.lipY, pastFace,
-                this.critter.getBbWidth() * 0.5, this.hop, this.lipProfile, this.motion);
+                this.critter.getBbWidth() * 0.5, this.hop, this.fromClimb, this.lipProfile, this.motion);
         if (this.motion.done) {
             this.end("done");
             return false;
@@ -342,6 +382,11 @@ public final class MantleController {
         this.holdGravity(false);
         this.critter.clearMantleData();
         // The critter's own tick puts its usual step height back.
+        if (this.fromClimb) {
+            // The path came up nodes against the face; walking back to the ones left behind would
+            // take the critter off the edge. Plan it again from the top.
+            this.critter.getNavigation().recomputePath();
+        }
         LOGGER.debug("[Mantle] {} ends: {}", this.critter, reason);
     }
 

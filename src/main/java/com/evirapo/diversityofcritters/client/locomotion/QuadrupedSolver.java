@@ -65,6 +65,8 @@ public final class QuadrupedSolver {
     /** Mantle input, set before {@link #solve}: its authority in [0, 1] and the pitch it asks for. */
     float mantleAuthority;
     float mantlePitch;
+    /** Take this frame's targets at once instead of following them: the pose is starting over. */
+    boolean snap;
 
     /** Unsmoothed targets this frame, for debug. */
     float pitchTarget;
@@ -105,7 +107,7 @@ public final class QuadrupedSolver {
      */
     public void solve(LocomotionState state, float gate, float dt) {
         final LocomotionState.LegState[] legs = state.legs();
-        final boolean smooth = state.initialised;
+        final boolean smooth = state.initialised && !this.snap;
         final float follow = Spring.blendFactor(WEIGHT_RATE, dt);
         // A mantle poses the body itself, and leaves the terrain behind while it does: over the crest
         // the animated hind feet are still over the ground below the wall. Kept lagging, that would
