@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IRI",
+    "BWC",
+    "ICI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "B": { "item": "minecraft:stone_button" },
+    "W": { "item": "minecraft:water_bucket" },
+    "C": { "item": "minecraft:copper_ingot" }
+  },
+  "result": {
+    "item": "diversityofcritters:humidifier",
+    "count": 1
+  }
+}

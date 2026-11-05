@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IRI",
+    "BCC",
+    "ICI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "B": { "item": "minecraft:stone_button" },
+    "C": { "item": "minecraft:copper_ingot" }
+  },
+  "result": {
+    "item": "diversityofcritters:air_conditioner",
+    "count": 1
+  }
+}

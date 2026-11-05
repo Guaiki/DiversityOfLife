@@ -23,7 +23,7 @@ public class DoCItemModelProvider extends ItemModelProvider {
         simpleItem(DOCItems.CIVET_SPAWN_EGG);
         simpleItem(DOCItems.SQUIRREL_SPAWN_EGG);
         simpleItem(DOCItems.SIFAKA_SPAWN_EGG);
-        // The item kept its old registry name (zoo_book) when it became the Animal Data Card, so
+        // The item kept its old registry name (zoo_book) when it became the Identity & Wellbeing Card, so
         // simpleItem() would point it at the old book texture.
         withExistingParent(DOCItems.ZOO_BOOK.getId().getPath(), new ResourceLocation("item/generated"))
                 .texture("layer0", modLoc("item/animal_data_card"));
