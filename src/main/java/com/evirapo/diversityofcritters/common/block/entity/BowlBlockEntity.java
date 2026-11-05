@@ -67,9 +67,13 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             items.set(i, inventory.getItem(i));
         }
-        ContainerHelper.saveAllItems(tag, items);
+        // Empty fields are left out so a broken empty bowl drops a plain item that stacks
+        // with fresh ones (the loot table copies these tags into the dropped item).
+        ContainerHelper.saveAllItems(tag, items, false);
 
-        tag.putInt("WaterCharges", this.waterCharges);
+        if (this.waterCharges > 0) {
+            tag.putInt("WaterCharges", this.waterCharges);
+        }
     }
 
     @Override
@@ -86,6 +90,12 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
         this.waterCharges = tag.getInt("WaterCharges");
 
         updateContentState();
+
+        // A bowl placed from a picked-up item goes EMPTY -> WATER above, which refills the
+        // charges; put back the saved level so a half-drunk bowl stays half-drunk.
+        if (tag.contains("WaterCharges")) {
+            this.waterCharges = tag.getInt("WaterCharges");
+        }
     }
 
     @Override

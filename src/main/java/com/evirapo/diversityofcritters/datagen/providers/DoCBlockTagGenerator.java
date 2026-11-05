@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.datagen.providers;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
@@ -34,5 +35,14 @@ public class DoCBlockTagGenerator extends BlockTagsProvider {
                      Blocks.DIRT,
                      Blocks.ROOTED_DIRT,
                      Blocks.MOSS_BLOCK);
+
+        this.tag(BlockTags.MINEABLE_WITH_AXE)
+                .add(DOCBlocks.BOWL.get(),
+                     DOCBlocks.DIG_BOX.get());
+
+        // Machines break like a furnace: pickaxe, any tier.
+        this.tag(BlockTags.MINEABLE_WITH_PICKAXE)
+                .add(DOCBlocks.AIR_CONDITIONER.get(),
+                     DOCBlocks.HUMIDIFIER.get());
     }
 }

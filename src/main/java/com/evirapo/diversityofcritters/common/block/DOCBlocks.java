@@ -26,10 +26,11 @@ public class DOCBlocks {
             () -> new DigBoxBlock(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS).noOcclusion()));
 
     public static final RegistryObject<Block> AIR_CONDITIONER = BLOCKS.register("air_conditioner",
-            () -> new AirConditionerBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)));
+            () -> new AirConditionerBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3.5F)));
 
+    // Same hardness as the furnace (3.5); both are tagged mineable/pickaxe in the block tag datagen.
     public static final RegistryObject<Block> HUMIDIFIER = BLOCKS.register("humidifier",
-            () -> new HumidifierBlock(BlockBehaviour.Properties.copy(Blocks.PRISMARINE)));
+            () -> new HumidifierBlock(BlockBehaviour.Properties.copy(Blocks.PRISMARINE).strength(3.5F)));
 
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
