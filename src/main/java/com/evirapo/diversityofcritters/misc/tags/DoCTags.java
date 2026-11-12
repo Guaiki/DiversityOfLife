@@ -9,6 +9,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 
+import javax.annotation.Nullable;
+import java.util.List;
+
 public class DoCTags {
 
     public static class Items {
@@ -48,6 +51,27 @@ public class DoCTags {
 
         /** Vanilla livestock that self-breeds under the per-area cap: cow, pig, sheep, chicken. */
         public static final TagKey<EntityType<?>> LIVESTOCK = create("livestock");
+
+        // Prey categories: every animal belongs to one, and each predator hunts some of them.
+        // Datapacks can move animals between categories by editing these tags.
+        public static final TagKey<EntityType<?>> SMALL_RODENT = create("category/small_rodent");
+        public static final TagKey<EntityType<?>> SMALL_CARNIVORA = create("category/small_carnivora");
+        public static final TagKey<EntityType<?>> SMALL_PRIMATE = create("category/small_primate");
+        public static final TagKey<EntityType<?>> LAGOMORPH = create("category/lagomorph");
+        public static final TagKey<EntityType<?>> SMALL_BIRD = create("category/small_bird");
+
+        /** Every prey category, in this order; an animal's category is the first one it is in. */
+        public static final List<TagKey<EntityType<?>>> CATEGORIES =
+                List.of(SMALL_RODENT, SMALL_CARNIVORA, SMALL_PRIMATE, LAGOMORPH, SMALL_BIRD);
+
+        /** The prey category of {@code type}, or null if it has none. */
+        @Nullable
+        public static TagKey<EntityType<?>> categoryOf(EntityType<?> type) {
+            for (TagKey<EntityType<?>> category : CATEGORIES) {
+                if (type.is(category)) return category;
+            }
+            return null;
+        }
 
         private static TagKey<EntityType<?>> create(String pName) {
             return TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(DiversityOfCritters.MODID, pName));

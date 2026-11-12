@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * sorbo es una repetición del bucle, así que el número de sorbos y la animación no pueden
  * desincronizarse.
  */
-public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> implements FeedingGoal {
+public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
 
     private static final double MAX_DRINK_DIST_SQ = 1.2D;
     private static final Direction[] HORIZONTALS = {

@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>La búsqueda de hojas se conserva; lo que se va es el {@code EAT_DURATION = 60} y los reintentos
  * de navegación a mano, que ahora los lleva la fase APPROACH de la clase base.
  */
-public class SquirrelEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritter> implements FeedingGoal {
+public class SquirrelEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritter> {
 
     /** El parámetro de tipo de la clase base es {@code DiverseCritter}, que es quien implementa
      *  {@code Animatable}; esto guarda la vista tipada para lo específico de la ardilla. */

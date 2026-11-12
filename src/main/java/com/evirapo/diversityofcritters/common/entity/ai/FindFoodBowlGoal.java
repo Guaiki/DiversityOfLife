@@ -14,7 +14,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 
-public class FindFoodBowlGoal extends Goal implements FeedingGoal {
+public class FindFoodBowlGoal extends Goal {
 
     private final DiverseCritter critter;
     private final double speed;

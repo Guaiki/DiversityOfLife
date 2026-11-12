@@ -48,45 +48,42 @@ public final class SeekComfortGameTests {
     }
 
     /**
-     * The fake climate, removed again shortly before the timeout too: a test that fails never runs
-     * its own clean-up, and a leftover freezing area would chill whatever later batch reuses this
-     * spot in the world.
+     * Floor, fake climate and the civet. Everything is undone again shortly before the timeout too:
+     * a failing test never runs its own clean-up, a leftover freezing area would chill whatever later
+     * batch reuses this spot, and a civet that walked out of the arena is out of reach of
+     * {@code killAllEntities()} and would wander into other tests.
      */
-    private static void climate(GameTestHelper helper, boolean warmCorner, int timeoutTicks) {
-        helper.runAfterDelay(timeoutTicks - 2, () -> {
-            AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(COLD_CENTER));
-            AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(WARM_CORNER));
-        });
+    private static CivetEntity setUp(GameTestHelper helper, boolean warmCorner, int timeoutTicks, Vec3 civetAt) {
+        floor(helper);
         AirConditionerManager.add(helper.getLevel(), helper.absolutePos(COLD_CENTER), TemperatureTier.FREEZING, 12);
         if (warmCorner) {
             AirConditionerManager.add(helper.getLevel(), helper.absolutePos(WARM_CORNER), TemperatureTier.MODERATE, 4);
         }
+        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), civetAt);
+        helper.runAfterDelay(timeoutTicks - 2, () -> cleanUp(helper, civet));
+        return civet;
     }
 
-    private static void cleanUp(GameTestHelper helper) {
+    private static void cleanUp(GameTestHelper helper, CivetEntity civet) {
         AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(COLD_CENTER));
         AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(WARM_CORNER));
-        helper.killAllEntities();
+        civet.discard();
     }
 
     @GameTest(template = ARENA, timeoutTicks = 800, batch = BATCH)
     public static void aFreezingCivetWalksToTheWarmCorner(GameTestHelper helper) {
-        floor(helper);
-        climate(helper, true, 800);
-        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(2.5, 3, 2.5));
+        CivetEntity civet = setUp(helper, true, 800, new Vec3(2.5, 3, 2.5));
 
         helper.succeedWhen(() -> {
             helper.assertTrue(civet.climateScoreAt(civet.blockPosition()) == 0,
                     "waiting for the civet to reach comfort, score " + civet.climateScoreAt(civet.blockPosition()));
-            cleanUp(helper);
+            cleanUp(helper, civet);
         });
     }
 
     @GameTest(template = ARENA, timeoutTicks = 800, batch = BATCH)
     public static void aWanderingPetSeeksComfortToo(GameTestHelper helper) {
-        floor(helper);
-        climate(helper, true, 800);
-        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(2.5, 3, 2.5));
+        CivetEntity civet = setUp(helper, true, 800, new Vec3(2.5, 3, 2.5));
         civet.setTame(true);
         civet.setWandering(true);
 
@@ -97,15 +94,13 @@ public final class SeekComfortGameTests {
                             + " sit " + civet.isOrderedToSit() + " sleep " + civet.getSleepState()
                             + " at " + helper.relativePos(civet.blockPosition())
                             + " navDone " + civet.getNavigation().isDone());
-            cleanUp(helper);
+            cleanUp(helper, civet);
         });
     }
 
     @GameTest(template = ARENA, timeoutTicks = 400, batch = BATCH)
     public static void aSittingPetStaysPutInTheCold(GameTestHelper helper) {
-        floor(helper);
-        climate(helper, true, 400);
-        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(2.5, 3, 2.5));
+        CivetEntity civet = setUp(helper, true, 400, new Vec3(2.5, 3, 2.5));
         civet.setTame(true);
         civet.setWandering(false);
         civet.setOrderedToSit(true);
@@ -115,26 +110,24 @@ public final class SeekComfortGameTests {
             if (civet.position().distanceTo(start) > 1.0D) helper.fail("the sitting pet moved away");
         });
         helper.runAfterDelay(300, () -> {
-            cleanUp(helper);
+            cleanUp(helper, civet);
             helper.succeed();
         });
     }
 
-    /** Freezing everywhere: no better spot, so the search backs off and the civet still eats. */
+    /** Hungry in freezing danger with food at hand: it gets its grace to eat before it leaves. */
     @GameTest(template = ARENA, timeoutTicks = 600, batch = BATCH)
-    public static void withNoBetterSpotTheCivetStillEats(GameTestHelper helper) {
-        floor(helper);
-        climate(helper, false, 600);
+    public static void aHungryCivetInDangerEatsBeforeLeaving(GameTestHelper helper) {
+        CivetEntity civet = setUp(helper, false, 600, new Vec3(3.5, 3, 5.5));
         BlockPos bowl = new BlockPos(7, 3, 5);
         helper.setBlock(bowl, DOCBlocks.BOWL.get());
         BowlBlockEntity bowlBe = (BowlBlockEntity) helper.getBlockEntity(bowl);
         bowlBe.getInventory().setItem(0, new ItemStack(Items.BEEF, 1));
-        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(3.5, 3, 5.5));
         civet.setHunger(civet.maxHunger() / 10);
 
         helper.succeedWhen(() -> {
             helper.assertTrue(bowlBe.getInventory().isEmpty(), "waiting for the cold civet to eat");
-            cleanUp(helper);
+            cleanUp(helper, civet);
         });
     }
 }

@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.datagen.providers;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
@@ -20,5 +21,11 @@ public class DoCEntityTagGenerator extends EntityTypeTagsProvider {
     protected void addTags(HolderLookup.Provider pProvider) {
         this.tag(DoCTags.EntityTypes.LIVESTOCK)
                 .add(EntityType.COW, EntityType.PIG, EntityType.SHEEP, EntityType.CHICKEN);
+
+        this.tag(DoCTags.EntityTypes.SMALL_RODENT).add(DOCEntities.SQUIRREL.get());
+        this.tag(DoCTags.EntityTypes.SMALL_CARNIVORA).add(DOCEntities.CIVET.get());
+        this.tag(DoCTags.EntityTypes.SMALL_PRIMATE).add(DOCEntities.SIFAKA.get());
+        this.tag(DoCTags.EntityTypes.LAGOMORPH).add(EntityType.RABBIT);
+        this.tag(DoCTags.EntityTypes.SMALL_BIRD).add(EntityType.CHICKEN, EntityType.PARROT);
     }
 }

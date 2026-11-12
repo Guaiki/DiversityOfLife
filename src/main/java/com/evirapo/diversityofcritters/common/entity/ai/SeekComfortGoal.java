@@ -24,10 +24,10 @@ import java.util.List;
  * <ul>
  *   <li>Wild animals always; tamed ones only while set to wander. Sitting or following the owner,
  *       the order wins.</li>
- *   <li>In mere stress, hunger and thirst come first. In danger the climate comes first, except
- *       that a hungry or thirsty animal first gets five seconds to find food or water, and one already
- *       on its way to it (a {@link FeedingGoal}) is left to eat: otherwise one whose only food lies in
- *       the danger would walk out on arrival, forever.</li>
+ *   <li>In mere stress, hunger and thirst come first. In danger, a hungry or thirsty animal first gets
+ *       30 seconds to eat or drink (about one heart of danger damage), then the climate wins. Without
+ *       that grace one whose only food lies in the danger would walk out on arrival, forever; without
+ *       the limit one with no food in reach would never leave the danger.</li>
  *   <li>A destination must be strictly better than where the animal stands, so it never walks into
  *       something worse. Stepping into danger during a stroll triggers this goal and walks it out.</li>
  *   <li>With no better spot in reach, the search backs off (three cooldowns) so it never blocks
@@ -39,7 +39,7 @@ public class SeekComfortGoal extends Goal {
     private static final int RANDOM_SAMPLES = 16;
     private static final int GROUND_SEARCH_DEPTH = 12;
     private static final double ARRIVED_DIST_SQ = 1.5D * 1.5D;
-    private static final int FEEDING_GRACE_TICKS = 100;
+    private static final int FEEDING_GRACE_TICKS = 600;
 
     private final DiverseCritter critter;
     private final double speed;
@@ -65,13 +65,13 @@ public class SeekComfortGoal extends Goal {
         if (here == 0) return false;
         boolean danger = here >= DiverseCritter.CLIMATE_DANGER_SCORE;
         boolean needy = critter.isHungry() || critter.isThirsty();
-        if (needy && (!danger || isFeeding())) {
+        if (needy && !danger) {
             needyInDangerSince = -1;
             return false;
         }
         if (needy) {
-            // Hungry or thirsty in danger: first give the food and water goals (lower priority, they
-            // scan once a second) the chance to find something before walking away from it.
+            // Hungry or thirsty in danger: first give the food and water goals (lower priority) the
+            // chance to eat or drink before walking away from them.
             if (needyInDangerSince < 0) needyInDangerSince = now;
             if (now - needyInDangerSince < FEEDING_GRACE_TICKS) return false;
         } else {
@@ -95,11 +95,6 @@ public class SeekComfortGoal extends Goal {
         if (critter.isPassenger() || critter.isLeashed()) return false;
         if (critter.isTame() && (!critter.isWandering() || critter.isOrderedToSit())) return false;
         return true;
-    }
-
-    /** Already walking to food or water, or eating or drinking (see {@link FeedingGoal}). */
-    private boolean isFeeding() {
-        return critter.goalSelector.getRunningGoals().anyMatch(g -> g.getGoal() instanceof FeedingGoal);
     }
 
     @Override

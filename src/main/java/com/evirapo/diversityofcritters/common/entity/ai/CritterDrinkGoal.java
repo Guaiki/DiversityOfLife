@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
-public class CritterDrinkGoal extends Goal implements FeedingGoal {
+public class CritterDrinkGoal extends Goal {
 
     private final DiverseCritter critter;
     private BlockPos waterPos;

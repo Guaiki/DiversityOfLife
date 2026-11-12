@@ -43,6 +43,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.*;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -59,6 +60,7 @@ import net.minecraftforge.event.entity.player.PlayerContainerEvent;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Arrays;
@@ -966,6 +968,38 @@ public abstract class DiverseCritter extends TamableAnimal
      * por especie.
      */
     public boolean isLargeAnimal() { return false; }
+
+    /**
+     * Categorías de presa que caza esta especie (etiquetas {@code diversityofcritters:category/*}).
+     * Vacía = no caza.
+     */
+    public List<TagKey<EntityType<?>>> preyCategories() { return List.of(); }
+
+    /** Hasta dónde ve una presa, en bloques. */
+    public double huntRange() { return 32.0D; }
+
+    /**
+     * Si {@code target} es presa de {@code hunter}: su tipo está en alguna categoría que el cazador
+     * caza, no es de su especie, está vivo y no es una mascota (de nadie).
+     */
+    public static boolean isPreyFor(DiverseCritter hunter, LivingEntity target) {
+        if (target == hunter || !target.isAlive()) return false;
+        if (target.getType() == hunter.getType()) return false;
+        if (target instanceof TamableAnimal tamable && tamable.isTame()) return false;
+        for (TagKey<EntityType<?>> category : hunter.preyCategories()) {
+            if (target.getType().is(category)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Si ahora caza: con hambre, adulto, despierto y sin sedar; una mascota solo en modo wandering.
+     */
+    public boolean canHunt() {
+        if (!this.isHungry() || this.isBaby() || this.isSedated()) return false;
+        if (this.getSleepState() != SleepState.AWAKE) return false;
+        return !this.isTame() || (this.isWandering() && !this.isOrderedToSit());
+    }
 
     /**
      * Una comida completa: llena el hambre y quita parte de la sed, más en un animal pequeño

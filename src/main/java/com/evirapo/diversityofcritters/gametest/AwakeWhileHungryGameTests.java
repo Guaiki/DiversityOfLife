@@ -25,6 +25,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 public final class AwakeWhileHungryGameTests {
 
     private static final String ARENA = "mantle_arena";
+    /** Own batch: hungry civets hunt, and the default batch has squirrels (mantle tests). */
+    private static final String BATCH = "awake_while_hungry";
     private static final int NOON = 6000;
     private static final int TIMEOUT = 600;
 
@@ -44,7 +46,7 @@ public final class AwakeWhileHungryGameTests {
         civet.setHunger(civet.maxHunger() / 4);
     }
 
-    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT, batch = BATCH)
     public static void aHungryCivetDoesNotFallAsleep(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
@@ -63,7 +65,7 @@ public final class AwakeWhileHungryGameTests {
         });
     }
 
-    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT, batch = BATCH)
     public static void aSleepingCivetWakesUpWhenItGetsHungry(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
@@ -85,7 +87,7 @@ public final class AwakeWhileHungryGameTests {
      * Once the rested civet sleeps, the thirsty one is watched for longer than the whole settle
      * spread, so it cannot pass just because its own bedtime had not come yet.
      */
-    @GameTest(template = ARENA, timeoutTicks = 1500)
+    @GameTest(template = ARENA, timeoutTicks = 1500, batch = BATCH)
     public static void aThirstyCivetDoesNotFallAsleep(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
@@ -96,13 +98,15 @@ public final class AwakeWhileHungryGameTests {
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(rested.getSleepState() == SleepState.SLEEPING,
                         "waiting for the rested civet to sleep"))
-                .thenExecuteFor(700, () -> helper.assertTrue(thirsty.getSleepState() == SleepState.AWAKE,
+                // Once it has drunk (there may be natural water near this batch's spot) it may sleep.
+                .thenExecuteFor(700, () -> helper.assertTrue(
+                        thirsty.getSleepState() == SleepState.AWAKE || !thirsty.isThirsty(),
                         "the thirsty civet went to sleep: " + thirsty.getSleepState()))
                 .thenExecute(helper::killAllEntities)
                 .thenSucceed();
     }
 
-    @GameTest(template = ARENA, timeoutTicks = 1500)
+    @GameTest(template = ARENA, timeoutTicks = 1500, batch = BATCH)
     public static void aSleepingCivetWakesUpWhenItGetsThirsty(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
@@ -124,7 +128,7 @@ public final class AwakeWhileHungryGameTests {
      * A freezing air conditioner where the civet lies down (it may wander a few blocks before it
      * settles): two tiers below its COOL minimum, danger.
      */
-    @GameTest(template = ARENA, timeoutTicks = 1500)
+    @GameTest(template = ARENA, timeoutTicks = 1500, batch = BATCH)
     public static void aSleepingCivetWakesUpInClimateDanger(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);

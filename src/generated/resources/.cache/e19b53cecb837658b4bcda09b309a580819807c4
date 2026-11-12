@@ -1,2 +1,7 @@
-// 1.20.1	2026-11-12T15:24:13.3534632	Tags for minecraft:entity_type mod id diversityofcritters
+// 1.20.1	2026-11-12T16:01:11.8475633	Tags for minecraft:entity_type mod id diversityofcritters
+676cee16d107d62d62093f32df13eb8e934c7db9 data/diversityofcritters/tags/entity_types/category/lagomorph.json
+109da958607dea8fe8be2e234070a86f53b41ed6 data/diversityofcritters/tags/entity_types/category/small_bird.json
+637a1ed889f2293bbee383f53b5350497a627cb7 data/diversityofcritters/tags/entity_types/category/small_carnivora.json
+57bdd9d7b5736f9c85ec019bd7037c8f2ff4c354 data/diversityofcritters/tags/entity_types/category/small_primate.json
+e4c2e97b53ba1bad732404cb4e73110189aa0e8a data/diversityofcritters/tags/entity_types/category/small_rodent.json
 2549324f37b8f1a140aa8a2fbc0938893c08813f data/diversityofcritters/tags/entity_types/livestock.json

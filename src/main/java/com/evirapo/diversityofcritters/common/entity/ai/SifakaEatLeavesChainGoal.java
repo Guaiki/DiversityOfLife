@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
  * replaced the squirrel's: the leaf search stays, the approach and the timing move to the base class,
  * and the animator plays the eat_enter / eat_loop / eat_exit chain.
  */
-public class SifakaEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritter> implements FeedingGoal {
+public class SifakaEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritter> {
 
     private final SifakaEntity sifaka;
     private final int searchRadius;

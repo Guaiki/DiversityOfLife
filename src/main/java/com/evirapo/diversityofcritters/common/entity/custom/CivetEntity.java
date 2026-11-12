@@ -39,14 +39,12 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
-import net.minecraft.world.entity.animal.Chicken;
-import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -129,7 +127,8 @@ public class CivetEntity extends DiverseCritter
                 .add(Attributes.MAX_HEALTH, 10.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.2D)
                 .add(Attributes.ATTACK_DAMAGE, 2.0D)
-                .add(Attributes.FOLLOW_RANGE, 16.0D);
+                // At least huntRange(): the chase gives up beyond the follow range.
+                .add(Attributes.FOLLOW_RANGE, 32.0D);
     }
 
     protected PathNavigation createNavigation(Level pLevel) {
@@ -210,8 +209,8 @@ public class CivetEntity extends DiverseCritter
                 .add(IdleVariant.SNIFF_RIGHT, "sniff_right", 25)
                 .condition(c -> !this.isClimbing()));
 
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Rabbit.class, false, (living) -> this.isHungry()));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Chicken.class, false, (living) -> this.isHungry()));
+        // Hunts by prey category (preyCategories), from huntRange() away, while canHunt().
+        this.targetSelector.addGoal(1, new CritterHuntTargetGoal(this));
     }
 
     // --- ANIMACIONES ---
@@ -913,7 +912,13 @@ public class CivetEntity extends DiverseCritter
     }
 
     private boolean isPrey(Entity entity) {
-        return entity instanceof Rabbit || entity instanceof Chicken;
+        return entity instanceof LivingEntity living && DiverseCritter.isPreyFor(this, living);
+    }
+
+    /** Small rodents (the squirrel), lagomorphs (rabbits) and small birds (chickens, parrots). */
+    @Override
+    public List<TagKey<EntityType<?>>> preyCategories() {
+        return List.of(DoCTags.EntityTypes.SMALL_RODENT, DoCTags.EntityTypes.LAGOMORPH, DoCTags.EntityTypes.SMALL_BIRD);
     }
 }
 
