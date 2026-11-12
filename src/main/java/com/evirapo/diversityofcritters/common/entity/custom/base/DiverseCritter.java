@@ -1201,6 +1201,14 @@ public abstract class DiverseCritter extends TamableAnimal
 
     public boolean isThirsty() { return getThirst() <= (int)(maxThirst() * 0.5f); }
     public boolean isHungry() { return getHunger() <= (int)(maxHunger() * 0.5f); }
+
+    /**
+     * Lo que no deja dormir y despierta al que duerme: hambre, sed o peligro de temperatura o
+     * humedad. Con las necesidades o el clima apagados por gamerule esas partes nunca son ciertas.
+     */
+    public boolean hasUrgentNeed() {
+        return isHungry() || isThirsty() || getTemperatureZone() >= 2 || getHumidityZone() >= 2;
+    }
     public boolean isEnrichmentNeeded() { return getEnrichment() <= (int)(maxEnrichment() * 0.5f); }
 
     public boolean canMove() {

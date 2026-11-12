@@ -4,6 +4,9 @@ import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter.SleepState;
+import com.evirapo.diversityofcritters.common.temperature.AirConditionerManager;
+import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
@@ -75,6 +78,66 @@ public final class AwakeWhileHungryGameTests {
                 .thenExecuteFor(60, () -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
                         "the hungry civet fell asleep again"))
                 .thenExecute(helper::killAllEntities)
+                .thenSucceed();
+    }
+
+    /**
+     * Once the rested civet sleeps, the thirsty one is watched for longer than the whole settle
+     * spread, so it cannot pass just because its own bedtime had not come yet.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 1500)
+    public static void aThirstyCivetDoesNotFallAsleep(GameTestHelper helper) {
+        floor(helper);
+        helper.setDayTime(NOON);
+        CivetEntity rested = helper.spawn(DOCEntities.CIVET.get(), new Vec3(3.5, 3, 3.5));
+        CivetEntity thirsty = helper.spawn(DOCEntities.CIVET.get(), new Vec3(8.5, 3, 8.5));
+        thirsty.setThirst(thirsty.maxThirst() / 4);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(rested.getSleepState() == SleepState.SLEEPING,
+                        "waiting for the rested civet to sleep"))
+                .thenExecuteFor(700, () -> helper.assertTrue(thirsty.getSleepState() == SleepState.AWAKE,
+                        "the thirsty civet went to sleep: " + thirsty.getSleepState()))
+                .thenExecute(helper::killAllEntities)
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void aSleepingCivetWakesUpWhenItGetsThirsty(GameTestHelper helper) {
+        floor(helper);
+        helper.setDayTime(NOON);
+        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(5.5, 3, 5.5));
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.SLEEPING,
+                        "waiting for the civet to sleep"))
+                .thenExecute(() -> civet.setThirst(civet.maxThirst() / 4))
+                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
+                        "waiting for the thirsty civet to wake up"))
+                .thenExecuteFor(60, () -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
+                        "the thirsty civet fell asleep again"))
+                .thenExecute(helper::killAllEntities)
+                .thenSucceed();
+    }
+
+    /** A freezing air conditioner on top of the civet: two tiers below its COOL minimum, danger. */
+    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    public static void aSleepingCivetWakesUpInClimateDanger(GameTestHelper helper) {
+        floor(helper);
+        helper.setDayTime(NOON);
+        CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(5.5, 3, 5.5));
+        BlockPos ac = helper.absolutePos(new BlockPos(5, 3, 5));
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.SLEEPING,
+                        "waiting for the civet to sleep"))
+                .thenExecute(() -> AirConditionerManager.add(helper.getLevel(), ac, TemperatureTier.FREEZING, 4))
+                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
+                        "waiting for the freezing civet to wake up"))
+                .thenExecute(() -> {
+                    AirConditionerManager.remove(helper.getLevel(), ac);
+                    helper.killAllEntities();
+                })
                 .thenSucceed();
     }
 }

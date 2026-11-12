@@ -192,10 +192,11 @@ public class SleepBehaviorGoal extends Goal {
             this.settleArmed = false;
         }
 
-        // Con hambre no se duerme, hasta que coma. Va después de guardar la orden del jugador y antes
-        // de cumplirla, para que un "a dormir" pulsado con hambre se cumpla en cuanto haya comido.
-        // El tranquilizante ya ha salido arriba: un sedado duerme aunque tenga hambre.
-        if (this.entity.isHungry()) {
+        // Con hambre, sed o peligro climático no se duerme, hasta que se resuelva. Va después de
+        // guardar la orden del jugador y antes de cumplirla, para que un "a dormir" pulsado con hambre
+        // se cumpla en cuanto haya comido. El tranquilizante ya ha salido arriba: un sedado duerme
+        // aunque tenga hambre.
+        if (this.entity.hasUrgentNeed()) {
             return false;
         }
 
@@ -267,9 +268,9 @@ public class SleepBehaviorGoal extends Goal {
         // La amenaza despierta igual que el dano o el agua, y por el mismo camino: AWAKENING retiene
         // al bicho hasta que el clip termina, y solo entonces stop() suelta MOVE y CritterFleeGoal
         // (prioridad 2) se lo lleva. La huida "encadenada despues del despertar" sale del reparto de
-        // prioridades; no hay que construirla. El hambre despierta por el mismo camino, y canUse() le
-        // impide volver a dormirse hasta que coma.
-        if (entity.hurtTime > 0 || entity.isInWater() || entity.sensor().hasThreat() || entity.isHungry()) {
+        // prioridades; no hay que construirla. El hambre, la sed y el peligro climático despiertan por
+        // el mismo camino, y canUse() le impide volver a dormirse hasta que se resuelvan.
+        if (entity.hurtTime > 0 || entity.isInWater() || entity.sensor().hasThreat() || entity.hasUrgentNeed()) {
             this.startWaking(true);
             return true;
         }
