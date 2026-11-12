@@ -175,8 +175,10 @@ public class BowlBlockEntity extends BlockEntity implements MenuProvider {
 
     public static class BowlLogic {
 
+        /** The meats tag (vanilla and category meats), plus fish and eggs, which bowls always took. */
         public static boolean isMeat(ItemStack stack) {
-            return stack.is(net.minecraft.world.item.Items.BEEF)
+            return stack.is(com.evirapo.diversityofcritters.misc.tags.DoCTags.Items.MEATS)
+                    || stack.is(net.minecraft.world.item.Items.BEEF)
                     || stack.is(net.minecraft.world.item.Items.PORKCHOP)
                     || stack.is(net.minecraft.world.item.Items.CHICKEN)
                     || stack.is(net.minecraft.world.item.Items.MUTTON)

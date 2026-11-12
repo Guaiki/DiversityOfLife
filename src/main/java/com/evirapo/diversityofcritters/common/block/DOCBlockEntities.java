@@ -3,6 +3,7 @@ package com.evirapo.diversityofcritters.common.block;
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import com.evirapo.diversityofcritters.common.block.entity.AirConditionerBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.BowlBlockEntity;
+import com.evirapo.diversityofcritters.common.block.entity.CorpseBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.DigBoxBlockEntity;
 import com.evirapo.diversityofcritters.common.block.entity.HumidifierBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -38,6 +39,11 @@ public class DOCBlockEntities {
             BLOCK_ENTITIES.register("humidifier_be", () ->
                     BlockEntityType.Builder.of(HumidifierBlockEntity::new,
                             DOCBlocks.HUMIDIFIER.get()).build(null));
+
+    public static final RegistryObject<BlockEntityType<CorpseBlockEntity>> CORPSE_BE =
+            BLOCK_ENTITIES.register("corpse_be", () ->
+                    BlockEntityType.Builder.of(CorpseBlockEntity::new,
+                            DOCBlocks.CORPSE.get()).build(null));
 
     public static void register(IEventBus eventBus) {
         BLOCK_ENTITIES.register(eventBus);

@@ -45,6 +45,16 @@ public class DOCBlocks {
                     .sound(SoundType.MUD)
                     .pushReaction(PushReaction.DESTROY)));
 
+    // What a predator's kill leaves: a food source for meat eaters that rots away. No item.
+    public static final RegistryObject<Block> CORPSE = BLOCKS.register("corpse",
+            () -> new CorpseBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BROWN)
+                    .noCollission()
+                    .noOcclusion()
+                    .strength(0.5F)
+                    .sound(SoundType.MUD)
+                    .pushReaction(PushReaction.DESTROY)));
+
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);
     }

@@ -41,6 +41,11 @@ public class DOCEntitiesCreativeTab {
                         output.accept(DOCItems.AIR_CONDITIONER.get());
                         output.accept(DOCItems.HUMIDIFIER.get());
                         output.accept(DOCItems.WATERHOLE.get());
+                        output.accept(DOCItems.SMALL_RODENT_MEAT.get());
+                        output.accept(DOCItems.SMALL_CARNIVORA_MEAT.get());
+                        output.accept(DOCItems.SMALL_PRIMATE_MEAT.get());
+                        output.accept(DOCItems.LAGOMORPH_MEAT.get());
+                        output.accept(DOCItems.SMALL_BIRD_MEAT.get());
                         output.accept(DOCItems.BRUSH.get());
                         output.accept(DOCItems.GAUZE_BANDAGE.get());
                         output.accept(DOCItems.EMPTY_NURSER_BOTTLE.get());

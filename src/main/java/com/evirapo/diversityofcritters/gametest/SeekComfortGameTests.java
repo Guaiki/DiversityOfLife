@@ -5,6 +5,8 @@ import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.block.entity.BowlBlockEntity;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.entity.custom.CivetEntity;
+import com.evirapo.diversityofcritters.common.humidity.HumidifierManager;
+import com.evirapo.diversityofcritters.common.humidity.HumidityTier;
 import com.evirapo.diversityofcritters.common.temperature.AirConditionerManager;
 import com.evirapo.diversityofcritters.common.temperature.TemperatureTier;
 import net.minecraft.core.BlockPos;
@@ -56,6 +58,9 @@ public final class SeekComfortGameTests {
     private static CivetEntity setUp(GameTestHelper helper, boolean warmCorner, int timeoutTicks, Vec3 civetAt) {
         floor(helper);
         AirConditionerManager.add(helper.getLevel(), helper.absolutePos(COLD_CENTER), TemperatureTier.FREEZING, 12);
+        // Humidity pinned to the civet's range, so only temperature varies (the biome under this
+        // batch's spot changes from run to run, and a dry one left the civet in stress everywhere).
+        HumidifierManager.add(helper.getLevel(), helper.absolutePos(COLD_CENTER), HumidityTier.HUMID, 16);
         if (warmCorner) {
             AirConditionerManager.add(helper.getLevel(), helper.absolutePos(WARM_CORNER), TemperatureTier.MODERATE, 4);
         }
@@ -67,6 +72,7 @@ public final class SeekComfortGameTests {
     private static void cleanUp(GameTestHelper helper, CivetEntity civet) {
         AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(COLD_CENTER));
         AirConditionerManager.remove(helper.getLevel(), helper.absolutePos(WARM_CORNER));
+        HumidifierManager.remove(helper.getLevel(), helper.absolutePos(COLD_CENTER));
         civet.discard();
     }
 

@@ -986,8 +986,13 @@ public abstract class DiverseCritter extends TamableAnimal
         if (target == hunter || !target.isAlive()) return false;
         if (target.getType() == hunter.getType()) return false;
         if (target instanceof TamableAnimal tamable && tamable.isTame()) return false;
-        for (TagKey<EntityType<?>> category : hunter.preyCategories()) {
-            if (target.getType().is(category)) return true;
+        return hunter.huntsCategoryOf(target.getType());
+    }
+
+    /** Si esta especie caza alguna categoría de presa a la que pertenece {@code type}. */
+    public boolean huntsCategoryOf(EntityType<?> type) {
+        for (TagKey<EntityType<?>> category : this.preyCategories()) {
+            if (type.is(category)) return true;
         }
         return false;
     }

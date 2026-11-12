@@ -1,6 +1,7 @@
 package com.evirapo.diversityofcritters.datagen.providers;
 
 import com.evirapo.diversityofcritters.DiversityOfCritters;
+import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
@@ -33,7 +34,12 @@ public class DoCItemTagGenerator extends ItemTagsProvider {
                 Items.MUTTON,
                 Items.COOKED_MUTTON,
                 Items.PORKCHOP,
-                Items.COOKED_PORKCHOP
+                Items.COOKED_PORKCHOP,
+                DOCItems.SMALL_RODENT_MEAT.get(),
+                DOCItems.SMALL_CARNIVORA_MEAT.get(),
+                DOCItems.SMALL_PRIMATE_MEAT.get(),
+                DOCItems.LAGOMORPH_MEAT.get(),
+                DOCItems.SMALL_BIRD_MEAT.get()
         );
 
         this.tag(DoCTags.Items.SQUIRREL_FOOD).add(

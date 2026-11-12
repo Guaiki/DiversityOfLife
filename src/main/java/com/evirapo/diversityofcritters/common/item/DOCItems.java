@@ -7,6 +7,7 @@ import com.evirapo.diversityofcritters.common.item.custom.BrushItem;
 import com.evirapo.diversityofcritters.common.item.custom.GauzeBandageItem;
 import com.evirapo.diversityofcritters.common.item.custom.MedicinePillItem;
 import com.evirapo.diversityofcritters.common.item.custom.TranquilizerRifleItem;
+import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -40,6 +41,31 @@ public class DOCItems {
 
     public static final RegistryObject<Item> TRAINING_STICK = ITEM_TYPES.register("training_stick",
             ()-> new Item(new Item.Properties()));
+
+    // Meat of each prey category, what a corpse gives. Placeholder textures until the client's arrive.
+    private static final FoodProperties CATEGORY_MEAT = new FoodProperties.Builder()
+            .nutrition(2).saturationMod(0.3F).meat().build();
+
+    public static final RegistryObject<Item> SMALL_RODENT_MEAT = ITEM_TYPES.register("small_rodent_meat",
+            () -> new Item(new Item.Properties().food(CATEGORY_MEAT)));
+    public static final RegistryObject<Item> SMALL_CARNIVORA_MEAT = ITEM_TYPES.register("small_carnivora_meat",
+            () -> new Item(new Item.Properties().food(CATEGORY_MEAT)));
+    public static final RegistryObject<Item> SMALL_PRIMATE_MEAT = ITEM_TYPES.register("small_primate_meat",
+            () -> new Item(new Item.Properties().food(CATEGORY_MEAT)));
+    public static final RegistryObject<Item> LAGOMORPH_MEAT = ITEM_TYPES.register("lagomorph_meat",
+            () -> new Item(new Item.Properties().food(CATEGORY_MEAT)));
+    public static final RegistryObject<Item> SMALL_BIRD_MEAT = ITEM_TYPES.register("small_bird_meat",
+            () -> new Item(new Item.Properties().food(CATEGORY_MEAT)));
+
+    /** The meat of a prey category; small rodent meat for an unknown or missing one. */
+    public static Item meatFor(@javax.annotation.Nullable net.minecraft.tags.TagKey<net.minecraft.world.entity.EntityType<?>> category) {
+        if (category == null) return SMALL_RODENT_MEAT.get();
+        if (category.equals(DoCTags.EntityTypes.SMALL_CARNIVORA)) return SMALL_CARNIVORA_MEAT.get();
+        if (category.equals(DoCTags.EntityTypes.SMALL_PRIMATE)) return SMALL_PRIMATE_MEAT.get();
+        if (category.equals(DoCTags.EntityTypes.LAGOMORPH)) return LAGOMORPH_MEAT.get();
+        if (category.equals(DoCTags.EntityTypes.SMALL_BIRD)) return SMALL_BIRD_MEAT.get();
+        return SMALL_RODENT_MEAT.get();
+    }
 
     public static final RegistryObject<Item> WATERHOLE = ITEM_TYPES.register("waterhole",
             () -> new BlockItem(DOCBlocks.WATERHOLE.get(), new Item.Properties()));

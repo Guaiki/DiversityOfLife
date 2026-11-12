@@ -1,6 +1,8 @@
 package com.evirapo.diversityofcritters.common.entity.util;
 
 import com.evirapo.diversityofcritters.common.block.BowlBlock;
+import com.evirapo.diversityofcritters.common.block.CorpseBlock;
+import com.evirapo.diversityofcritters.common.block.entity.CorpseBlockEntity;
 import com.evirapo.diversityofcritters.common.block.BowlContent;
 import com.evirapo.diversityofcritters.common.block.entity.BowlBlockEntity;
 import com.evirapo.diversityofcritters.common.entity.custom.base.DiverseCritter;
@@ -34,6 +36,10 @@ public class BowlFeedingHelper {
 
     public static boolean hasFoodFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof CorpseBlock) {
+            return critter.getDietConfig().acceptsMeat
+                    && level.getBlockEntity(pos) instanceof CorpseBlockEntity corpse && corpse.portions() > 0;
+        }
         if (!(state.getBlock() instanceof BowlBlock)) return false;
 
         BowlContent content = state.getValue(BowlBlock.CONTENT);
@@ -57,6 +63,7 @@ public class BowlFeedingHelper {
 
     public static boolean consumeFoodFor(DiverseCritter critter, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof CorpseBlock) return eatFromCorpse(critter, level, pos);
         if (!(state.getBlock() instanceof BowlBlock)) return false;
 
         BowlContent content = state.getValue(BowlBlock.CONTENT);
@@ -101,6 +108,18 @@ public class BowlFeedingHelper {
             return true;
         }
         return false;
+    }
+
+    /** One portion of a corpse: any meat eater may feed, not only the hunter. */
+    private static boolean eatFromCorpse(DiverseCritter critter, Level level, BlockPos pos) {
+        if (!critter.getDietConfig().acceptsMeat) return false;
+        if (!(level.getBlockEntity(pos) instanceof CorpseBlockEntity corpse)) return false;
+        ItemStack meat = corpse.takePortion();
+        if (meat.isEmpty()) return false;
+        var foodProps = meat.isEdible() ? meat.getFoodProperties(critter) : null;
+        critter.onAteFood();
+        critter.heal(foodProps != null ? (float) foodProps.getNutrition() : 1.0F);
+        return true;
     }
 
     public static boolean consumeWaterFor(DiverseCritter critter, Level level, BlockPos pos) {
