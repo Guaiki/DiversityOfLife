@@ -937,6 +937,23 @@ public abstract class DiverseCritter extends TamableAnimal
     public boolean canClimb() { return false; }
 
     /**
+     * Si es un animal grande (como el okapi): al comer recupera menos sed que uno pequeño. Constante
+     * por especie.
+     */
+    public boolean isLargeAnimal() { return false; }
+
+    /**
+     * Una comida completa: llena el hambre y quita parte de la sed, más en un animal pequeño
+     * ({@code smallThirstFromFood}) que en uno grande ({@code largeThirstFromFood}).
+     */
+    public void onAteFood() {
+        this.setHunger(this.maxHunger());
+        var eco = DOCServerConfig.ecosystem();
+        int pct = this.isLargeAnimal() ? eco.largeThirstFromFood() : eco.smallThirstFromFood();
+        this.setThirst(this.getThirst() + this.maxThirst() * pct / 100);
+    }
+
+    /**
      * Poses where the legs are placed by the animation for reasons other than the ground under
      * them: resting, grooming, drinking, rearing, climbing, riding, swimming, dying. Species add
      * their own busy states on top.

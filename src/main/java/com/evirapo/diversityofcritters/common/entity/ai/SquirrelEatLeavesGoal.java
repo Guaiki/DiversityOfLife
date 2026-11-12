@@ -103,7 +103,7 @@ public class SquirrelEatLeavesGoal extends Goal {
             squirrel.setDeltaMovement(0, squirrel.getDeltaMovement().y, 0);
             eatTimer++;
             if (eatTimer >= EAT_DURATION) {
-                squirrel.setHunger(squirrel.maxHunger());
+                squirrel.onAteFood();
                 this.stop();
             }
             return;

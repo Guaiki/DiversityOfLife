@@ -111,7 +111,7 @@ public class CritterEatItemChainGoal extends PhasedActivityGoal<DiverseCritter> 
         mob.onStopEatingItem();
         // Igual que antes: el hambre se saciaba al agotarse el temporizador, no al interrumpirse.
         if (!interrupted) {
-            mob.setHunger(mob.maxHunger());
+            mob.onAteFood();
         }
         this.targetItem = null;
     }

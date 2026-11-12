@@ -80,7 +80,7 @@ public class SquirrelEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritte
         squirrel.setEatingPlant(false);
         squirrel.setEatingItem(ItemStack.EMPTY);
         if (!interrupted) {
-            mob.setHunger(mob.maxHunger());
+            mob.onAteFood();
         }
         this.leavesPos = null;
     }

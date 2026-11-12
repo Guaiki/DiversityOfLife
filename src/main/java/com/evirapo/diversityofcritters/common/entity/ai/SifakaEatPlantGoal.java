@@ -103,7 +103,7 @@ public class SifakaEatPlantGoal extends Goal {
             sifaka.setDeltaMovement(0, sifaka.getDeltaMovement().y, 0);
             eatTimer++;
             if (eatTimer >= EAT_DURATION) {
-                sifaka.setHunger(sifaka.maxHunger());
+                sifaka.onAteFood();
                 this.stop();
             }
             return;

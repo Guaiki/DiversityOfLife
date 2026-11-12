@@ -77,7 +77,7 @@ public class SifakaEatLeavesChainGoal extends PhasedActivityGoal<DiverseCritter>
         sifaka.setEatingPlant(false);
         sifaka.setEatingItem(ItemStack.EMPTY);
         if (!interrupted) {
-            mob.setHunger(mob.maxHunger());
+            mob.onAteFood();
         }
         this.leavesPos = null;
     }

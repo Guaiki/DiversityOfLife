@@ -54,6 +54,17 @@ public final class DOCServerConfig {
     public static final ForgeConfigSpec.IntValue ENDANGERED_THRESHOLD;
     public static final ForgeConfigSpec.DoubleValue WILD_BREEDING_RATE;
 
+    public static final ForgeConfigSpec.IntValue SMALL_THIRST_FROM_FOOD;
+    public static final ForgeConfigSpec.IntValue LARGE_THIRST_FROM_FOOD;
+    public static final ForgeConfigSpec.IntValue COMFORT_SEARCH_RADIUS;
+    public static final ForgeConfigSpec.IntValue COMFORT_SCAN_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.BooleanValue LIVESTOCK_ENABLED;
+    public static final ForgeConfigSpec.IntValue LIVESTOCK_CAP;
+    public static final ForgeConfigSpec.IntValue LIVESTOCK_CAP_RADIUS;
+    public static final ForgeConfigSpec.IntValue LIVESTOCK_BREED_INTERVAL_SECONDS;
+    public static final ForgeConfigSpec.IntValue CORPSE_PORTIONS;
+    public static final ForgeConfigSpec.IntValue CORPSE_ROT_SECONDS;
+
     private static final Map<String, SpeciesSpawnSettings> SETTINGS = new LinkedHashMap<>();
     private static final Map<PopulationEvent, ForgeConfigSpec.IntValue> WEIGHTS = new EnumMap<>(PopulationEvent.class);
 
@@ -119,6 +130,42 @@ public final class DOCServerConfig {
 
         builder.pop();
 
+        EcosystemSettings d = EcosystemSettings.DEFAULTS;
+        builder.comment("Ecosystem mechanics shared by every critter.").push("ecosystem");
+        SMALL_THIRST_FROM_FOOD = builder
+                .comment("Percent of max thirst a small animal recovers each time it eats.")
+                .defineInRange("smallThirstFromFood", d.smallThirstFromFood(), 0, 100);
+        LARGE_THIRST_FROM_FOOD = builder
+                .comment("Percent of max thirst a large animal recovers each time it eats.")
+                .defineInRange("largeThirstFromFood", d.largeThirstFromFood(), 0, 100);
+        COMFORT_SEARCH_RADIUS = builder
+                .comment("How far, in blocks, an uncomfortable animal looks for a spot with better",
+                        "temperature and humidity.")
+                .defineInRange("comfortSearchRadius", d.comfortSearchRadius(), 4, 64);
+        COMFORT_SCAN_COOLDOWN_TICKS = builder
+                .comment("Ticks between two searches for a better spot. Lower = quicker, but more work.")
+                .defineInRange("comfortScanCooldownTicks", d.comfortScanCooldownTicks(), 20, 1200);
+        LIVESTOCK_ENABLED = builder
+                .comment("Cows, pigs, sheep and chickens breed on their own and are capped per area.")
+                .define("livestockEnabled", d.livestockEnabled());
+        LIVESTOCK_CAP = builder
+                .comment("Most animals of one livestock type (cow, pig, sheep or chicken) in one area.",
+                        "Natural spawns and self-breeding stop at this number; breeding by players does not.")
+                .defineInRange("livestockCap", d.livestockCap(), 1, 64);
+        LIVESTOCK_CAP_RADIUS = builder
+                .comment("Radius, in blocks, of the area the livestock cap counts.")
+                .defineInRange("livestockCapRadius", d.livestockCapRadius(), 8, 128);
+        LIVESTOCK_BREED_INTERVAL_SECONDS = builder
+                .comment("How often, in seconds, an adult livestock animal may try to breed on its own.")
+                .defineInRange("livestockBreedIntervalSeconds", d.livestockBreedIntervalSeconds(), 1, 72000);
+        CORPSE_PORTIONS = builder
+                .comment("Meals a fresh corpse holds.")
+                .defineInRange("corpsePortions", d.corpsePortions(), 1, 16);
+        CORPSE_ROT_SECONDS = builder
+                .comment("Seconds before a corpse rots away, eaten or not.")
+                .defineInRange("corpseRotSeconds", d.corpseRotSeconds(), 1, 72000);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -149,6 +196,7 @@ public final class DOCServerConfig {
     private static volatile Globals globals = DEFAULT_GLOBALS;
     private static volatile PopulationSettings population = DEFAULT_POPULATION;
     private static volatile Map<String, Snapshot> species = DEFAULT_SPECIES;
+    private static volatile EcosystemSettings ecosystem = EcosystemSettings.DEFAULTS;
 
     /**
      * Rebuilds the cache from the spec's current values.
@@ -175,6 +223,19 @@ public final class DOCServerConfig {
                 WILD_BREEDING_RATE.get(),
                 Collections.unmodifiableMap(weights)
         );
+
+        ecosystem = new EcosystemSettings(
+                SMALL_THIRST_FROM_FOOD.get(),
+                LARGE_THIRST_FROM_FOOD.get(),
+                COMFORT_SEARCH_RADIUS.get(),
+                COMFORT_SCAN_COOLDOWN_TICKS.get(),
+                LIVESTOCK_ENABLED.get(),
+                LIVESTOCK_CAP.get(),
+                LIVESTOCK_CAP_RADIUS.get(),
+                LIVESTOCK_BREED_INTERVAL_SECONDS.get(),
+                CORPSE_PORTIONS.get(),
+                CORPSE_ROT_SECONDS.get()
+        );
     }
 
     /** Falls back to the defaults when a world's config is unloaded. */
@@ -182,6 +243,7 @@ public final class DOCServerConfig {
         globals = DEFAULT_GLOBALS;
         species = DEFAULT_SPECIES;
         population = DEFAULT_POPULATION;
+        ecosystem = EcosystemSettings.DEFAULTS;
     }
 
     // ==============================
@@ -204,6 +266,11 @@ public final class DOCServerConfig {
         if (fallback != null) return fallback;
 
         throw new IllegalArgumentException("Unknown species in the spawn config: " + key);
+    }
+
+    /** {@code [ecosystem]}. Never null: falls back to the defaults outside a world. */
+    public static EcosystemSettings ecosystem() {
+        return ecosystem;
     }
 
     public static boolean releasedCanDespawn() {

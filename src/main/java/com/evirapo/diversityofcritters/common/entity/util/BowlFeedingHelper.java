@@ -93,7 +93,7 @@ public class BowlFeedingHelper {
             stack.shrink(1);
             if (stack.isEmpty()) inv.setItem(i, ItemStack.EMPTY);
 
-            critter.setHunger(critter.maxHunger());
+            critter.onAteFood();
             if (foodProps != null) critter.heal((float) foodProps.getNutrition());
             else critter.heal(1.0F);
 

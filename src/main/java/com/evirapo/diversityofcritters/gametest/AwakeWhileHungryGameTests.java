@@ -102,7 +102,7 @@ public final class AwakeWhileHungryGameTests {
                 .thenSucceed();
     }
 
-    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    @GameTest(template = ARENA, timeoutTicks = 1500)
     public static void aSleepingCivetWakesUpWhenItGetsThirsty(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
@@ -120,22 +120,29 @@ public final class AwakeWhileHungryGameTests {
                 .thenSucceed();
     }
 
-    /** A freezing air conditioner on top of the civet: two tiers below its COOL minimum, danger. */
-    @GameTest(template = ARENA, timeoutTicks = TIMEOUT)
+    /**
+     * A freezing air conditioner where the civet lies down (it may wander a few blocks before it
+     * settles): two tiers below its COOL minimum, danger.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 1500)
     public static void aSleepingCivetWakesUpInClimateDanger(GameTestHelper helper) {
         floor(helper);
         helper.setDayTime(NOON);
         CivetEntity civet = helper.spawn(DOCEntities.CIVET.get(), new Vec3(5.5, 3, 5.5));
-        BlockPos ac = helper.absolutePos(new BlockPos(5, 3, 5));
+        BlockPos[] ac = new BlockPos[1];
 
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.SLEEPING,
                         "waiting for the civet to sleep"))
-                .thenExecute(() -> AirConditionerManager.add(helper.getLevel(), ac, TemperatureTier.FREEZING, 4))
-                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
-                        "waiting for the freezing civet to wake up"))
                 .thenExecute(() -> {
-                    AirConditionerManager.remove(helper.getLevel(), ac);
+                    ac[0] = civet.blockPosition();
+                    AirConditionerManager.add(helper.getLevel(), ac[0], TemperatureTier.FREEZING, 4);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
+                        "waiting for the freezing civet to wake up: " + civet.getSleepState()
+                                + " tier " + civet.getTemperatureTier()))
+                .thenExecute(() -> {
+                    AirConditionerManager.remove(helper.getLevel(), ac[0]);
                     helper.killAllEntities();
                 })
                 .thenSucceed();

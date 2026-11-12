@@ -496,7 +496,7 @@ public class SquirrelEntity extends DiverseCritter {
         ItemStack stack = this.getItemBySlot(EquipmentSlot.MAINHAND);
 
         if (!stack.isEmpty() && stack.is(DoCTags.Items.SQUIRREL_FOOD) && !this.isNewborn()) {
-            this.setHunger(this.maxHunger());
+            this.onAteFood();
 
             var foodProps = stack.isEdible() ? stack.getFoodProperties(this) : null;
             if (foodProps != null) {
@@ -635,7 +635,7 @@ public class SquirrelEntity extends DiverseCritter {
         if (isItemTamingFood && !this.isBaby()) {
             if (this.getHunger() < this.maxHunger() || this.getHealth() < this.getMaxHealth()) {
                 if (!this.level().isClientSide()) {
-                    this.setHunger(this.maxHunger());
+                    this.onAteFood();
 
                     var foodProps = itemstack.isEdible() ? itemstack.getFoodProperties(this) : null;
                     if (foodProps != null) this.heal((float) foodProps.getNutrition());

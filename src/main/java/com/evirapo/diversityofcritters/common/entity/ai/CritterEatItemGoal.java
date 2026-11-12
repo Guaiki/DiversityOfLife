@@ -78,7 +78,7 @@ public class CritterEatItemGoal extends Goal {
             entity.setDeltaMovement(0, dm.y, 0);
             eatTimer--;
             if (eatTimer <= 0) {
-                entity.setHunger(entity.maxHunger());
+                entity.onAteFood();
                 this.stop();
             }
             return;
