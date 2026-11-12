@@ -5,7 +5,7 @@ import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.FluidTags;
+import com.evirapo.diversityofcritters.common.entity.util.DrinkSources;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -164,7 +164,7 @@ public class CritterDrinkGoal extends Goal {
     }
 
     public boolean isConnectedToLand(BlockPos pos) {
-        if (this.critter.level().getFluidState(pos).is(FluidTags.WATER)) {
+        if (DrinkSources.isDrinkable(this.critter.level(), pos)) {
             for (Direction dir : HORIZONTALS) {
                 BlockPos offsetPos = pos.relative(dir);
                 if (this.critter.level().getFluidState(offsetPos).isEmpty()
@@ -177,7 +177,7 @@ public class CritterDrinkGoal extends Goal {
     }
 
     public BlockPos getLandPos(BlockPos pos) {
-        if (this.critter.level().getFluidState(pos).is(FluidTags.WATER)) {
+        if (DrinkSources.isDrinkable(this.critter.level(), pos)) {
             for (Direction dir : HORIZONTALS) {
                 BlockPos offsetPos = pos.relative(dir);
                 if (this.critter.level().getFluidState(offsetPos).isEmpty()

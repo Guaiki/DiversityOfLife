@@ -11,6 +11,10 @@ import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.client.event.RegisterColorHandlersEvent;
+import net.minecraft.client.renderer.BiomeColors;
+import com.evirapo.diversityofcritters.common.block.DOCBlocks;
+import com.evirapo.diversityofcritters.common.item.DOCItems;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -40,5 +44,20 @@ public class DOCClientEvents {
         event.registerEntityRenderer(DOCEntities.SQUIRREL.get(), SquirrelRenderer::new);
         event.registerEntityRenderer(DOCEntities.SIFAKA.get(), SifakaRenderer::new);
         event.registerEntityRenderer(DOCEntities.TRANQUILIZER_DART.get(), ThrownItemRenderer::new);
+    }
+
+    /** The vanilla default water colour, for the item and wherever no biome is known. */
+    private static final int DEFAULT_WATER_COLOR = 0x3F76E4;
+
+    @SubscribeEvent
+    public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
+        event.register((state, level, pos, tintIndex) -> level != null && pos != null
+                        ? BiomeColors.getAverageWaterColor(level, pos) : DEFAULT_WATER_COLOR,
+                DOCBlocks.WATERHOLE.get());
+    }
+
+    @SubscribeEvent
+    public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
+        event.register((stack, tintIndex) -> DEFAULT_WATER_COLOR, DOCItems.WATERHOLE.get());
     }
 }

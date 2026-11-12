@@ -23,6 +23,8 @@ public class DoCBlockTagGenerator extends BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider provider) {
+        this.tag(DoCTags.Blocks.DRINKABLE).add(DOCBlocks.WATERHOLE.get());
+
         this.tag(DoCTags.Blocks.CIVET_CLIMBABLE)
                 .addTag(BlockTags.LOGS);           // tree logs, the natural climbing surface
 

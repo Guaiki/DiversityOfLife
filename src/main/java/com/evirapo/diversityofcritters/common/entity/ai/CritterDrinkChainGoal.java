@@ -5,7 +5,7 @@ import net.darkblade.deluxelib.entity.ai.goal.PhasedActivityGoal;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.FluidTags;
+import com.evirapo.diversityofcritters.common.entity.util.DrinkSources;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -125,6 +125,11 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
                 }
             }
         }
+        if (best == null) {
+            // Un charco (waterhole) de una casilla casi nunca sale en el muestreo aleatorio.
+            BlockPos hole = DrinkSources.nearestDrinkableBlock(mob.level(), mob.blockPosition(), range / 2, 4);
+            if (hole != null && landNextTo(hole) != null) best = hole;
+        }
         return best;
     }
 
@@ -139,7 +144,7 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
      * en el suelo), o un bloque mas arriba si la orilla es un talud.
      */
     private @Nullable BlockPos landNextTo(BlockPos pos) {
-        if (!mob.level().getFluidState(pos).is(FluidTags.WATER)) return null;
+        if (!DrinkSources.isDrinkable(mob.level(), pos)) return null;
         for (Direction dir : HORIZONTALS) {
             BlockPos side = pos.relative(dir);
             if (canStandAt(side)) return side;

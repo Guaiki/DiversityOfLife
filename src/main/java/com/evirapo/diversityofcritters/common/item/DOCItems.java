@@ -41,6 +41,9 @@ public class DOCItems {
     public static final RegistryObject<Item> TRAINING_STICK = ITEM_TYPES.register("training_stick",
             ()-> new Item(new Item.Properties()));
 
+    public static final RegistryObject<Item> WATERHOLE = ITEM_TYPES.register("waterhole",
+            () -> new BlockItem(DOCBlocks.WATERHOLE.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> BOWL = ITEM_TYPES.register("bowl",
             () -> new BlockItem(DOCBlocks.BOWL.get(), new Item.Properties()));
 

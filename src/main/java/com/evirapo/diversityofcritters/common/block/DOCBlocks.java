@@ -3,6 +3,9 @@ package com.evirapo.diversityofcritters.common.block;
 import com.evirapo.diversityofcritters.DiversityOfCritters;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -31,6 +34,16 @@ public class DOCBlocks {
     // Same hardness as the furnace (3.5); both are tagged mineable/pickaxe in the block tag datagen.
     public static final RegistryObject<Block> HUMIDIFIER = BLOCKS.register("humidifier",
             () -> new HumidifierBlock(BlockBehaviour.Properties.copy(Blocks.PRISMARINE).strength(3.5F)));
+
+    // A puddle animals drink from; generated in the world like a plant (see worldgen/placed_feature).
+    public static final RegistryObject<Block> WATERHOLE = BLOCKS.register("waterhole",
+            () -> new WaterholeBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.WATER)
+                    .noCollission()
+                    .noOcclusion()
+                    .strength(0.3F)
+                    .sound(SoundType.MUD)
+                    .pushReaction(PushReaction.DESTROY)));
 
     public static void register(IEventBus eventBus) {
         BLOCKS.register(eventBus);

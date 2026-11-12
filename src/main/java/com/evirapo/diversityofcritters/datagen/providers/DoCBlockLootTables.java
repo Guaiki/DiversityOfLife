@@ -26,6 +26,7 @@ public class DoCBlockLootTables extends BlockLootSubProvider {
         this.dropSelf(DOCBlocks.DIG_BOX.get());
         this.dropSelf(DOCBlocks.AIR_CONDITIONER.get());
         this.dropSelf(DOCBlocks.HUMIDIFIER.get());
+        this.dropSelf(DOCBlocks.WATERHOLE.get());
 
         // The bowl keeps what it holds, like a shulker box: the contents ride along in the
         // item's BlockEntityTag and are loaded back into the block entity when it is placed.

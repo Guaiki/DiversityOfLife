@@ -27,6 +27,9 @@ public class DoCTags {
 
         public static final TagKey<Block> CIVET_CLIMBABLE = create("civet_climbable");
 
+        /** Blocks critters drink from besides water, e.g. the waterhole. */
+        public static final TagKey<Block> DRINKABLE = create("drinkable");
+
         /**
          * Ground blocks the mod's animals are allowed to spawn on.
          *

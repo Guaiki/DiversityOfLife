@@ -1,5 +1,6 @@
-// 1.20.1	2026-11-04T20:16:19.7718222	Tags for minecraft:block mod id diversityofcritters
+// 1.20.1	2026-11-12T15:13:24.1853055	Tags for minecraft:block mod id diversityofcritters
 b147fcff5c0b4d72df1cb7809b063b2562180832 data/diversityofcritters/tags/blocks/civet_climbable.json
 847606413059f5ef14d712616965f5758137c958 data/diversityofcritters/tags/blocks/critters_spawnable_on.json
+a585b3e356ef736594a3e150fdb73c9a515e98c4 data/diversityofcritters/tags/blocks/drinkable.json
 3397ae413433d9e10f2f84f26f36c7d8de6ec999 data/minecraft/tags/blocks/mineable/axe.json
 690ca08e77ba85341a06744ec215a312ccc87ee6 data/minecraft/tags/blocks/mineable/pickaxe.json

@@ -1,0 +1,24 @@
+{
+  "type": "forge:add_features",
+  "biomes": {
+    "type": "forge:and",
+    "values": [
+      "#minecraft:is_overworld",
+      {
+        "type": "forge:not",
+        "value": {
+          "type": "forge:or",
+          "values": [
+            "#minecraft:is_ocean",
+            "#minecraft:is_deep_ocean",
+            "#minecraft:is_river",
+            "#minecraft:is_beach",
+            ["minecraft:mushroom_fields"]
+          ]
+        }
+      }
+    ]
+  },
+  "features": "diversityofcritters:waterhole",
+  "step": "vegetal_decoration"
+}
