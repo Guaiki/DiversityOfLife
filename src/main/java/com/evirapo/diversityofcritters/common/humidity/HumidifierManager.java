@@ -5,6 +5,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,5 +48,17 @@ public class HumidifierManager {
             }
         }
         return best;
+    }
+
+    /** Positions of every Humidifier whose block is within {@code range} blocks of {@code pos}. */
+    public static List<BlockPos> centersWithin(Level level, BlockPos pos, int range) {
+        Map<BlockPos, Area> map = AREAS.get(level.dimension());
+        if (map == null || map.isEmpty()) return List.of();
+        List<BlockPos> centers = new ArrayList<>();
+        double rangeSq = (double) range * range;
+        for (BlockPos center : map.keySet()) {
+            if (center.distSqr(pos) <= rangeSq) centers.add(center);
+        }
+        return centers;
     }
 }

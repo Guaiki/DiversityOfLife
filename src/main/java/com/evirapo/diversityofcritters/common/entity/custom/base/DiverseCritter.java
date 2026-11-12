@@ -2,6 +2,7 @@ package com.evirapo.diversityofcritters.common.entity.custom.base;
 
 import com.evirapo.diversityofcritters.client.menu.DOCStatsMenu;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
+import com.evirapo.diversityofcritters.common.entity.ai.SeekComfortGoal;
 import com.evirapo.diversityofcritters.common.damage.DOCDamageTypes;
 import com.evirapo.diversityofcritters.common.gamerule.DOCGameRules;
 import com.evirapo.diversityofcritters.common.entity.util.CritterDietConfig;
@@ -373,6 +374,9 @@ public abstract class DiverseCritter extends TamableAnimal
     protected void registerGoals() {
         super.registerGoals();
         this.goalSelector.addGoal(0, new AnimationLockGoal(this));
+        // Por encima de comer (10+) y de seguir al dueño (6), por debajo de huir y del sueño. En
+        // simple estrés el propio goal cede ante el hambre y la sed.
+        this.goalSelector.addGoal(5, new SeekComfortGoal(this, 1.1D));
     }
 
     /** Con histéresis y sincronizado — ver {@link #IS_MOVING}. Lo usan las playCondition de
@@ -922,6 +926,27 @@ public abstract class DiverseCritter extends TamableAnimal
         if (getHumidityZone() >= 2 && this.tickCount % HUMIDITY_DANGER_DAMAGE_INTERVAL == 0) {
             this.hurt(DOCDamageTypes.source(this.level(), DOCDamageTypes.HUMIDITY), HUMIDITY_DANGER_DAMAGE);
         }
+    }
+
+    /**
+     * Lo incómodo que sería para esta especie estar en {@code pos}: 0 = temperatura y humedad en
+     * rango; cada eje suma 1 en estrés y 4 en peligro, así que el peligro pesa más que dos estrés
+     * juntos. Mira el clima efectivo (bioma, estación, aire acondicionado y humidificador) en ese
+     * momento, no el tier sincronizado del animal. Siempre 0 con {@code doCritterClimate} apagado.
+     */
+    public int climateScoreAt(BlockPos pos) {
+        if (!this.climateEnabled()) return 0;
+        int t = TemperatureSystem.getEffectiveTier(this.level(), pos).distanceOutside(comfortTierMin(), comfortTierMax());
+        int h = HumiditySystem.getEffectiveTier(this.level(), pos).distanceOutside(comfortHumidityMin(), comfortHumidityMax());
+        return climateWeight(t) + climateWeight(h);
+    }
+
+    /** Puntuación de {@link #climateScoreAt} a partir de la cual hay peligro en algún eje. */
+    public static final int CLIMATE_DANGER_SCORE = 4;
+
+    private static int climateWeight(int distance) {
+        if (distance <= 0) return 0;
+        return distance == 1 ? 1 : CLIMATE_DANGER_SCORE;
     }
 
     public boolean isClimbing() { return false; }
