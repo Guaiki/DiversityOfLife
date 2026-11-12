@@ -1,0 +1,28 @@
+{
+  "type": "forge:add_spawns",
+  "biomes": {
+    "type": "forge:and",
+    "values": [
+      "#minecraft:is_overworld",
+      {
+        "type": "forge:not",
+        "value": {
+          "type": "forge:or",
+          "values": [
+            "#minecraft:is_ocean",
+            "#minecraft:is_deep_ocean",
+            "#minecraft:is_river",
+            "#minecraft:is_beach",
+            ["minecraft:mushroom_fields"]
+          ]
+        }
+      }
+    ]
+  },
+  "spawners": [
+    { "type": "minecraft:cow", "weight": 8, "minCount": 2, "maxCount": 4 },
+    { "type": "minecraft:pig", "weight": 8, "minCount": 2, "maxCount": 4 },
+    { "type": "minecraft:sheep", "weight": 8, "minCount": 2, "maxCount": 4 },
+    { "type": "minecraft:chicken", "weight": 8, "minCount": 2, "maxCount": 4 }
+  ]
+}

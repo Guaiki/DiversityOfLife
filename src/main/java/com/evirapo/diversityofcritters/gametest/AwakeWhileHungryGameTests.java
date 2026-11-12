@@ -136,7 +136,7 @@ public final class AwakeWhileHungryGameTests {
                         "waiting for the civet to sleep"))
                 .thenExecute(() -> {
                     ac[0] = civet.blockPosition();
-                    AirConditionerManager.add(helper.getLevel(), ac[0], TemperatureTier.FREEZING, 4);
+                    AirConditionerManager.add(helper.getLevel(), ac[0], TemperatureTier.FREEZING, 2);
                 })
                 .thenWaitUntil(() -> helper.assertTrue(civet.getSleepState() == SleepState.AWAKE,
                         "waiting for the freezing civet to wake up: " + civet.getSleepState()

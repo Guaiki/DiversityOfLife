@@ -13,7 +13,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
 
-public class FindWaterBowlGoal extends Goal {
+public class FindWaterBowlGoal extends Goal implements FeedingGoal {
 
     private final DiverseCritter critter;
     private final double speed;

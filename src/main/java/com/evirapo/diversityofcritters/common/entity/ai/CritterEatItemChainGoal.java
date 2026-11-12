@@ -37,7 +37,7 @@ import java.util.List;
  * APPROACH de la clase base es la dueña de la navegación, y {@link #shouldStart()} ya escanea en
  * cada evaluación.
  */
-public class CritterEatItemChainGoal extends PhasedActivityGoal<DiverseCritter> {
+public class CritterEatItemChainGoal extends PhasedActivityGoal<DiverseCritter> implements FeedingGoal {
 
     private static final double REACH = 1.2D;
     private static final int SEARCH_RADIUS_XZ = 32;

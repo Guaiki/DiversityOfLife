@@ -4,6 +4,7 @@ import com.evirapo.diversityofcritters.DiversityOfCritters;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
@@ -40,6 +41,16 @@ public class DoCTags {
 
         private static TagKey<Block> create(String pName) {
             return TagKey.create(Registries.BLOCK, new ResourceLocation(DiversityOfCritters.MODID, pName));
+        }
+    }
+
+    public static class EntityTypes {
+
+        /** Vanilla livestock that self-breeds under the per-area cap: cow, pig, sheep, chicken. */
+        public static final TagKey<EntityType<?>> LIVESTOCK = create("livestock");
+
+        private static TagKey<EntityType<?>> create(String pName) {
+            return TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(DiversityOfCritters.MODID, pName));
         }
     }
 

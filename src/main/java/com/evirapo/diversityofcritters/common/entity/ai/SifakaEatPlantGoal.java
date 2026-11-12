@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 import java.util.EnumSet;
 
-public class SifakaEatPlantGoal extends Goal {
+public class SifakaEatPlantGoal extends Goal implements FeedingGoal {
 
     private final SifakaEntity sifaka;
     private final double speed;

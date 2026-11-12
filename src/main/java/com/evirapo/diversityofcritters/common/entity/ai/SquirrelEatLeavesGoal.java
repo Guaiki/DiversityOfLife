@@ -13,7 +13,7 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 import java.util.EnumSet;
 
-public class SquirrelEatLeavesGoal extends Goal {
+public class SquirrelEatLeavesGoal extends Goal implements FeedingGoal {
 
     private final SquirrelEntity squirrel;
     private final double speed;

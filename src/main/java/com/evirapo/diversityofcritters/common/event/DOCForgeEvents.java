@@ -7,6 +7,7 @@ import com.evirapo.diversityofcritters.common.command.FamilyDebugCommand;
 import com.evirapo.diversityofcritters.common.command.SetNeedsCommand;
 import com.evirapo.diversityofcritters.common.command.SetPregnancyCommand;
 import com.evirapo.diversityofcritters.common.command.SpawnDebugCommand;
+import com.evirapo.diversityofcritters.common.command.LivestockDebugCommand;
 import com.evirapo.diversityofcritters.common.spawn.WildPopulation;
 import com.evirapo.diversityofcritters.common.spawn.SpawnRuleEngine;
 import com.mojang.logging.LogUtils;
@@ -49,6 +50,7 @@ public class DOCForgeEvents {
         WarinessDebugCommand.register(event.getDispatcher());
         FamilyDebugCommand.register(event.getDispatcher());
         SpawnDebugCommand.register(event.getDispatcher());
+        LivestockDebugCommand.register(event.getDispatcher());
     }
 
     /**

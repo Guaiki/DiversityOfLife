@@ -9,7 +9,7 @@ import net.minecraft.world.item.Item;
 import java.util.List;
 import java.util.function.Predicate;
 
-public class LookForFoodItems extends Goal {
+public class LookForFoodItems extends Goal implements FeedingGoal {
     private final DiverseCritter base;
     private final TagKey<Item> tags;
     private ItemEntity itemPos;

@@ -13,7 +13,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Predicate;
 
-public class CritterEatItemGoal extends Goal {
+public class CritterEatItemGoal extends Goal implements FeedingGoal {
 
     private final DiverseCritter entity;
     private final TagKey<Item> foodTag;

@@ -57,7 +57,7 @@ public final class WaterholeGameTests {
     public static void aWaterholeNeverDriesUp(GameTestHelper helper) {
         dryFloorWithAWaterhole(helper);
         BlockPos abs = helper.absolutePos(HOLE);
-        AirConditionerManager.add(helper.getLevel(), abs, TemperatureTier.SCORCHING, 4);
+        AirConditionerManager.add(helper.getLevel(), abs, TemperatureTier.SCORCHING, 2);
 
         helper.runAfterDelay(600, () -> {
             AirConditionerManager.remove(helper.getLevel(), abs);
