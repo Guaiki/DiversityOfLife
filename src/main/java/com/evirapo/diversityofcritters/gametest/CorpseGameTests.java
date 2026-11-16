@@ -129,7 +129,7 @@ public final class CorpseGameTests {
         walledFloor(helper);
         BlockPos pos = new BlockPos(5, 3, 5);
         CorpseBlockEntity be = corpse(helper, pos, DoCTags.EntityTypes.SMALL_RODENT, 1, helper.getLevel().getGameTime());
-        helper.assertTrue(!be.takePortion().isEmpty(), "the last portion gave no meat");
+        helper.assertTrue(be.takePortion(), "the last portion could not be eaten");
         helper.assertBlockNotPresent(DOCBlocks.CORPSE.get(), pos);
         helper.succeed();
     }

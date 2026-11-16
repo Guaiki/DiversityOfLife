@@ -2,7 +2,6 @@ package com.evirapo.diversityofcritters.common.block.entity;
 
 import com.evirapo.diversityofcritters.common.block.DOCBlockEntities;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
-import com.evirapo.diversityofcritters.common.item.DOCItems;
 import com.evirapo.diversityofcritters.misc.tags.DoCTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -10,7 +9,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,7 +16,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import javax.annotation.Nullable;
 
 /**
- * A corpse's state: the prey category it came from, the portions of meat left and when it appeared.
+ * A corpse's state: the prey category it came from (for a per-category look later), the meals left
+ * and when it appeared.
  * The last portion eaten removes the block; so does age ({@code corpseRotSeconds}), eaten or not.
  */
 public class CorpseBlockEntity extends BlockEntity {
@@ -48,14 +47,13 @@ public class CorpseBlockEntity extends BlockEntity {
 
     public long bornGameTime() { return bornGameTime; }
 
-    /** One portion of meat, removing the corpse when it was the last; empty if nothing is left. */
-    public ItemStack takePortion() {
-        if (level == null || portions <= 0) return ItemStack.EMPTY;
+    /** Eats one portion, removing the corpse when it was the last. False if nothing was left. */
+    public boolean takePortion() {
+        if (level == null || portions <= 0) return false;
         portions--;
         setChanged();
-        ItemStack meat = new ItemStack(DOCItems.meatFor(category));
         if (portions <= 0) level.removeBlock(worldPosition, false);
-        return meat;
+        return true;
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, CorpseBlockEntity be) {

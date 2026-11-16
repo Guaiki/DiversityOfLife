@@ -9,11 +9,6 @@
     "minecraft:mutton",
     "minecraft:cooked_mutton",
     "minecraft:porkchop",
-    "minecraft:cooked_porkchop",
-    "diversityofcritters:small_rodent_meat",
-    "diversityofcritters:small_carnivora_meat",
-    "diversityofcritters:small_primate_meat",
-    "diversityofcritters:lagomorph_meat",
-    "diversityofcritters:small_bird_meat"
+    "minecraft:cooked_porkchop"
   ]
 }

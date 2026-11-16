@@ -110,15 +110,16 @@ public class BowlFeedingHelper {
         return false;
     }
 
+    /** What one corpse meal heals, the same as the raw meats a bowl holds (about one heart). */
+    private static final float CORPSE_MEAL_HEAL = 2.0F;
+
     /** One portion of a corpse: any meat eater may feed, not only the hunter. */
     private static boolean eatFromCorpse(DiverseCritter critter, Level level, BlockPos pos) {
         if (!critter.getDietConfig().acceptsMeat) return false;
         if (!(level.getBlockEntity(pos) instanceof CorpseBlockEntity corpse)) return false;
-        ItemStack meat = corpse.takePortion();
-        if (meat.isEmpty()) return false;
-        var foodProps = meat.isEdible() ? meat.getFoodProperties(critter) : null;
+        if (!corpse.takePortion()) return false;
         critter.onAteFood();
-        critter.heal(foodProps != null ? (float) foodProps.getNutrition() : 1.0F);
+        critter.heal(CORPSE_MEAL_HEAL);
         return true;
     }
 
