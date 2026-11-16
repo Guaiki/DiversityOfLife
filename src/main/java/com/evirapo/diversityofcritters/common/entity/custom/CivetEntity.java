@@ -911,8 +911,11 @@ public class CivetEntity extends DiverseCritter
         return flag;
     }
 
+    /** Called right after the bite, when the prey may already be dead: no aliveness check here. */
     private boolean isPrey(Entity entity) {
-        return entity instanceof LivingEntity living && DiverseCritter.isPreyFor(this, living);
+        return entity instanceof LivingEntity living && living.getType() != this.getType()
+                && this.huntsCategoryOf(living.getType())
+                && !(living instanceof TamableAnimal tamable && tamable.isTame());
     }
 
     /** Small rodents (the squirrel), lagomorphs (rabbits) and small birds (chickens, parrots). */

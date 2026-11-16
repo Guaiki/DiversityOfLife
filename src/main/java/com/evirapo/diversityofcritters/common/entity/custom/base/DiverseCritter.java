@@ -989,6 +989,19 @@ public abstract class DiverseCritter extends TamableAnimal
         return hunter.huntsCategoryOf(target.getType());
     }
 
+    /** Ticks sin cazar tras matar una presa: tiempo para ir a comerse el cadáver. */
+    public static final int HUNT_COOLDOWN_AFTER_KILL = 400;
+    private long huntCooldownUntil;
+
+    /**
+     * Acaba de matar una presa: deja de cazar un rato para ir a comérsela. Sin esto, con hambre
+     * todavía, elegía la siguiente presa a la vista y vaciaba un corral antes de comer.
+     */
+    public void onPreyKilled() {
+        this.huntCooldownUntil = this.level().getGameTime() + HUNT_COOLDOWN_AFTER_KILL;
+        this.setTarget(null);
+    }
+
     /** Si esta especie caza alguna categoría de presa a la que pertenece {@code type}. */
     public boolean huntsCategoryOf(EntityType<?> type) {
         for (TagKey<EntityType<?>> category : this.preyCategories()) {
@@ -1002,6 +1015,7 @@ public abstract class DiverseCritter extends TamableAnimal
      */
     public boolean canHunt() {
         if (!this.isHungry() || this.isBaby() || this.isSedated()) return false;
+        if (this.level().getGameTime() < this.huntCooldownUntil) return false;
         if (this.getSleepState() != SleepState.AWAKE) return false;
         return !this.isTame() || (this.isWandering() && !this.isOrderedToSit());
     }

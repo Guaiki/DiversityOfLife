@@ -14,6 +14,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -34,6 +35,17 @@ public final class CorpseEvents {
     private static final int SEARCH_RADIUS = 2;
 
     private CorpseEvents() {
+    }
+
+    /** A predator that kills its prey stops hunting for a while, to go and eat it. */
+    @SubscribeEvent
+    public static void onDeath(LivingDeathEvent event) {
+        LivingEntity victim = event.getEntity();
+        if (victim.level().isClientSide()) return;
+        if (event.getSource().getEntity() instanceof DiverseCritter hunter
+                && victim.getType() != hunter.getType() && hunter.huntsCategoryOf(victim.getType())) {
+            hunter.onPreyKilled();
+        }
     }
 
     @SubscribeEvent

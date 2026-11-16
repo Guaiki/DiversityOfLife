@@ -34,6 +34,10 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
     private @Nullable BlockPos waterPos;
     private @Nullable BlockPos standPos;
 
+    /** Espera tras un barrido de waterholes sin resultado. */
+    private static final int HOLE_SCAN_RETRY_TICKS = 160;
+    private long nextHoleScanTick;
+
     public CritterDrinkChainGoal(DiverseCritter critter) {
         super(critter, "drink_enter", "drink_loop", "drink_exit");
         repeat(2, 3);                       // dos o tres sorbos
@@ -125,10 +129,13 @@ public class CritterDrinkChainGoal extends PhasedActivityGoal<DiverseCritter> {
                 }
             }
         }
-        if (best == null) {
-            // Un charco (waterhole) de una casilla casi nunca sale en el muestreo aleatorio.
-            BlockPos hole = DrinkSources.nearestDrinkableBlock(mob.level(), mob.blockPosition(), range / 2, 4);
-            if (hole != null && landNextTo(hole) != null) best = hole;
+        if (best == null && mob.level().getGameTime() >= nextHoleScanTick) {
+            // Un charco (waterhole) de una casilla casi nunca sale en el muestreo aleatorio. El barrido
+            // lee miles de bloques y shouldStart() se evalúa cada pocos ticks mientras tiene sed, así
+            // que tras uno vacío se espera antes de repetirlo.
+            best = DrinkSources.nearestDrinkableBlock(mob.level(), mob.blockPosition(), range / 2, 4,
+                    hole -> landNextTo(hole) != null);
+            if (best == null) nextHoleScanTick = mob.level().getGameTime() + HOLE_SCAN_RETRY_TICKS;
         }
         return best;
     }

@@ -120,4 +120,74 @@ public final class HuntingGameTests {
         civet.discard();
         helper.succeed();
     }
+
+    /** Walls two blocks high round the floor, so a rabbit cannot run off. */
+    private static void walls(GameTestHelper helper) {
+        for (int x = 1; x <= 10; x++) {
+            for (int z = 1; z <= 10; z++) {
+                boolean edge = x == 1 || x == 10 || z == 1 || z == 10;
+                helper.setBlock(x, 3, z, edge ? Blocks.STONE : Blocks.AIR);
+                helper.setBlock(x, 4, z, edge ? Blocks.STONE : Blocks.AIR);
+            }
+        }
+    }
+
+    /** Killing prey is enrichment, as it was before hunting went by category. */
+    @GameTest(template = ARENA, timeoutTicks = 800, batch = "hunt_enrichment")
+    public static void aKillFillsTheCivetsEnrichment(GameTestHelper helper) {
+        CivetEntity civet = setUp(helper, true);
+        walls(helper);
+        civet.setPos(helper.absoluteVec(new Vec3(2.5, 3, 2.5)));
+        civet.setEnrichment(0);
+        LivingEntity rabbit = helper.spawn(EntityType.RABBIT, new Vec3(8.5, 3, 8.5));
+        discardLater(helper, 800, civet, rabbit);
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!rabbit.isAlive(), "waiting for the kill");
+            helper.assertTrue(civet.getEnrichment() == civet.maxEnrichment(),
+                    "enrichment after the kill: " + civet.getEnrichment() + "/" + civet.maxEnrichment());
+            discard(civet);
+            clearCorpses(helper);
+        });
+    }
+
+    /**
+     * After a kill the civet goes to eat it, instead of hunting the next prey in sight first: with
+     * two rabbits, it eats the first one's corpse while the second is still alive.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 1000, batch = "hunt_one_at_a_time")
+    public static void aCivetEatsItsKillBeforeHuntingAgain(GameTestHelper helper) {
+        CivetEntity civet = setUp(helper, true);
+        walls(helper);
+        civet.setPos(helper.absoluteVec(new Vec3(2.5, 3, 2.5)));
+        LivingEntity first = helper.spawn(EntityType.RABBIT, new Vec3(8.5, 3, 8.5));
+        LivingEntity second = helper.spawn(EntityType.RABBIT, new Vec3(8.5, 3, 2.5));
+        discardLater(helper, 1000, civet, first, second);
+
+        helper.onEachTick(() -> {
+            if (!first.isAlive() && !second.isAlive() && civet.isHungry()) {
+                helper.fail("the civet killed both rabbits before eating");
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!first.isAlive() || !second.isAlive(), "waiting for the first kill");
+            helper.assertTrue(!civet.isHungry(), "waiting for the civet to eat its kill, hunger "
+                    + civet.getHungerPercentage() + "%");
+            discard(civet, first, second);
+            clearCorpses(helper);
+        });
+    }
+
+    private static void clearCorpses(GameTestHelper helper) {
+        for (int x = 1; x <= 10; x++) {
+            for (int z = 1; z <= 10; z++) {
+                for (int y = 2; y <= 4; y++) {
+                    net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(x, y, z);
+                    if (helper.getBlockState(p).is(com.evirapo.diversityofcritters.common.block.DOCBlocks.CORPSE.get())) {
+                        helper.setBlock(p, Blocks.AIR);
+                    }
+                }
+            }
+        }
+    }
 }
