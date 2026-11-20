@@ -8,13 +8,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PageTurnTest {
 
+    private static final float PI = (float) Math.PI;
+    private static final float EPS = 1e-4F;
+
     @Test
-    void leafIsFlatAtTheEndsAndEdgeOnHalfway() {
-        assertEquals(147, PageTurn.leafWidth(0.0F, 147));
-        assertEquals(0, PageTurn.leafWidth(0.5F, 147));
-        assertEquals(147, PageTurn.leafWidth(1.0F, 147));
-        assertEquals(104, PageTurn.leafWidth(0.25F, 147)); // 147 * cos(45°)
-        assertEquals(104, PageTurn.leafWidth(0.75F, 147));
+    void easingStartsAndEndsGently() {
+        assertEquals(0.0F, PageTurn.ease(0.0F), EPS);
+        assertEquals(0.5F, PageTurn.ease(0.5F), EPS);
+        assertEquals(1.0F, PageTurn.ease(1.0F), EPS);
+        assertTrue(PageTurn.ease(0.1F) < 0.05F, "slow out of the start");
+        assertTrue(PageTurn.ease(0.9F) > 0.95F, "slow into the end");
+    }
+
+    @Test
+    void forwardTurnSwingsFromRightToLeftAndBackTheOtherWay() {
+        PageTurn forward = new PageTurn(null, 1, 0L);
+        assertEquals(0.0F, forward.angle(0L), EPS);
+        assertEquals(PI / 2, forward.angle(PageTurn.DURATION_MS / 2), EPS);
+        assertEquals(PI, forward.angle(PageTurn.DURATION_MS), EPS);
+
+        PageTurn back = new PageTurn(null, -1, 0L);
+        assertEquals(PI, back.angle(0L), EPS);
+        assertEquals(0.0F, back.angle(PageTurn.DURATION_MS), EPS);
+    }
+
+    @Test
+    void flatLeafProjectsOntoThePage() {
+        assertEquals(100.0F, PageTurn.projectedX(100.0F, 0.0F), EPS);
+        assertEquals(-100.0F, PageTurn.projectedX(100.0F, PI), EPS);
+        assertEquals(1.0F, PageTurn.heightScale(100.0F, 0.0F), EPS);
+        assertEquals(1.0F, PageTurn.heightScale(100.0F, PI), EPS);
+    }
+
+    @Test
+    void raisedLeafComesTowardsTheViewer() {
+        // Upright, the leaf is edge-on, and its outer edge is nearer the viewer so it looks taller.
+        assertEquals(0.0F, PageTurn.projectedX(147.0F, PI / 2), EPS);
+        assertTrue(PageTurn.heightScale(147.0F, PI / 2) > 1.2F);
+        assertEquals(1.0F, PageTurn.heightScale(0.0F, PI / 2), EPS, "the hinge stays on the spine");
+        // Half raised, perspective pushes the outer edge further out than plain foreshortening.
+        assertTrue(PageTurn.projectedX(147.0F, PI / 4) > 147.0F * (float) Math.cos(PI / 4));
     }
 
     @Test

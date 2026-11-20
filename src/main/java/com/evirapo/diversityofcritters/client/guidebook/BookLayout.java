@@ -17,6 +17,9 @@ public final class BookLayout {
     public static final int RIGHT_PAGE_X0 = 152, RIGHT_PAGE_X1 = 275;
     public static final int PAGE_TOP = 10, PAGE_BOTTOM = 166;
 
+    /** The paper of both pages, inside the cover. */
+    public static final int PAPER_X0 = 15, PAPER_X1 = 278, PAPER_Y0 = 7, PAPER_Y1 = 170;
+
     /** Middle of the spine (x 145-148): the hinge pages turn around. */
     public static final int SPINE_X = 147;
 
