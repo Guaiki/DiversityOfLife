@@ -10,4 +10,16 @@ public enum ConservationTier {
     public int dotX() {
         return 164 + this.ordinal() * 14;
     }
+
+    /**
+     * How a species is doing in this world, from its wild population. No wild animals left is
+     * "extinct in the wild"; below the endangered threshold it is CR (under half the threshold) or
+     * EN; below the base population it is VU (under three quarters of the base) or NT; otherwise LC.
+     */
+    public static ConservationTier forWildPopulation(int population, int basePopulation, int endangeredThreshold) {
+        if (population <= 0) return EW;
+        if (population < endangeredThreshold) return population * 2 < endangeredThreshold ? CR : EN;
+        if (population < basePopulation) return population * 4 < basePopulation * 3 ? VU : NT;
+        return LC;
+    }
 }
