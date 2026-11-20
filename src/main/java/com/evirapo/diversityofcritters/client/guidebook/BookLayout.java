@@ -17,6 +17,9 @@ public final class BookLayout {
     public static final int RIGHT_PAGE_X0 = 152, RIGHT_PAGE_X1 = 275;
     public static final int PAGE_TOP = 10, PAGE_BOTTOM = 166;
 
+    /** Middle of the spine (x 145-148): the hinge pages turn around. */
+    public static final int SPINE_X = 147;
+
     public static final int LEFT_CENTER = (LEFT_PAGE_X0 + LEFT_PAGE_X1) / 2;
     public static final int RIGHT_CENTER = (RIGHT_PAGE_X0 + RIGHT_PAGE_X1) / 2;
 
