@@ -112,5 +112,14 @@
   "gui.diversityofcritters.guidebook.thanks": "Thanks for playing Diversity of Life.",
   "gui.diversityofcritters.guidebook.coming_soon": "Coming in a future update",
   "gui.diversityofcritters.guidebook.discord": "Discord",
-  "gui.diversityofcritters.guidebook.discord_soon": "Link coming soon"
+  "gui.diversityofcritters.guidebook.discord_soon": "Link coming soon",
+
+  "guidebook.diversityofcritters.fact.civet": "Named for the dark bands that cross its back. It hunts on the forest floor at night, sniffing out earthworms, ants, spiders and small animals. In this world it climbs, scratches logs, digs, and hunts prey smaller than itself.",
+  "guidebook.diversityofcritters.fact.sifaka": "Its name comes from its alarm call, a loud \"shi-fak\". On the ground it crosses open spaces by hopping sideways on its back legs, a gait often called dancing. In the trees it clings upright and leaps between trunks.",
+  "guidebook.diversityofcritters.fact.squirrel": "One of the largest flying squirrels. A furry membrane between its legs lets it glide from tree to tree instead of climbing down. It wakes at dusk and feeds on nuts, seeds, fruit and leaves.",
+  "guidebook.diversityofcritters.enrichment.dig_box": "Dig Box: digs for buried treats",
+  "guidebook.diversityofcritters.enrichment.scratch_logs": "Tree logs: scratches the bark",
+  "guidebook.diversityofcritters.enrichment.dig_dirt": "Dirt: digs in the ground",
+  "guidebook.diversityofcritters.enrichment.hunting": "Hunting: catches small prey",
+  "guidebook.diversityofcritters.enrichment.climbing": "Trees: climbing up and back down"
 }

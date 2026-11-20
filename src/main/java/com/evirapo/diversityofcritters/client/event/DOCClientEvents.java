@@ -23,6 +23,11 @@ import net.minecraftforge.fml.common.Mod;
 public class DOCClientEvents {
 
     @SubscribeEvent
+    public static void registerReloadListeners(net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(com.evirapo.diversityofcritters.client.guidebook.data.GuidebookData.INSTANCE);
+    }
+
+    @SubscribeEvent
     public static void registerLayer(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(ModelLayers.LION_LAYER, LionModel::createBodyLayer);
         event.registerLayerDefinition(ModelLayers.LION_CUB_LAYER, LionCubModel::createBodyLayer);

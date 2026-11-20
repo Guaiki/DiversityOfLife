@@ -1,0 +1,13 @@
+{
+  "entity": "diversityofcritters:sifaka",
+  "background": "diversityofcritters:textures/gui/guidebook/species_sifaka.png",
+  "scientific_name": "Propithecus verreauxi",
+  "genus": "Propithecus",
+  "family": "Indriidae",
+  "tags": ["lemur", "herbivore", "primates", "mammal", "diurnal"],
+  "status": "CR",
+  "diet": "diversityofcritters:sifaka_food",
+  "enrichment": [
+    {"item": "minecraft:oak_log", "tooltip": "guidebook.diversityofcritters.enrichment.climbing"}
+  ]
+}

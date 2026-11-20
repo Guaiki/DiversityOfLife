@@ -1,0 +1,13 @@
+{
+  "entity": "diversityofcritters:squirrel",
+  "background": "diversityofcritters:textures/gui/guidebook/species_squirrel.png",
+  "scientific_name": "Petaurista alborufus",
+  "genus": "Petaurista",
+  "family": "Sciuridae",
+  "tags": ["squirrel", "herbivore", "rodentia", "mammal", "nocturnal", "glider"],
+  "status": "LC",
+  "diet": "diversityofcritters:squirrel_food",
+  "enrichment": [
+    {"item": "minecraft:oak_log", "tooltip": "guidebook.diversityofcritters.enrichment.climbing"}
+  ]
+}
