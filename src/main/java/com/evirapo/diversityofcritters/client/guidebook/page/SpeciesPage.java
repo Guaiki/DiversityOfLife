@@ -122,13 +122,14 @@ public class SpeciesPage extends BookPage {
             BookText.centered(g, font, Component.literal("v"), left + TEXT_X1 - 2, top + FACT_Y1 - 6, BookLayout.COLOR_TEXT_SOFT, BookText.SMALL, 8);
         }
 
-        ring(g, left, top, this.entry.realStatus(), 6, RING_REAL);
+        ring(g, left, top, this.entry.realStatus(), BookLayout.RING_RADIUS, RING_REAL);
         if (this.worldTier != null) {
-            ring(g, left, top, this.worldTier, this.worldTier == this.entry.realStatus() ? 7 : 6, RING_WORLD);
+            ring(g, left, top, this.worldTier, this.worldTier == this.entry.realStatus() ? BookLayout.MAX_RING_RADIUS : BookLayout.RING_RADIUS, RING_WORLD);
         }
 
-        int dietCx = left + (BookLayout.DIET_X0 + BookLayout.DIET_X1) / 2;
-        int enrichCx = left + (BookLayout.ENRICH_X0 + BookLayout.ENRICH_X1) / 2;
+        // The box edges are one-pixel borders at both x0 and x1, so the middle is (x0 + x1 + 1) / 2.
+        float dietCx = left + (BookLayout.DIET_X0 + BookLayout.DIET_X1 + 1) / 2.0F;
+        float enrichCx = left + (BookLayout.ENRICH_X0 + BookLayout.ENRICH_X1 + 1) / 2.0F;
         BookText.centered(g, font, HomePage.key("diet"), dietCx, top + BookLayout.BOX_TITLE_Y, BookLayout.COLOR_TEXT, BookText.SMALL, 44);
         BookText.centered(g, font, HomePage.key("enrichment"), enrichCx, top + BookLayout.BOX_TITLE_Y, BookLayout.COLOR_TEXT, BookText.SMALL, 44);
         this.diet.render(g, left, top, mouseX, mouseY);

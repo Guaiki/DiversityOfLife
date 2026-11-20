@@ -25,10 +25,13 @@ public final class BookLayout {
 
     /** Species pages: the IUCN dots, the diet box and the enrichment box are painted into the texture. */
     public static final int DOT_Y = 108, DOT_SIZE = 9;
+    /** The rings drawn around the dots: 6 px, or 7 px for the yellow one when both rings share a dot. */
+    public static final int RING_RADIUS = 6, MAX_RING_RADIUS = 7;
     public static final int DIET_X0 = 168, DIET_X1 = 213;
     public static final int ENRICH_X0 = 213, ENRICH_X1 = 259;
     public static final int BOX_Y0 = 125, BOX_Y1 = 165;
-    public static final int BOX_TITLE_Y = 115;
+    /** Between the bottom of the rings (y 115) and the top of the boxes (y 125). */
+    public static final int BOX_TITLE_Y = 118;
 
     public static final int COLOR_BOX = 0xFFA5A889;
     public static final int COLOR_BORDER = 0xFF999C7F;

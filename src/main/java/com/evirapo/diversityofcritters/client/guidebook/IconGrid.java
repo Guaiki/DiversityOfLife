@@ -21,7 +21,8 @@ public class IconGrid {
 
     private static final int CELL = 12;
     private static final float ITEM_SCALE = 11 / 16.0F;
-    private static final int AUTO_PAGE_TICKS = 60;
+    /** 5 seconds. */
+    static final int AUTO_PAGE_TICKS = 100;
 
     private final int x, y, w, h;
     private final List<Icon> icons;
