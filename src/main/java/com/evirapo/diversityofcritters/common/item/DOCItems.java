@@ -5,6 +5,7 @@ import com.evirapo.diversityofcritters.common.block.DOCBlocks;
 import com.evirapo.diversityofcritters.common.entity.DOCEntities;
 import com.evirapo.diversityofcritters.common.item.custom.BrushItem;
 import com.evirapo.diversityofcritters.common.item.custom.GauzeBandageItem;
+import com.evirapo.diversityofcritters.common.item.custom.GuidebookItem;
 import com.evirapo.diversityofcritters.common.item.custom.MedicinePillItem;
 import com.evirapo.diversityofcritters.common.item.custom.TranquilizerRifleItem;
 import net.minecraft.world.food.FoodProperties;
@@ -34,6 +35,9 @@ public class DOCItems {
 
     public static final RegistryObject<Item> ZOO_BOOK = ITEM_TYPES.register("zoo_book",
             ()-> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> GUIDEBOOK = ITEM_TYPES.register("guidebook",
+            ()-> new GuidebookItem(new Item.Properties().stacksTo(1)));
 
     public static final RegistryObject<Item> ENTITY_TAB_ICON = ITEM_TYPES.register("entity_tab_icon",
             ()-> new Item(new Item.Properties()));

@@ -34,6 +34,7 @@ public class DOCEntitiesCreativeTab {
                     .title(Component.translatable("creativetab.docitems_tab"))
                     .displayItems((itemDisplayParameters, output) -> {
 
+                        output.accept(DOCItems.GUIDEBOOK.get());
                         output.accept(DOCItems.ZOO_BOOK.get());
                         output.accept(DOCItems.TRAINING_STICK.get());
                         output.accept(DOCItems.BOWL.get());

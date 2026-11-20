@@ -90,5 +90,8 @@
   "key.diversityofcritters.locomotion.overlay": "Toggle leg IK overlay",
   "key.diversityofcritters.locomotion.dump": "Dump leg IK state to log",
   "key.diversityofcritters.locomotion.bypass": "Toggle leg IK bypass",
-  "key.diversityofcritters.locomotion.pin": "Toggle leg IK pin (first leg)"
+  "key.diversityofcritters.locomotion.pin": "Toggle leg IK pin (first leg)",
+
+  "item.diversityofcritters.guidebook": "Natural History Guide",
+  "gui.diversityofcritters.guidebook.back": "< Back"
 }
