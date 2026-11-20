@@ -93,5 +93,24 @@
   "key.diversityofcritters.locomotion.pin": "Toggle leg IK pin (first leg)",
 
   "item.diversityofcritters.guidebook": "Natural History Guide",
-  "gui.diversityofcritters.guidebook.back": "< Back"
+  "gui.diversityofcritters.guidebook.back": "< Back",
+  "gui.diversityofcritters.guidebook.title1": "Diversity of Life",
+  "gui.diversityofcritters.guidebook.title2": "Natural History",
+  "gui.diversityofcritters.guidebook.intro": "This world is filled with many... many... and it deserves the guide book.",
+  "gui.diversityofcritters.guidebook.species": "SPECIES",
+  "gui.diversityofcritters.guidebook.animal": "Animal",
+  "gui.diversityofcritters.guidebook.plant": "Plant",
+  "gui.diversityofcritters.guidebook.plants": "Plants",
+  "gui.diversityofcritters.guidebook.plants_sub": "Roots, leaves and everything that grows",
+  "gui.diversityofcritters.guidebook.other_life": "Other Life",
+  "gui.diversityofcritters.guidebook.other_life_sub": "Fungi, insects and the rest",
+  "gui.diversityofcritters.guidebook.care": "Care",
+  "gui.diversityofcritters.guidebook.etc": "Etc",
+  "gui.diversityofcritters.guidebook.credit": "Credit",
+  "gui.diversityofcritters.guidebook.credits": "Credits",
+  "gui.diversityofcritters.guidebook.credits_sub": "The team behind Diversity of Life",
+  "gui.diversityofcritters.guidebook.thanks": "Thanks for playing Diversity of Life.",
+  "gui.diversityofcritters.guidebook.coming_soon": "Coming in a future update",
+  "gui.diversityofcritters.guidebook.discord": "Discord",
+  "gui.diversityofcritters.guidebook.discord_soon": "Link coming soon"
 }
