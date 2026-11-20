@@ -13,8 +13,9 @@ public final class GuidebookSearch {
 
     /**
      * True when the animal passes the search box and every ticked filter. The query matches part of
-     * the name or of any tag, ignoring case and surrounding spaces; an undiscovered animal's name
-     * never matches, so searching cannot reveal it.
+     * the name or of any tag, ignoring case and surrounding spaces. An undiscovered animal matches
+     * only on the general {@link #FILTER_TAGS} (taxonomy, diet, activity): its name and its
+     * name-like tags ("civet", "lemur") would single out its "???" row.
      */
     public static boolean matches(String name, List<String> tags, boolean discovered, String query, Set<String> filters) {
         if (!tags.containsAll(filters)) return false;
@@ -22,7 +23,7 @@ public final class GuidebookSearch {
         if (q.isEmpty()) return true;
         if (discovered && name.toLowerCase(Locale.ROOT).contains(q)) return true;
         for (String tag : tags) {
-            if (tag.contains(q)) return true;
+            if ((discovered || FILTER_TAGS.contains(tag)) && tag.contains(q)) return true;
         }
         return false;
     }

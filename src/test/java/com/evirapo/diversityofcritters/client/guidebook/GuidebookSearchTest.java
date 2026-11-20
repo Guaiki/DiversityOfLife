@@ -33,6 +33,13 @@ class GuidebookSearchTest {
     }
 
     @Test
+    void undiscoveredCommonNameTagIsHidden() {
+        // "civet" is a tag too; matching it would single out the civet's "???" row.
+        assertFalse(GuidebookSearch.matches(CIVET, CIVET_TAGS, false, "civet", Set.of()));
+        assertTrue(GuidebookSearch.matches(CIVET, CIVET_TAGS, true, "civet", Set.of()));
+    }
+
+    @Test
     void allFiltersMustMatch() {
         assertFalse(GuidebookSearch.matches("Verreaux's Sifaka", SIFAKA_TAGS, true, "", Set.of("mammal", "nocturnal")));
         assertTrue(GuidebookSearch.matches(CIVET, CIVET_TAGS, true, "", Set.of("mammal", "nocturnal")));
