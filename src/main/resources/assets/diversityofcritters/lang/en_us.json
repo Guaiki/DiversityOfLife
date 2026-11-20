@@ -94,6 +94,8 @@
 
   "item.diversityofcritters.guidebook": "Natural History Guide",
   "gui.diversityofcritters.guidebook.back": "< Back",
+  "message.diversityofcritters.guidebook.discovered": "Added %s to your guide",
+  "message.diversityofcritters.guidebook.already": "%s is already in your guide",
   "gui.diversityofcritters.guidebook.title1": "Diversity of Life",
   "gui.diversityofcritters.guidebook.title2": "Natural History",
   "gui.diversityofcritters.guidebook.intro": "This world is filled with many... many... and it deserves the guide book.",

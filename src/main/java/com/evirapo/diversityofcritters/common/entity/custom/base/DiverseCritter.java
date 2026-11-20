@@ -1319,6 +1319,21 @@ public abstract class DiverseCritter extends TamableAnimal
     public InteractionResult mobInteract(Player pPlayer, InteractionHand pHand) {
         ItemStack itemstack = pPlayer.getItemInHand(pHand);
 
+        // Right-clicking an animal with the guidebook registers its species for that player.
+        if (itemstack.is(DOCItems.GUIDEBOOK.get())) {
+            if (pPlayer instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                boolean added = com.evirapo.diversityofcritters.common.guidebook.GuidebookDiscoveries.discover(serverPlayer, this.getType());
+                serverPlayer.displayClientMessage(Component.translatable(added
+                        ? "message.diversityofcritters.guidebook.discovered"
+                        : "message.diversityofcritters.guidebook.already", this.getType().getDescription()), true);
+                if (added) {
+                    this.level().playSound(null, serverPlayer.blockPosition(), net.minecraft.sounds.SoundEvents.BOOK_PAGE_TURN,
+                            net.minecraft.sounds.SoundSource.PLAYERS, 1.0F, 1.0F);
+                }
+            }
+            return InteractionResult.sidedSuccess(this.level().isClientSide);
+        }
+
         if (itemstack.is(DOCItems.ZOO_BOOK.get())) {
             this.openGUI(pPlayer);
             return InteractionResult.SUCCESS;

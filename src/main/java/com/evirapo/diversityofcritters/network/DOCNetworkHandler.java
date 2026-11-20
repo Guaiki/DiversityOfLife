@@ -38,5 +38,9 @@ public class DOCNetworkHandler {
 
         CHANNEL.registerMessage(id++, FireTranquilizerMsg.class,
                 FireTranquilizerMsg::encode, FireTranquilizerMsg::decode, FireTranquilizerMsg::handle);
+
+        CHANNEL.registerMessage(id++, OpenGuidebookMsg.class,
+                OpenGuidebookMsg::encode, OpenGuidebookMsg::decode, OpenGuidebookMsg::handle,
+                java.util.Optional.of(net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT));
     }
 }
