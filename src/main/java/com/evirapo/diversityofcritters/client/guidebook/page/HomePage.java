@@ -26,7 +26,7 @@ public class HomePage extends BookPage {
     @Override
     public void init(GuidebookScreen screen, int left, int top) {
         int x = left + BookLayout.RIGHT_CENTER - BUTTON_W / 2;
-        button(screen, x, top + 30, "animal", null);
+        button(screen, x, top + 30, "animal", AnimalListPage::new);
         button(screen, x, top + 46, "plant", () -> new ComingSoonPage(key("plants"), key("plants_sub")));
         button(screen, x, top + 62, "other_life", () -> new ComingSoonPage(key("other_life"), key("other_life_sub")));
         button(screen, x, top + 85, "care", null);
