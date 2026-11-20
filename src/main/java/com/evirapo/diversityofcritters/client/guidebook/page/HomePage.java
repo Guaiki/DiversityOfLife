@@ -6,6 +6,7 @@ import com.evirapo.diversityofcritters.client.guidebook.BookPage;
 import com.evirapo.diversityofcritters.client.guidebook.BookText;
 import com.evirapo.diversityofcritters.client.guidebook.DiscordButton;
 import com.evirapo.diversityofcritters.client.guidebook.GuidebookScreen;
+import com.evirapo.diversityofcritters.client.guidebook.data.GuidebookData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,8 +30,8 @@ public class HomePage extends BookPage {
         button(screen, x, top + 30, "animal", AnimalListPage::new);
         button(screen, x, top + 46, "plant", () -> new ComingSoonPage(key("plants"), key("plants_sub")));
         button(screen, x, top + 62, "other_life", () -> new ComingSoonPage(key("other_life"), key("other_life_sub")));
-        button(screen, x, top + 85, "care", null);
-        button(screen, x, top + 101, "etc", null);
+        button(screen, x, top + 85, "care", () -> new RecipePage(key("care"), key("care_sub"), GuidebookData.care()));
+        button(screen, x, top + 101, "etc", () -> new RecipePage(key("etc"), key("etc_sub"), GuidebookData.etc()));
         button(screen, x, top + 124, "credit", CreditsPage::new);
         screen.addPageWidget(new DiscordButton(screen, x, top + 144, BUTTON_W, BUTTON_H));
     }
