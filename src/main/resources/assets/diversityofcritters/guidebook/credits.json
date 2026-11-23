@@ -1,4 +1,8 @@
 {
-  "names": ["Desmo", "PaleoGuy", "Void", "[developer name]"],
-  "discord": ""
+  "team": [
+    {"role": "owner", "names": ["Carlos the Guaiki"]},
+    {"role": "main_developer", "names": ["Darkblade"]},
+    {"role": "developers", "names": ["Desmo", "PaleoGuy", "Void"]}
+  ],
+  "discord": "https://discord.gg/Pwad2ZVjQM"
 }

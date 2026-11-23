@@ -14,8 +14,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Names on the credits page and the Discord invite, from {@code guidebook/credits.json}. */
-public record Credits(List<String> names, String discord) {
+/**
+ * The team on the credits page, grouped by role in the order they are shown, and the Discord invite,
+ * from {@code guidebook/credits.json}. Each role is a lang key suffix ({@code guidebook.role.<role>}).
+ */
+public record Credits(List<Group> team, String discord) {
+
+    public record Group(String role, List<String> names) {
+    }
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ResourceLocation FILE = new ResourceLocation(DiversityOfCritters.MODID, "guidebook/credits.json");
@@ -33,8 +39,13 @@ public record Credits(List<String> names, String discord) {
     }
 
     public static Credits fromJson(JsonObject json) {
-        List<String> names = new ArrayList<>();
-        GsonHelper.getAsJsonArray(json, "names").forEach(e -> names.add(e.getAsString()));
-        return new Credits(List.copyOf(names), GsonHelper.getAsString(json, "discord", ""));
+        List<Group> team = new ArrayList<>();
+        GsonHelper.getAsJsonArray(json, "team").forEach(e -> {
+            JsonObject group = GsonHelper.convertToJsonObject(e, "team entry");
+            List<String> names = new ArrayList<>();
+            GsonHelper.getAsJsonArray(group, "names").forEach(n -> names.add(n.getAsString()));
+            team.add(new Group(GsonHelper.getAsString(group, "role"), List.copyOf(names)));
+        });
+        return new Credits(List.copyOf(team), GsonHelper.getAsString(json, "discord", ""));
     }
 }
