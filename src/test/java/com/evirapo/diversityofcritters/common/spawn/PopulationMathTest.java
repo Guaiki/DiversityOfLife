@@ -1,5 +1,8 @@
 package com.evirapo.diversityofcritters.common.spawn;
 
+import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
+import com.evirapo.diversityofcritters.common.config.PopulationSettings;
+import com.evirapo.diversityofcritters.common.guidebook.ConservationTier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,5 +94,24 @@ class PopulationMathTest {
         assertEquals(-1, PopulationEvent.TAME.delta(1));
         assertEquals(3, PopulationEvent.RELEASE.delta(3));
         assertEquals(0, PopulationEvent.PLAYER_KILL.delta(0));
+    }
+
+    @Test
+    void startingPopulationFallsBackToTheBaseAndIsClamped() {
+        assertEquals(20, PopulationMath.startingPopulation(-1, 20, 5, 60));
+        assertEquals(8, PopulationMath.startingPopulation(8, 20, 5, 60));
+        assertEquals(5, PopulationMath.startingPopulation(2, 20, 5, 60));
+        assertEquals(60, PopulationMath.startingPopulation(99, 20, 5, 60));
+    }
+
+    @Test
+    void onlyTheSifakaStartsEndangeredWithTheDefaults() {
+        PopulationSettings population = DOCServerConfig.population();
+        for (String key : new String[]{"civet", "sifaka", "squirrel"}) {
+            int start = PopulationMath.startingPopulation(DOCServerConfig.forSpecies(key).startingPopulation(),
+                    population.basePopulation(), population.floor(), population.cap());
+            ConservationTier tier = ConservationTier.forWildPopulation(start, population.basePopulation(), population.endangeredThreshold());
+            assertEquals(key.equals("sifaka") ? ConservationTier.EN : ConservationTier.LC, tier, key);
+        }
     }
 }

@@ -37,6 +37,8 @@ public class SpeciesPage extends BookPage {
     private static final int TEXT_X0 = BookLayout.PHOTO_X0, TEXT_X1 = BookLayout.PHOTO_X1;
     private static final int FACT_Y0 = 104, FACT_Y1 = 166, FACT_LINE = 8;
     private static final int GRID_MARGIN = 2;
+    /** Ring legend above the status dots: centre line, swatch ring radius, and spacing. */
+    private static final int LEGEND_Y = BookLayout.DOT_Y - 13, LEGEND_RING = 3, LEGEND_PAD = 2, LEGEND_GAP = 8;
 
     private final SpeciesEntry entry;
     private final ResourceLocation background;
@@ -126,6 +128,7 @@ public class SpeciesPage extends BookPage {
         if (this.worldTier != null) {
             ring(g, left, top, this.worldTier, this.worldTier == this.entry.realStatus() ? BookLayout.MAX_RING_RADIUS : BookLayout.RING_RADIUS, RING_WORLD);
         }
+        ringLegend(g, font, left, top);
 
         // The box edges are one-pixel borders at both x0 and x1, so the middle is (x0 + x1 + 1) / 2.
         float dietCx = left + (BookLayout.DIET_X0 + BookLayout.DIET_X1 + 1) / 2.0F;
@@ -136,9 +139,41 @@ public class SpeciesPage extends BookPage {
         this.enrichment.render(g, left, top, mouseX, mouseY);
     }
 
+    /**
+     * Names the two rings just above the status dots: a small ringed dot in each colour followed by
+     * "Real world" or "This world", centred on the right page.
+     */
+    private void ringLegend(GuiGraphics g, Font font, int left, int top) {
+        Component real = HomePage.key("real_world"), world = HomePage.key("this_world");
+        int swatch = LEGEND_RING * 2 + 1;
+        float realW = (font.width(real) - 1) * BookText.SMALL, worldW = (font.width(world) - 1) * BookText.SMALL;
+        float total = swatch + LEGEND_PAD + realW + LEGEND_GAP + swatch + LEGEND_PAD + worldW;
+        float x = left + BookLayout.RIGHT_CENTER - total / 2.0F;
+        int cy = top + LEGEND_Y;
+        x = legendEntry(g, font, real, RING_REAL, x, cy) + LEGEND_GAP;
+        legendEntry(g, font, world, RING_WORLD, x, cy);
+    }
+
+    /** One legend entry starting at {@code x}; returns where it ends. */
+    private static float legendEntry(GuiGraphics g, Font font, Component label, int color, float x, int cy) {
+        int cx = Math.round(x) + LEGEND_RING;
+        g.fill(cx - 1, cy - 1, cx + 2, cy + 2, BookLayout.COLOR_TEXT);
+        ringAt(g, cx, cy, LEGEND_RING, color);
+        float textX = cx + LEGEND_RING + 1 + LEGEND_PAD;
+        g.pose().pushPose();
+        g.pose().translate(textX, cy - 3, 0);
+        g.pose().scale(BookText.SMALL, BookText.SMALL, 1);
+        g.drawString(font, label, 0, 0, BookLayout.COLOR_TEXT_SOFT, false);
+        g.pose().popPose();
+        return textX + (font.width(label) - 1) * BookText.SMALL;
+    }
+
     /** A one-pixel ring of {@code radius} around a status dot, corners cut so it reads as round. */
     private static void ring(GuiGraphics g, int left, int top, ConservationTier tier, int radius, int color) {
-        int cx = left + tier.dotX(), cy = top + BookLayout.DOT_Y;
+        ringAt(g, left + tier.dotX(), top + BookLayout.DOT_Y, radius, color);
+    }
+
+    private static void ringAt(GuiGraphics g, int cx, int cy, int radius, int color) {
         int x0 = cx - radius, x1 = cx + radius + 1, y0 = cy - radius, y1 = cy + radius + 1;
         g.fill(x0 + 2, y0, x1 - 2, y0 + 1, color);
         g.fill(x0 + 2, y1 - 1, x1 - 2, y1, color);

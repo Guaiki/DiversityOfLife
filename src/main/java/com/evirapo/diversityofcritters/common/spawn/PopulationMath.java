@@ -31,6 +31,11 @@ public final class PopulationMath {
         return Math.max(0.0D, Math.min(1.0D, chanceBase * multiplier));
     }
 
+    /** A species' starting population: its own if configured (0 or more), else the base; clamped. */
+    public static int startingPopulation(int configured, int basePopulation, int floor, int cap) {
+        return clamp(configured >= 0 ? configured : basePopulation, floor, cap);
+    }
+
     /**
      * Version 1 stored how many animals had been released, on top of an implicit baseline. The
      * baseline is now explicit, so it gets added.

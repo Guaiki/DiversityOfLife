@@ -53,7 +53,7 @@ public class WildPopulation extends SavedData {
     /** Population, safe to read from any thread. Before the save is loaded, the base population. */
     public static int cachedPopulation(DOCSpecies species) {
         int cached = populationCache[species.ordinal()];
-        return cached != UNKNOWN ? cached : defaultPopulation();
+        return cached != UNKNOWN ? cached : defaultPopulation(species);
     }
 
     /** Called when the server stops, so one world's data does not leak into the next. */
@@ -69,9 +69,11 @@ public class WildPopulation extends SavedData {
         populationCache = snapshot;
     }
 
-    private static int defaultPopulation() {
+    /** What a species has before anything is stored: its configured starting population. */
+    private static int defaultPopulation(DOCSpecies species) {
         PopulationSettings settings = DOCServerConfig.population();
-        return settings.clamp(settings.basePopulation());
+        return PopulationMath.startingPopulation(species.settings().startingPopulation(),
+                settings.basePopulation(), settings.floor(), settings.cap());
     }
 
     // ==============================
@@ -102,7 +104,7 @@ public class WildPopulation extends SavedData {
 
     public int get(DOCSpecies species) {
         Integer stored = this.populations.get(species);
-        return stored != null ? stored : defaultPopulation();
+        return stored != null ? stored : defaultPopulation(species);
     }
 
     /**
@@ -125,10 +127,10 @@ public class WildPopulation extends SavedData {
         return write(species, population, server);
     }
 
-    /** Back to the base population, with a clean history. Only for {@code /doc_spawn reset}. */
+    /** Back to the starting population, with a clean history. Only for {@code /doc_spawn reset}. */
     public void reset(DOCSpecies species, MinecraftServer server) {
         this.history.remove(species);
-        set(species, DOCServerConfig.population().basePopulation(), server);
+        set(species, defaultPopulation(species), server);
     }
 
     public void resetAll(MinecraftServer server) {

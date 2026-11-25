@@ -20,12 +20,18 @@ public final class SpeciesSpawnSettings {
         FORBIDDEN
     }
 
-    /** A species' default values, used both by the spec and by the initial cache. */
+    /** Marks a species that starts at the shared {@code basePopulation}. */
+    public static final int BASE_STARTING_POPULATION = -1;
+
+    /**
+     * A species' default values, used both by the spec and by the initial cache.
+     * {@code startingPopulation} is {@link #BASE_STARTING_POPULATION} to start at the shared base.
+     */
     public record Defaults(double spawnChance, int groupMin, int groupMax,
-                           int minY, int maxY, int maxBlockLight, SkyAccess skyAccess) {
+                           int minY, int maxY, int maxBlockLight, SkyAccess skyAccess, int startingPopulation) {
 
         public Snapshot toSnapshot() {
-            return new Snapshot(true, spawnChance, groupMin, groupMax, minY, maxY, maxBlockLight, skyAccess);
+            return new Snapshot(true, spawnChance, groupMin, groupMax, minY, maxY, maxBlockLight, skyAccess, startingPopulation);
         }
     }
 
@@ -36,7 +42,7 @@ public final class SpeciesSpawnSettings {
      * path invoked hundreds of times per tick during the natural spawn cycle.
      */
     public record Snapshot(boolean enabled, double spawnChance, int groupMin, int groupMax,
-                           int minY, int maxY, int maxBlockLight, SkyAccess skyAccess) {}
+                           int minY, int maxY, int maxBlockLight, SkyAccess skyAccess, int startingPopulation) {}
 
     public final ForgeConfigSpec.BooleanValue enabled;
     public final ForgeConfigSpec.DoubleValue spawnChance;
@@ -46,6 +52,7 @@ public final class SpeciesSpawnSettings {
     public final ForgeConfigSpec.IntValue maxY;
     public final ForgeConfigSpec.IntValue maxBlockLight;
     public final ForgeConfigSpec.EnumValue<SkyAccess> skyAccess;
+    public final ForgeConfigSpec.IntValue startingPopulation;
 
     SpeciesSpawnSettings(ForgeConfigSpec.Builder builder, String key, String displayName, Defaults d) {
         builder.comment("Natural spawn settings for the " + displayName + ".").push(key);
@@ -89,6 +96,12 @@ public final class SpeciesSpawnSettings {
                          "  FORBIDDEN = must be under cover or canopy")
                 .defineEnum("skyAccess", d.skyAccess());
 
+        this.startingPopulation = builder
+                .comment("Wild population a new world starts with for this species. -1 = the shared basePopulation.",
+                         "Below endangeredThreshold the species starts endangered (and spawns less until it recovers).",
+                         "Only applies while the world has no stored population for the species.")
+                .defineInRange("startingPopulation", d.startingPopulation(), BASE_STARTING_POPULATION, 100_000);
+
         builder.pop();
     }
 
@@ -102,7 +115,8 @@ public final class SpeciesSpawnSettings {
                 this.minY.get(),
                 this.maxY.get(),
                 this.maxBlockLight.get(),
-                this.skyAccess.get()
+                this.skyAccess.get(),
+                this.startingPopulation.get()
         );
     }
 }
