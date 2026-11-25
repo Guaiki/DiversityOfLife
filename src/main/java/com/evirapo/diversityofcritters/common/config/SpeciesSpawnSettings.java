@@ -98,7 +98,8 @@ public final class SpeciesSpawnSettings {
 
         this.startingPopulation = builder
                 .comment("Wild population a new world starts with for this species. -1 = the shared basePopulation.",
-                         "Below endangeredThreshold the species starts endangered (and spawns less until it recovers).",
+                         "The defaults match each species' real-world IUCN status: with the default population settings,",
+                         "5 or less is CR, 6-9 EN, 10-14 VU, 15-19 NT and 20 or more LC. Below basePopulation it spawns less.",
                          "Only applies while the world has no stored population for the species.")
                 .defineInRange("startingPopulation", d.startingPopulation(), BASE_STARTING_POPULATION, 100_000);
 

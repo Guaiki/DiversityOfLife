@@ -3,7 +3,13 @@ package com.evirapo.diversityofcritters.common.spawn;
 import com.evirapo.diversityofcritters.common.config.DOCServerConfig;
 import com.evirapo.diversityofcritters.common.config.PopulationSettings;
 import com.evirapo.diversityofcritters.common.guidebook.ConservationTier;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
+
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -99,19 +105,23 @@ class PopulationMathTest {
     @Test
     void startingPopulationFallsBackToTheBaseAndIsClamped() {
         assertEquals(20, PopulationMath.startingPopulation(-1, 20, 5, 60));
-        assertEquals(8, PopulationMath.startingPopulation(8, 20, 5, 60));
+        assertEquals(17, PopulationMath.startingPopulation(17, 20, 5, 60));
         assertEquals(5, PopulationMath.startingPopulation(2, 20, 5, 60));
         assertEquals(60, PopulationMath.startingPopulation(99, 20, 5, 60));
     }
 
     @Test
-    void onlyTheSifakaStartsEndangeredWithTheDefaults() {
+    void everySpeciesStartsAtItsRealWorldStatusWithTheDefaults() throws Exception {
         PopulationSettings population = DOCServerConfig.population();
         for (String key : new String[]{"civet", "sifaka", "squirrel"}) {
+            String path = "/assets/diversityofcritters/guidebook/animals/" + key + ".json";
+            ConservationTier real;
+            try (Reader reader = new InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream(path)), StandardCharsets.UTF_8)) {
+                real = ConservationTier.valueOf(JsonParser.parseReader(reader).getAsJsonObject().get("status").getAsString());
+            }
             int start = PopulationMath.startingPopulation(DOCServerConfig.forSpecies(key).startingPopulation(),
                     population.basePopulation(), population.floor(), population.cap());
-            ConservationTier tier = ConservationTier.forWildPopulation(start, population.basePopulation(), population.endangeredThreshold());
-            assertEquals(key.equals("sifaka") ? ConservationTier.EN : ConservationTier.LC, tier, key);
+            assertEquals(real, ConservationTier.forWildPopulation(start, population.basePopulation(), population.endangeredThreshold()), key);
         }
     }
 }

@@ -26,15 +26,15 @@ public final class DOCServerConfig {
     //       PER-SPECIES DEFAULTS
     // ==============================
 
-    /** Banded palm civet: jungle, nocturnal, arboreal. */
+    /** Banded palm civet: jungle, nocturnal, arboreal. Near threatened in reality, so it starts NT. */
     private static final Defaults CIVET_DEFAULTS =
-            new Defaults(0.45D, 2, 4, 55, 140, 7, SkyAccess.NONE, SpeciesSpawnSettings.BASE_STARTING_POPULATION);
+            new Defaults(0.45D, 2, 4, 55, 140, 7, SkyAccess.NONE, 17);
 
-    /** Verreaux's sifaka: savanna, diurnal, open country. Critically endangered in reality, so it starts endangered. */
+    /** Verreaux's sifaka: savanna, diurnal, open country. Critically endangered in reality, so it starts CR, at the floor. */
     private static final Defaults SIFAKA_DEFAULTS =
-            new Defaults(0.05D, 2, 4, 60, 120, 15, SkyAccess.REQUIRED, 8);
+            new Defaults(0.05D, 2, 4, 60, 120, 15, SkyAccess.REQUIRED, 5);
 
-    /** Red and white giant flying squirrel: forest and taiga, arboreal. */
+    /** Red and white giant flying squirrel: forest and taiga, arboreal. Least concern, so it starts at the base. */
     private static final Defaults SQUIRREL_DEFAULTS =
             new Defaults(0.65D, 2, 4, 60, 130, 12, SkyAccess.NONE, SpeciesSpawnSettings.BASE_STARTING_POPULATION);
 

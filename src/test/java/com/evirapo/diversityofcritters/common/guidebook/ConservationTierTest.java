@@ -18,7 +18,8 @@ class ConservationTierTest {
         int base = 20, threshold = 10;
         assertEquals(ConservationTier.EW, ConservationTier.forWildPopulation(0, base, threshold));
         assertEquals(ConservationTier.CR, ConservationTier.forWildPopulation(4, base, threshold));
-        assertEquals(ConservationTier.EN, ConservationTier.forWildPopulation(5, base, threshold));
+        assertEquals(ConservationTier.CR, ConservationTier.forWildPopulation(5, base, threshold));
+        assertEquals(ConservationTier.EN, ConservationTier.forWildPopulation(6, base, threshold));
         assertEquals(ConservationTier.EN, ConservationTier.forWildPopulation(9, base, threshold));
         assertEquals(ConservationTier.VU, ConservationTier.forWildPopulation(10, base, threshold));
         assertEquals(ConservationTier.VU, ConservationTier.forWildPopulation(14, base, threshold));
